@@ -5,6 +5,7 @@ while user annotations are merged only after the repository locks its ledger.
 """
 
 import re
+from copy import deepcopy
 from typing import NotRequired, TypedDict
 
 from .accounts import ACCOUNT_TYPES, normalize_account
@@ -132,6 +133,12 @@ def imported_account(record: ImportedAccount) -> dict:
 def annotated_transaction(record: ImportedTransaction, annotations: dict, *, categories=None) -> dict:
     """Apply the latest user edits to a normalized bank record."""
     validate_imported_transaction(record)
+    if annotations.get('voided') and annotations.get('id') == record['id']:
+        # A source refresh cannot amend the exact record the user excluded. Its
+        # add/modify event only proves this identity still exists at the provider.
+        frozen = deepcopy(annotations)
+        frozen.pop('providerDeleted', None)
+        return frozen
     category = (
         annotations.get("categoryId")
         if annotations.get("categoryEdited")
@@ -181,4 +188,26 @@ def annotated_transaction(record: ImportedTransaction, annotations: dict, *, cat
         # Untouched legacy invalid flags await explicit cleanup, not upgrade/sync.
         if (not old_eligible or not new_eligible) and (old_eligible or new_eligible or result['pending'] != annotations.get('pending', False)):
             result['reviewed'] = False
+    if annotations.get('voided'):
+        # A posted replacement has a new provider identity and evidence, but
+        # inherits the pending record's explicit exclusion rather than reviving it.
+        result.update(voided=True, deleted=True, reviewed=False)
+    elif 'voided' in annotations:
+        result['voided'] = False
     return result
+
+
+def sync_annotations(existing, pending):
+    """An explicitly voided predecessor cannot be bypassed by a posting retry."""
+    if existing and 'voided' in existing:
+        return existing
+    if pending and pending.get('voided'):
+        return {**existing, 'voided': True, 'deleted': True, 'reviewed': False} if existing else pending
+    return existing or pending or {}
+
+
+def mark_provider_removed(transaction):
+    """Retain provider removal separately from an explicit user tombstone."""
+    transaction['deleted'] = True
+    if transaction.get('voided'):
+        transaction['providerDeleted'] = True

@@ -231,7 +231,7 @@ def _pack_ledger(state, *, portable=False, complete_associations=True):
 
 def decode(raw):
     value = parse(raw)
-    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2, 3, 4, 5}:
+    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2, 3, 4, 5, 6}:
         raise StoreError("This JSON storage schema is newer or unsupported; install a compatible plugin.")
     fields = {"formatVersion", "generation", "operationId", "authorityEpoch", "workspaces"}
     _exact(value, fields | ({"authority"} if value["formatVersion"] >= 2 else set()))
@@ -299,8 +299,18 @@ def retains_pairs(state):
                    for row in (change['before'], change['after'])))
 
 
+def retains_voids(state):
+    """Require tombstone semantics for intent retained in data or history."""
+    journal = state.get('history') or {}
+    return (any('voided' in row for row in state['transactions'].values())
+            or any('voided' in row for row in journal.get('baseline', {}).get('transactions', ()))
+            or any(row is not None and 'voided' in row for entry in journal.get('entries', ())
+                   for change in entry['changes'] if change['path'][0] == 'transactions'
+                   for row in (change['before'], change['after'])))
+
+
 def export_files(state):
-    value = {"formatVersion": 2 if retains_pairs(state) else 1, **_pack_ledger(state, portable=True)}
+    value = {"formatVersion": 3 if retains_voids(state) else 2 if retains_pairs(state) else 1, **_pack_ledger(state, portable=True)}
     return {"budget.json": serialize(value, MAX_PORTABLE_BYTES)}
 
 
@@ -327,6 +337,6 @@ def read_files(files):
         raise StoreError("JSON budgets require exactly one budget.json payload.")
     value = parse(files["budget.json"], MAX_PORTABLE_BYTES)
     _exact(value, {"formatVersion", "ledger", "items", "associations", "receipts", "importReceipt"})
-    if type(value["formatVersion"]) is not int or value["formatVersion"] not in {1, 2} or value["items"] or value["associations"]:
+    if type(value["formatVersion"]) is not int or value["formatVersion"] not in {1, 2, 3} or value["items"] or value["associations"]:
         raise StoreError("JSON portable budgets cannot contain protected provider records.")
     return _read_ledger({key: row for key, row in value.items() if key != "formatVersion"}, "personal", portable=True)

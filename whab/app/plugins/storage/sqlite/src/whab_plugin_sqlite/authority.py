@@ -100,7 +100,7 @@ class Authority:
         if type(row[0]) is not bytes:
             raise StoreError("Invalid SQLite storage authority metadata.")
         metadata = read_storage_json(row[0])
-        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3, 4, 5}:
+        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3, 4, 5, 6}:
             raise StoreError("Invalid SQLite storage authority metadata.")
         if metadata.keys() != {
             "formatVersion", "budgetId", "environment", "instanceId", "authorityEpoch", "generation",
@@ -462,6 +462,9 @@ class Authority:
             from whab.domain.transfer_matching import validate_pairs
             pairs = validate_pairs(payload['pairs'], reviewed=payload.get('reviewed', False))
             selected = [identifier for pair in pairs for identifier in (pair['outId'], pair['inId'])]
+        elif name == 'apply_transaction_void':
+            from whab.domain.transaction_voids import validate_void_ids
+            selected = validate_void_ids(payload['transactionIds'])
         elif name == 'classify_accounts':
             selected = ()
         with self._authority_write(workspace=operation.workspace, transaction_ids=selected) as transaction:

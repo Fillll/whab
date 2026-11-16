@@ -31,14 +31,14 @@ _COLLECTIONS = {
 _FIELDS = {
     'accounts': (ACCOUNT_FIELDS, {'bankWebsite', 'nameOverridden', 'closed'}),
     'categories': (CATEGORY_FIELDS, {'kind'}),
-    'transactions': (TRANSACTION_FIELDS, {'categoryAgent', 'original', 'transferPeerId'}),
+    'transactions': (TRANSACTION_FIELDS, {'categoryAgent', 'original', 'transferPeerId', 'voided', 'providerDeleted'}),
     'assignments': (ASSIGNMENT_FIELDS, set()),
     'futureFunding': (FUTURE_FUNDING_FIELDS, set()),
     'rolloverModes': (ROLLOVER_MODE_FIELDS, set()),
     'categoryGroups': ({'id', 'name'}, set()),
 }
 REVERSIBLE = frozenset({'match_transfer', 'apply_transfer_match', 'match_transfers', 'apply_transfer_matches',
-    'repair_transfers', 'repair_transfer_matches',
+    'repair_transfers', 'repair_transfer_matches', 'void_transactions', 'unvoid_transactions',
     'add_account', 'update_account', 'add_category', 'add_category_group', 'move_category', 'delete_category', 'delete_category_group', 'add_transaction',
     'edit_transactions', 'change_transactions', 'classify_accounts', 'edit_transaction', 'edit_transaction_details', 'review_transactions', 'classify_category', 'rename_category', 'append_transaction_note',
     'assign', 'assign_next_month', 'set_rollover_mode',
@@ -321,11 +321,19 @@ def apply_to_state(state, wanted):
     if any(identifier not in candidate['transactions'] for identifier in state.get('receipts', {})):
         raise StoreError('This reversal would orphan a receipt attachment.')
     from .review import review_status
-    from .transfer_matching import incoming_links, valid_pair
+    from .transfer_matching import archived_pair, incoming_links, valid_pair
     current_context = {'transactions': state['transactions'], 'accounts': state['accounts'], 'incoming': incoming_links(state['transactions'])}
     candidate_context = {'transactions': candidate['transactions'], 'accounts': candidate['accounts'], 'incoming': incoming_links(candidate['transactions'])}
     for identifier, row in candidate['transactions'].items():
         previous = state['transactions'].get(identifier, {})
+        if row.get('voided'):
+            if row.get('transferPeerId') and not archived_pair(row, candidate['transactions'], candidate['accounts'], candidate['categories'], incoming=candidate_context['incoming']):
+                raise StoreError(f'{identifier}: This reversal would restore an incomplete voided transfer pair.')
+            continue
+        if previous.get('voided') and previous.get('providerDeleted'):
+            raise StoreError(f'{identifier}: This reversal would restore a provider-removed transaction.')
+        if previous.get('voided') and row.get('transferPeerId') and not valid_pair(row, candidate['transactions'], candidate['accounts'], candidate['categories'], incoming=candidate_context['incoming']):
+            raise StoreError(f'{identifier}: This reversal would restore an incomplete transfer pair.')
         if candidate['categories'].get(row.get('categoryId'), {}).get('kind') == 'transfer':
             if (not valid_pair(row, candidate['transactions'], candidate['accounts'], candidate['categories'], incoming=candidate_context['incoming'])
                     and (previous.get('categoryId') != row.get('categoryId')

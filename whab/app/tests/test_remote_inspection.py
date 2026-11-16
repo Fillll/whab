@@ -9,6 +9,7 @@ from whab.plugins import LedgerService, PreflightInspection, StoreError
 from whab.plugins.remote_transport import RemoteStore
 
 POLICIES = {
+    'transaction_void_policy': {'version': 1, 'maxTransactions': 100, 'durableTombstones': True},
     'opening_balance_policy': {'version': 1, 'categoryType': 'opening_balance',
                                'zeroAmountReview': True, 'preservesBalances': True},
     'review_policy': {'version': 1, 'classificationRequired': True},
@@ -27,6 +28,7 @@ def remote(handler):
 
 
 @pytest.mark.parametrize('method,operation', [
+    ('supports_transaction_voiding', 'transaction_void_policy'),
     ('supports_opening_balances', 'opening_balance_policy'),
     ('supports_classified_review', 'review_policy'),
     ('supports_atomic_transaction_changes', 'transaction_change_policy'),

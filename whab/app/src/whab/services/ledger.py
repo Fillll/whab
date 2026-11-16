@@ -580,6 +580,28 @@ class LedgerService:
         )):
             raise StoreError('Update the storage backend/authority for reversible atomic voids with durable tombstones, history and exact retries. Nothing was changed.')
 
+    def _guard_void_history(self, workspace, payload):
+        """An older authority must not undo away a user/provider tombstone."""
+        inspection = getattr(self._store, 'inspection_scope', None)
+        with inspection() if callable(inspection) else nullcontext():
+            supported = getattr(self._store, 'supports_transaction_voiding', None)
+            if callable(supported):
+                try:
+                    if supported() is True:
+                        return
+                except StoreError:
+                    pass
+            preview = getattr(self._store, 'history_preview', None)
+            plan = preview(workspace, payload['action'], target=payload.get('target')) if callable(preview) else None
+            if type(plan) is not dict or type(plan.get('changes')) is not list:
+                raise StoreError('Update the storage backend to verify reversible void history. Nothing was changed.')
+            def has_void(value):
+                if isinstance(value, dict):
+                    return 'voided' in value or 'providerDeleted' in value or any(has_void(row) for row in value.values())
+                return isinstance(value, list) and any(has_void(row) for row in value)
+            if has_void(plan['changes']):
+                self._require_transaction_voiding()
+
     def _require_transfer_matching(self):
         supported = getattr(self._store, 'supports_transfer_matching', None)
         if not callable(supported) or supported() is not True or not all(callable(getattr(self._store, name, None)) for name in (
@@ -747,6 +769,8 @@ class LedgerService:
             if operation not in {'feature', 'categorization'}:
                 self._guard_opening_balances(workspace, payload, history=operation == 'history_apply')
                 self._guard_transfer_integrity(workspace, payload, history=operation == 'history_apply')
+                if operation == 'history_apply':
+                    self._guard_void_history(workspace, payload)
             response_revision = str(uuid4())
             durable_scope = getattr(self._store, "durable_command_scope", None)
             scope = (durable_scope(request_id, fingerprint, response_revision)

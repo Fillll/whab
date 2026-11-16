@@ -351,12 +351,12 @@ class RemoteStore:
                 and policy.get('maxTransactions') == 100 and policy.get('durableTombstones') is True)
 
     def preview_transaction_void(self, workspace, transaction_ids, action):
-        if action not in {'void', 'unvoid'}:
+        if type(action) is not str or action not in {'void', 'unvoid'}:
             raise StoreError('Choose void or unvoid.')
         return self._query('preview_' + action + '_transactions', workspace, parameters={'transactionIds': transaction_ids})
 
     def apply_transaction_void(self, workspace, transaction_ids, action, fingerprint):
-        if action not in {'void', 'unvoid'}:
+        if type(action) is not str or action not in {'void', 'unvoid'}:
             raise StoreError('Choose void or unvoid.')
         return self._command(action + '_transactions', workspace, {'transactionIds': transaction_ids, 'fingerprint': fingerprint})
 

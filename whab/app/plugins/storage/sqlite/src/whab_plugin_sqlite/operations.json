@@ -4619,6 +4619,521 @@
         }
       ],
       "side_effects": "Read only capability declaration."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One explicitly addressed budget/environment/workspace. Each account keeps its own currency; no conversion or cross-budget writes.",
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.82+, TransactionVoiding native capability or compatible remote authority.",
+      "errors": [
+        "One missing, duplicated, provider-only deleted, invalid or incomplete paired target rejects the complete 1–100-ID operation before mutation.",
+        "Unvoid requires a user-void tombstone and refuses a later provider deletion. Invalid legacy transfer state must be repaired explicitly first.",
+        "Stale revision/fingerprint or conflicting request-ID reuse rejects without changes. Unsupported authorities fail before mutation.",
+        "Uncertain outcomes retain the entire original intent; never retry with a new request ID."
+      ],
+      "name": "TransactionVoiding.preview_transaction_void",
+      "kind": "sdk",
+      "summary": "Preview or apply a complete explicit void/unvoid batch with exact records and account balance changes.",
+      "input": {
+        "type": "object",
+        "description": "Explicit transaction selection and preview guard.",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Exact stable transaction ID, never a fuzzy merchant/name match."
+            },
+            "description": "Explicit ordered IDs; include both legs of each reciprocal pair. No implicit expansion or splitting."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "void",
+              "unvoid"
+            ],
+            "description": "Explicit reversible exclusion or restoration of selected identities."
+          }
+        },
+        "required": [
+          "transactionIds",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Complete deterministic preview or saved receipt; no truncation.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Requested reversible exclusion action.",
+            "enum": [
+              "void",
+              "unvoid"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of explicit transaction IDs."
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Number of records changed by this exact operation."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact preview fingerprint; retain it with revision, request ID and attribution for recovery."
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "Complete public before/after records in requested order; exact identity, financial fields, notes and source evidence remain inspectable.",
+            "items": {
+              "type": "object",
+              "description": "One exact record change.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID, never a fuzzy merchant/name match."
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact saved public record, including source/original evidence and user/provider tombstones when present."
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact proposed/saved record; void changes exclusion/review markers, unvoid restores eligibility without marking reviewed."
+                }
+              },
+              "required": [
+                "id",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "balanceChanges": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "description": "Exact balance comparison for an affected account, including unchanged imported snapshots.",
+              "properties": {
+                "accountId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID, never a fuzzy merchant/name match."
+                },
+                "accountType": {
+                  "type": "string",
+                  "description": "Saved account type; credit/loan/other_liability carry positive amounts owed."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "Account currency; amounts are integer minor units."
+                },
+                "before": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Exact current account balance snapshot, null when unknown."
+                },
+                "after": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Proposed/saved balance; imported-source corrections preserve the snapshot. Manual/demo effects are reversed/restored according to account type."
+                }
+              },
+              "required": [
+                "accountId",
+                "accountType",
+                "currency",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Every affected account snapshot and its explicit balance policy outcome."
+          }
+        },
+        "required": [
+          "action",
+          "count",
+          "changed",
+          "fingerprint",
+          "changes",
+          "balanceChanges"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-import"
+            ],
+            "action": "void"
+          },
+          "output": {
+            "action": "void",
+            "count": 1,
+            "changed": 1,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "changes": [
+              {
+                "id": "fictional-import",
+                "before": {
+                  "id": "fictional-import",
+                  "accountId": "fictional-cash",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional shop  ",
+                  "merchantLogo": null,
+                  "amount": 2500,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "source": "ynab",
+                  "note": "[YNAB: uncleared]\nExact note",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false,
+                  "transferPeerId": null
+                },
+                "after": {
+                  "id": "fictional-import",
+                  "accountId": "fictional-cash",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional shop  ",
+                  "merchantLogo": null,
+                  "amount": 2500,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "source": "ynab",
+                  "note": "[YNAB: uncleared]\nExact note",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": true,
+                  "transferPeerId": null,
+                  "voided": true
+                }
+              }
+            ],
+            "balanceChanges": [
+              {
+                "accountId": "fictional-cash",
+                "accountType": "depository",
+                "currency": "USD",
+                "before": 100000,
+                "after": 100000
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read-only exact preview: no revision reservation, mutation, audit, save or bank synchronization."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One explicitly addressed budget/environment/workspace. Each account keeps its own currency; no conversion or cross-budget writes.",
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.82+, TransactionVoiding native capability or compatible remote authority.",
+      "errors": [
+        "One missing, duplicated, provider-only deleted, invalid or incomplete paired target rejects the complete 1–100-ID operation before mutation.",
+        "Unvoid requires a user-void tombstone and refuses a later provider deletion. Invalid legacy transfer state must be repaired explicitly first.",
+        "Stale revision/fingerprint or conflicting request-ID reuse rejects without changes. Unsupported authorities fail before mutation.",
+        "Uncertain outcomes retain the entire original intent; never retry with a new request ID."
+      ],
+      "name": "TransactionVoiding.apply_transaction_void",
+      "kind": "sdk",
+      "summary": "Preview or apply a complete explicit void/unvoid batch with exact records and account balance changes.",
+      "input": {
+        "type": "object",
+        "description": "Explicit transaction selection and preview guard.",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Exact stable transaction ID, never a fuzzy merchant/name match."
+            },
+            "description": "Explicit ordered IDs; include both legs of each reciprocal pair. No implicit expansion or splitting."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact preview fingerprint; retain it with revision, request ID and attribution for recovery."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "void",
+              "unvoid"
+            ],
+            "description": "Explicit reversible exclusion or restoration of selected identities."
+          }
+        },
+        "required": [
+          "transactionIds",
+          "fingerprint",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Complete deterministic preview or saved receipt; no truncation.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Requested reversible exclusion action.",
+            "enum": [
+              "void",
+              "unvoid"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of explicit transaction IDs."
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Number of records changed by this exact operation."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact preview fingerprint; retain it with revision, request ID and attribution for recovery."
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "description": "Complete public before/after records in requested order; exact identity, financial fields, notes and source evidence remain inspectable.",
+            "items": {
+              "type": "object",
+              "description": "One exact record change.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID, never a fuzzy merchant/name match."
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact saved public record, including source/original evidence and user/provider tombstones when present."
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact proposed/saved record; void changes exclusion/review markers, unvoid restores eligibility without marking reviewed."
+                }
+              },
+              "required": [
+                "id",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "balanceChanges": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "description": "Exact balance comparison for an affected account, including unchanged imported snapshots.",
+              "properties": {
+                "accountId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID, never a fuzzy merchant/name match."
+                },
+                "accountType": {
+                  "type": "string",
+                  "description": "Saved account type; credit/loan/other_liability carry positive amounts owed."
+                },
+                "currency": {
+                  "type": "string",
+                  "description": "Account currency; amounts are integer minor units."
+                },
+                "before": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Exact current account balance snapshot, null when unknown."
+                },
+                "after": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Proposed/saved balance; imported-source corrections preserve the snapshot. Manual/demo effects are reversed/restored according to account type."
+                }
+              },
+              "required": [
+                "accountId",
+                "accountType",
+                "currency",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Every affected account snapshot and its explicit balance policy outcome."
+          }
+        },
+        "required": [
+          "action",
+          "count",
+          "changed",
+          "fingerprint",
+          "changes",
+          "balanceChanges"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-import"
+            ],
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "action": "void"
+          },
+          "output": {
+            "action": "void",
+            "count": 1,
+            "changed": 1,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "changes": [
+              {
+                "id": "fictional-import",
+                "before": {
+                  "id": "fictional-import",
+                  "accountId": "fictional-cash",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional shop  ",
+                  "merchantLogo": null,
+                  "amount": 2500,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "source": "ynab",
+                  "note": "[YNAB: uncleared]\nExact note",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false,
+                  "transferPeerId": null
+                },
+                "after": {
+                  "id": "fictional-import",
+                  "accountId": "fictional-cash",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional shop  ",
+                  "merchantLogo": null,
+                  "amount": 2500,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "source": "ynab",
+                  "note": "[YNAB: uncleared]\nExact note",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": true,
+                  "transferPeerId": null,
+                  "voided": true
+                }
+              }
+            ],
+            "balanceChanges": [
+              {
+                "accountId": "fictional-cash",
+                "accountType": "depository",
+                "currency": "USD",
+                "before": 100000,
+                "after": 100000
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One native atomic commit, one revision, one coherent exact before/after audit entry and one synchronous durable checkpoint. Exact retries return the original receipt without duplicate mutation/history/save, including after restart. User tombstones survive refresh/reimport; later provider removals prevent unvoid. No record deletion, fabricated reversal, new zero record, bank sync or future rule. Guarded history reversals preserve the same financial safety."
+    },
+    {
+      "kind": "sdk",
+      "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
+      "scope": "One budget/environment/workspace.",
+      "errors": [
+        "Missing or false capability refuses transaction voiding before mutation."
+      ],
+      "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
+      "availability": "WHAB 2.82+, SQLite 1.30+ or JSON 1.22+.",
+      "name": "TransactionVoiding.supports_transaction_voiding",
+      "summary": "Advertise atomic reversible voids, source-preserving tombstones and guarded restoration.",
+      "input": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false,
+        "description": "Public callback parameters."
+      },
+      "output": {
+        "type": "boolean",
+        "description": "True only when the complete public contract is supported."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": true
+        }
+      ],
+      "side_effects": "Read only capability declaration."
     }
   ]
 }

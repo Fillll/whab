@@ -10,7 +10,7 @@ from .store import Store
 
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
-_FORMAT_VERSION = 2
+_FORMAT_VERSION = 3
 _ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized", "tx_uncategorized_recent", "tx_transfer_peer")
 _ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000, "transaction_receipts": 10000, "budget_history": 1}
 
@@ -31,6 +31,7 @@ def _without_additive_columns(schema):
             else (*row[:3], row[3].replace(", closed_account_cursors TEXT", "")) if row[1] == 'items'
             else (*row[:3], row[3].replace(", category_groups TEXT", "")) if row[1] == "meta"
             else (*row[:3], row[3].replace(", kind TEXT", "")) if row[1] == "categories"
+            else (*row[:3], row[3].replace(", voided INTEGER", "").replace(", provider_deleted INTEGER NOT NULL DEFAULT 0", "")) if row[1] == "transactions"
             else row for row in schema]
 
 
@@ -58,7 +59,7 @@ def _build_image(raw, previous, journal, hints):
     if len(positions) != 1:
         return None
     changes = entries[positions[0] + 1:]
-    if not changes or any(entry['operation'] not in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts', 'match_transfers'}
+    if not changes or any(entry['operation'] not in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts', 'match_transfers', 'void_transactions', 'unvoid_transactions'}
                           or any(change['path'][0] not in {'accounts', 'transactions'} or change['before'] is None or change['after'] is None
                                  for change in entry['changes']) for entry in changes):
         return None
@@ -67,12 +68,23 @@ def _build_image(raw, previous, journal, hints):
     clean = sqlite3.connect(':memory:')
     try:
         clean.deserialize(raw)
-        if any(row is not None and row.get('transferPeerId') for entry in changes
+        voids = any(row is not None and 'voided' in row for entry in changes
+                    for change in entry['changes'] if change['path'][0] == 'transactions'
+                    for row in (change['before'], change['after']))
+        if voids:
+            present = {row[1] for row in clean.execute("PRAGMA table_info(transactions)")}
+            for column in ('voided', 'provider_deleted'):
+                if column not in present:
+                    declaration = "INTEGER" if column == "voided" else "INTEGER NOT NULL DEFAULT 0"
+                    clean.execute(f"ALTER TABLE transactions ADD COLUMN {column} {declaration}")
+            clean.execute(f"PRAGMA user_version={_FORMAT_VERSION}")
+        elif any(row is not None and row.get('transferPeerId') for entry in changes
                for change in entry['changes'] if change['path'][0] == 'transactions'
                for row in (change['before'], change['after'])):
             # Fence the first pairing even when its save uses only bounded
             # record deltas against a previously exported format-1 image.
-            clean.execute(f"PRAGMA user_version={_FORMAT_VERSION}")
+            clean.execute(f"PRAGMA user_version={max(2, clean.execute('PRAGMA user_version').fetchone()[0])}")
+        void_columns = "voided" in {row[1] for row in clean.execute("PRAGMA table_info(transactions)")}
         for entry in changes:
             for change in entry['changes']:
                 row = change['after']
@@ -80,8 +92,8 @@ def _build_image(raw, previous, journal, hints):
                     clean.execute("UPDATE accounts SET name=?,type=?,balance=?,currency=?,on_budget=?,subtype=?,bank_website=?,name_overridden=?,closed=? WHERE workspace=? AND id=?",
                                   (row['name'], row['type'], row['balance'], row['currency'], int(row['onBudget']), row['subtype'], row.get('bankWebsite'), int(row.get('nameOverridden', False)), int(row.get('closed', False)), 'personal', row['id']))
                 else:
-                    clean.execute("UPDATE transactions SET account_id=?,date=?,merchant=?,merchant_logo=?,amount=?,category_id=?,pending=?,reviewed=?,source=?,note=?,is_transfer=?,inferred_transfer=?,category_edited=?,deleted=?,original_details=?,category_agent=?,transfer_peer_id=? WHERE workspace=? AND id=?",
-                                  (row['accountId'], row['date'], row['merchant'], row['merchantLogo'], row['amount'], row['categoryId'], int(row['pending']), int(row['reviewed']), row['source'], row['note'], int(row['isTransfer']), int(row['inferredTransfer']), int(row['categoryEdited']), int(row['deleted']), json.dumps(row['original']) if 'original' in row else None, row.get('categoryAgent'), row.get('transferPeerId'), 'personal', row['id']))
+                    clean.execute("UPDATE transactions SET account_id=?,date=?,merchant=?,merchant_logo=?,amount=?,category_id=?,pending=?,reviewed=?,source=?,note=?,is_transfer=?,inferred_transfer=?,category_edited=?,deleted=?,original_details=?,category_agent=?,transfer_peer_id=?" + (",voided=?,provider_deleted=?" if void_columns else "") + " WHERE workspace=? AND id=?",
+                                  (row['accountId'], row['date'], row['merchant'], row['merchantLogo'], row['amount'], row['categoryId'], int(row['pending']), int(row['reviewed']), row['source'], row['note'], int(row['isTransfer']), int(row['inferredTransfer']), int(row['categoryEdited']), int(row['deleted']), json.dumps(row['original']) if 'original' in row else None, row.get('categoryAgent'), row.get('transferPeerId'), *((int(row['voided']) if 'voided' in row else None, int(row.get('providerDeleted', False))) if void_columns else ()), 'personal', row['id']))
         from types import SimpleNamespace
 
         from .history_writes import save_history
@@ -180,6 +192,16 @@ def export_file_changes(store, workspace, previous):
                          'size': len(raw), 'chunks': chunks}]}
 
 
+def _retained_images(store, workspace):
+    # Public receipt reads remain limited to active register rows. Portable files
+    # also retain private images attached to explicitly voided archive records.
+    return [tuple(row) for row in store.db.execute(
+        'SELECT r.transaction_id,r.image FROM transaction_receipts r JOIN transactions t '
+        'ON t.workspace=r.workspace AND t.id=r.transaction_id WHERE r.workspace=? '
+        'AND (t.deleted=0 OR t.voided=1) ORDER BY r.transaction_id', (workspace,),
+    )]
+
+
 def export_files(store, workspace):
     """Serialize a fresh database that has never contained connection credentials."""
     with store._snapshot():
@@ -195,7 +217,7 @@ def export_files(store, workspace):
                 store._portable_images[workspace] = (stamp, raw, head)
                 return {_FILENAME: raw}
         snapshot = store.export_budget(workspace)
-        images = [(transaction_id, store.get_receipt(workspace, transaction_id)) for transaction_id in store.receipt_ids(workspace)]
+        images = _retained_images(store, workspace)
     clean = Store(":memory:", month=snapshot["budgetStartMonth"], _authority=False)
     try:
         # Portable images are data containers. Rebuild runtime-only indexes when
@@ -220,8 +242,13 @@ def export_files(store, workspace):
             from .history_writes import save_history
             save_history(clean, 'personal', snapshot['history'], None, cache_valid=False)
         clean.db.execute("VACUUM")
+        from .transaction_voids import retains_voids
         from .transfer_pairs import retains_pairs
-        clean.db.execute(f"PRAGMA user_version={_FORMAT_VERSION if retains_pairs(snapshot) else 1}")
+        version = _FORMAT_VERSION if retains_voids(snapshot) else 2 if retains_pairs(snapshot) else 1
+        if version < 3:
+            clean.db.execute("ALTER TABLE transactions DROP COLUMN voided")
+            clean.db.execute("ALTER TABLE transactions DROP COLUMN provider_deleted")
+        clean.db.execute(f"PRAGMA user_version={version}")
         raw = clean.db.serialize()
         if len(raw) > MAX_DATABASE_BYTES and snapshot.get('history'):
             clean.db.execute("UPDATE budget_history SET record=? WHERE workspace='personal'", (json.dumps(snapshot['history'], separators=(',', ':')),))
@@ -274,6 +301,10 @@ def _validate_rows(connection, *, legacy_accounts, legacy_tables):
     ):
         for row in connection.execute(f"SELECT {columns} FROM {table}"):
             if any(type(value) is not int or value not in (0, 1) for value in row):
+                raise StoreError("SQLite budget flags must be integer booleans.")
+    for column in ('voided', 'provider_deleted'):
+        if column in {row["name"] for row in connection.execute("PRAGMA table_info(transactions)")}:
+            if any((row[0] is not None or column != "voided") and (type(row[0]) is not int or row[0] not in (0, 1)) for row in connection.execute(f"SELECT {column} FROM transactions")):
                 raise StoreError("SQLite budget flags must be integer booleans.")
     for column in ('name_overridden', 'closed'):
         if column in {row["name"] for row in connection.execute("PRAGMA table_info(accounts)")}:
@@ -348,7 +379,7 @@ def read_files(files, *, with_receipts=False):
             raise StoreError("This SQLite budget has an unsupported database schema.")
         normalized_schema = [row for row in actual_schema if row[1] not in optional_indexes]
         if (
-            reader.db.execute("PRAGMA user_version").fetchone()[0] not in {1, _FORMAT_VERSION}
+            reader.db.execute("PRAGMA user_version").fetchone()[0] not in {1, 2, _FORMAT_VERSION}
             or _without_additive_columns(normalized_schema) not in compatible_schemas
         ):
             raise StoreError("This SQLite budget has an unsupported database schema.")
@@ -362,10 +393,10 @@ def read_files(files, *, with_receipts=False):
         snapshot = reader.export_budget()
         images = []
         if any(row[1] == "transaction_receipts" for row in actual_schema):
-            transactions = {row["id"] for row in snapshot["transactions"] if not row["deleted"]}
+            transactions = {row["id"] for row in snapshot["transactions"] if not row["deleted"] or row.get("voided")}
             for transaction_id, image in reader.db.execute("SELECT transaction_id,image FROM transaction_receipts ORDER BY transaction_id"):
                 if transaction_id not in transactions:
-                    raise StoreError("Receipt images must belong to an active transaction.")
+                    raise StoreError("Receipt images must belong to an active or explicitly voided transaction.")
                 receipt_media_type(image)
                 images.append((transaction_id, image))
         return (snapshot, images) if with_receipts else snapshot
@@ -402,9 +433,6 @@ def prepare_files(store, files, *, existing):
                 return
         if receipt is not None:
             return
-    elif _semantic(store.export_budget()) == _semantic(snapshot) and images == [
-        (transaction_id, store.get_receipt("personal", transaction_id))
-        for transaction_id in store.receipt_ids("personal")
-    ]:
+    elif _semantic(store.export_budget()) == _semantic(snapshot) and images == _retained_images(store, "personal"):
         return
     store.restore_budget("personal", snapshot, _receipts=images)

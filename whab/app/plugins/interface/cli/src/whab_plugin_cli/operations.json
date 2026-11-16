@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "cli",
-  "summary": "Name-addressed whab console with an agent workflow, offline operation help and JSON discovery, guarded financial edits/manual creation/atomic splits/history, bank/investment reports, local budget creation, imports and plugin management; production is the CLI default.",
+  "summary": "Name-addressed whab console with an agent workflow, offline operation help and JSON discovery, guarded financial edits/manual creation/atomic splits/reversible void and unvoid/history, bank/investment reports, local budget creation, imports and plugin management; production is the CLI default.",
   "delegates": [
     "core"
   ],
@@ -6730,6 +6730,1340 @@
         }
       ],
       "side_effects": "Explicit atomic repair clears invalid reviewed state, orphan Transfer category and invalid links shown in the preview. Preserve imported hints and all financial fields/identities/history; never manufacture a pair. One commit/revision/checkpoint/audit entry."
+    },
+    {
+      "name": "trnx.void",
+      "kind": "local",
+      "summary": "Reversible transaction corrections (1–100 explicit stable IDs):\n  whab \"My budget\" trnx void TX1 TX2 --dry-run --format table\n  whab \"My budget\" trnx void TX1 TX2 --revision REV --fingerprint HASH --agent Codex\n  whab \"My budget\" trnx unvoid TX1 TX2 --dry-run\n  whab \"My budget\" trnx unvoid TX1 TX2 --agent Codex --batch correction\n\nUse void only for user-confirmed erroneous records. Discover live IDs with trnx\nlist; transaction names/payees are not identities. Preserve the exact IDs from\nthe receipt/history for unvoid. Void is reversible exclusion, not physical\ndeletion, a zero-amount edit, or a fabricated balancing transaction. Unvoid\nrestores explicitly voided records; it does not revive provider-only deletions.\n\nEvery selected record is validated before ONE native atomic commit, revision\nadvancement, synchronous durable save and permanent exact before/after audit\nentry. Empty, oversized, duplicate, missing or disallowed selections reject ALL\nchanges. Batches are never split. Include both reciprocal transfer legs\nexplicitly; no counterpart, amount or link is invented. Imported, manual and\nzero-value records use the same explicit workflow.\n\n--dry-run returns the exact core before/after records and balanceChanges, plus\nthe observed revision and fingerprint, without mutation/history/save. Inspect\nboth records and balances before deciding. Bind that preview with --revision\nand --fingerprint; otherwise the CLI previews current state internally. Normal\nexecution is noninteractive. Stale revisions and changed fingerprints refuse\nthe complete operation. JSON is complete; tables show every proposed/saved\nrecord and account balance change in integer currency minor units.\n\nImported corrections preserve provider/imported account balance snapshots;\nmanual-entry corrections reverse/reapply their account balance effect. Inspect\nthe explicit balanceChanges rather than assuming voiding changes a bank balance.\nEach balance change names its accountType: assets reverse an outflow by adding\nits amount; liabilities reverse the amount owed. Unvoid applies the opposite.\nUnknown/null snapshots stay unknown when no balance adjustment is needed; a\nnonzero manual adjustment requires a known balance and otherwise rejects all.\nMonthly assignments remain exact, even if excluding false income reveals a\nfunding deficit; this command does not silently reallocate envelopes.\nNo bank sync, guessed reconciliation or future rule is created. Import identity,\nsource evidence, notes, merchant whitespace and financial fields are retained.\nExplicit tombstones prevent refresh/reimport from silently resurrecting a void.\nBoth void and unvoid leave affected transactions unreviewed. Existing reciprocal\npair links and categories remain intact; both legs must be restored together.\nUnvoid sets voided=false as an explicit restoration marker, so a later posted\nrefresh cannot inherit an old pending tombstone. It refuses a later provider-\ndeletion marker rather than overriding evidence.\n\nVerify the saved receipt and history list/show. Voided records are excluded\nfrom ordinary trnx list; use unvoid IDS --dry-run to inspect the retained rows.\nUnvoid and guarded history undo/redo retain permanent history and must satisfy\ncurrent financial/transfer rules. --agent labels the audit actor; --batch groups\nhistory entries and never combines separate commands into one commit.\n\nAfter an uncertain response, inspect receipt/history and retain the COMPLETE\noriginal intent: ordered IDs, action, --revision, --fingerprint, --request-id,\n--agent and --batch. Exact successful retries return the original durable receipt\nafter restart without duplicate changes/history/saves. Never retry automatically\nor replace an uncertain intent with a fresh revision/request ID. Conflicting\nrequest-ID reuse is refused. Unsupported backends fail before mutation.\nRequires CLI 2.24 / WHAB 2.82 and native SQLite 1.30 or JSON 1.22. Help is offline.\n",
+      "input": {
+        "type": "object",
+        "description": "Ordinary name-addressed CLI options; no JSON input or revision/request ID required for a new intent.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Existing budget name or stable ID; exact existing resolution, no fuzzy matching."
+          },
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "description": "1–100 explicit stable IDs in preserved order, including both reciprocal transfer legs. Never inferred or split.",
+            "items": {
+              "type": "string",
+              "description": "Stable transaction identity.",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false,
+            "description": "--dry-run performs the exact read-only core preview without mutation/history/save."
+          },
+          "revision": {
+            "type": "string",
+            "description": "--revision binds an observed preview, or retains the original revision for exact retry."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Exact core preview fingerprint. Internally obtained unless explicitly supplied using --fingerprint; preserve for recovery.",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "--request-id retains the original intent for recovery; otherwise the CLI generates one UUID."
+          },
+          "agent": {
+            "type": "string",
+            "description": "--agent labels the audit actor without changing category attribution."
+          },
+          "batch": {
+            "type": "string",
+            "description": "--batch groups history only, not commits."
+          },
+          "format": {
+            "type": "string",
+            "description": "Output presentation.",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json"
+          }
+        },
+        "required": [
+          "budget",
+          "transactionIds"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Verified CLI response. Additional request metadata appears after a saved operation.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Addressed name/ID."
+          },
+          "budgetId": {
+            "type": "string",
+            "description": "Resolved permanent budget identity."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Observed preview or saved revision."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "True only when no write was submitted."
+          },
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "description": "1–100 explicit stable IDs in preserved order, including both reciprocal transfer legs. Never inferred or split.",
+            "items": {
+              "type": "string",
+              "description": "Stable transaction identity.",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "data": {
+            "type": "object",
+            "description": "Exact complete atomic void/unvoid preview or durable receipt.",
+            "properties": {
+              "action": {
+                "type": "string",
+                "description": "Requested tombstone action.",
+                "enum": [
+                  "void"
+                ]
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "Selected record count."
+              },
+              "changed": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "Changed record count; same-state requests are refused unless replaying the original receipt."
+              },
+              "fingerprint": {
+                "type": "string",
+                "description": "Exact core preview fingerprint. Internally obtained unless explicitly supplied using --fingerprint; preserve for recovery.",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "changes": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 100,
+                "description": "Every selected record in input order.",
+                "items": {
+                  "type": "object",
+                  "description": "Exact retained before and after states.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Permanent transaction ID."
+                    },
+                    "before": {
+                      "type": "object",
+                      "description": "Exact retained transaction, including source evidence and annotations; currency/accountName are public account context.",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Permanent identity."
+                        },
+                        "accountId": {
+                          "type": "string",
+                          "description": "Unchanged owning account identity."
+                        },
+                        "accountName": {
+                          "type": "string",
+                          "description": "Account display name."
+                        },
+                        "date": {
+                          "type": "string",
+                          "description": "Unchanged posting date.",
+                          "format": "date"
+                        },
+                        "merchant": {
+                          "type": "string",
+                          "description": "Unchanged merchant, including whitespace."
+                        },
+                        "merchantLogo": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Unchanged optional merchant artwork."
+                        },
+                        "amount": {
+                          "type": "integer",
+                          "description": "Unchanged signed minor units: positive outflow, negative inflow; zero supported."
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Account currency; never converted."
+                        },
+                        "categoryId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Unchanged category reference."
+                        },
+                        "categoryAgent": {
+                          "type": "string",
+                          "description": "Unchanged optional category attribution."
+                        },
+                        "pending": {
+                          "type": "boolean",
+                          "description": "Unchanged posting state."
+                        },
+                        "reviewed": {
+                          "type": "boolean",
+                          "description": "Always false after void or unvoid."
+                        },
+                        "note": {
+                          "type": "string",
+                          "description": "Unchanged memo verbatim."
+                        },
+                        "source": {
+                          "type": "string",
+                          "description": "Unchanged import/provider/manual source."
+                        },
+                        "isTransfer": {
+                          "type": "boolean",
+                          "description": "Unchanged explicit transfer treatment."
+                        },
+                        "inferredTransfer": {
+                          "type": "boolean",
+                          "description": "Unchanged import hint."
+                        },
+                        "deleted": {
+                          "type": "boolean",
+                          "description": "True while voided; false on explicit restoration."
+                        },
+                        "voided": {
+                          "type": "boolean",
+                          "description": "True is explicit user exclusion; unvoid sets false and retains that restoration decision."
+                        },
+                        "providerDeleted": {
+                          "type": "boolean",
+                          "description": "Read-only provider removal evidence; true blocks unvoid."
+                        },
+                        "categoryEdited": {
+                          "type": "boolean",
+                          "description": "Unchanged category edit provenance."
+                        },
+                        "original": {
+                          "type": "object",
+                          "description": "Unchanged source evidence, if present."
+                        },
+                        "transferPeerId": {
+                          "type": "string",
+                          "description": "Unchanged reciprocal peer; both legs must be selected."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "accountId",
+                        "accountName",
+                        "date",
+                        "merchant",
+                        "merchantLogo",
+                        "amount",
+                        "currency",
+                        "categoryId",
+                        "pending",
+                        "reviewed",
+                        "note",
+                        "source",
+                        "isTransfer",
+                        "inferredTransfer",
+                        "deleted"
+                      ],
+                      "additionalProperties": true
+                    },
+                    "after": {
+                      "type": "object",
+                      "description": "Exact retained transaction, including source evidence and annotations; currency/accountName are public account context.",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Permanent identity."
+                        },
+                        "accountId": {
+                          "type": "string",
+                          "description": "Unchanged owning account identity."
+                        },
+                        "accountName": {
+                          "type": "string",
+                          "description": "Account display name."
+                        },
+                        "date": {
+                          "type": "string",
+                          "description": "Unchanged posting date.",
+                          "format": "date"
+                        },
+                        "merchant": {
+                          "type": "string",
+                          "description": "Unchanged merchant, including whitespace."
+                        },
+                        "merchantLogo": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Unchanged optional merchant artwork."
+                        },
+                        "amount": {
+                          "type": "integer",
+                          "description": "Unchanged signed minor units: positive outflow, negative inflow; zero supported."
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Account currency; never converted."
+                        },
+                        "categoryId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Unchanged category reference."
+                        },
+                        "categoryAgent": {
+                          "type": "string",
+                          "description": "Unchanged optional category attribution."
+                        },
+                        "pending": {
+                          "type": "boolean",
+                          "description": "Unchanged posting state."
+                        },
+                        "reviewed": {
+                          "type": "boolean",
+                          "description": "Always false after void or unvoid."
+                        },
+                        "note": {
+                          "type": "string",
+                          "description": "Unchanged memo verbatim."
+                        },
+                        "source": {
+                          "type": "string",
+                          "description": "Unchanged import/provider/manual source."
+                        },
+                        "isTransfer": {
+                          "type": "boolean",
+                          "description": "Unchanged explicit transfer treatment."
+                        },
+                        "inferredTransfer": {
+                          "type": "boolean",
+                          "description": "Unchanged import hint."
+                        },
+                        "deleted": {
+                          "type": "boolean",
+                          "description": "True while voided; false on explicit restoration."
+                        },
+                        "voided": {
+                          "type": "boolean",
+                          "description": "True is explicit user exclusion; unvoid sets false and retains that restoration decision."
+                        },
+                        "providerDeleted": {
+                          "type": "boolean",
+                          "description": "Read-only provider removal evidence; true blocks unvoid."
+                        },
+                        "categoryEdited": {
+                          "type": "boolean",
+                          "description": "Unchanged category edit provenance."
+                        },
+                        "original": {
+                          "type": "object",
+                          "description": "Unchanged source evidence, if present."
+                        },
+                        "transferPeerId": {
+                          "type": "string",
+                          "description": "Unchanged reciprocal peer; both legs must be selected."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "accountId",
+                        "accountName",
+                        "date",
+                        "merchant",
+                        "merchantLogo",
+                        "amount",
+                        "currency",
+                        "categoryId",
+                        "pending",
+                        "reviewed",
+                        "note",
+                        "source",
+                        "isTransfer",
+                        "inferredTransfer",
+                        "deleted"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "before",
+                    "after"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "balanceChanges": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 100,
+                "description": "Every touched account exactly once, including unchanged imported balances.",
+                "items": {
+                  "type": "object",
+                  "description": "Exact account balance result; imported snapshots stay unchanged; manual/demo effects use this account type.",
+                  "properties": {
+                    "accountId": {
+                      "type": "string",
+                      "description": "Touched account identity."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Account currency."
+                    },
+                    "accountType": {
+                      "type": "string",
+                      "description": "Existing domain account classification."
+                    },
+                    "before": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Previous balance in currency minor units, or null when unknown."
+                    },
+                    "after": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Resulting balance in currency minor units; null remains null without a manual adjustment."
+                    }
+                  },
+                  "required": [
+                    "accountId",
+                    "currency",
+                    "accountType",
+                    "before",
+                    "after"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "action",
+              "count",
+              "changed",
+              "fingerprint",
+              "changes",
+              "balanceChanges"
+            ],
+            "additionalProperties": false
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Original request identity; preserve for exact recovery."
+          },
+          "expectedRevision": {
+            "type": "string",
+            "description": "Original write guard."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Exact core preview fingerprint. Internally obtained unless explicitly supplied using --fingerprint; preserve for recovery.",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "intent": {
+            "type": "object",
+            "description": "Complete original public command envelope, including actor/batch metadata. Retain verbatim for uncertain-write recovery."
+          }
+        },
+        "required": [
+          "budget",
+          "budgetId",
+          "revision",
+          "dryRun",
+          "transactionIds",
+          "data"
+        ],
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "budget": "Fictional budget",
+            "transactionIds": [
+              "fictional-import"
+            ],
+            "dryRun": true
+          },
+          "output": {
+            "budget": "Fictional budget",
+            "budgetId": "fictional",
+            "revision": "preview-revision",
+            "dryRun": true,
+            "transactionIds": [
+              "fictional-import"
+            ],
+            "data": {
+              "action": "void",
+              "count": 1,
+              "changed": 1,
+              "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+              "changes": [
+                {
+                  "id": "fictional-import",
+                  "before": {
+                    "id": "fictional-import",
+                    "accountId": "fictional-account",
+                    "accountName": "旅行 🍏",
+                    "date": "2026-11-01",
+                    "merchant": "  Fictional placeholder  ",
+                    "merchantLogo": null,
+                    "amount": 1234,
+                    "currency": "USD",
+                    "categoryId": null,
+                    "pending": false,
+                    "reviewed": false,
+                    "note": "[YNAB] exact  ",
+                    "source": "ynab",
+                    "isTransfer": false,
+                    "inferredTransfer": false,
+                    "deleted": false,
+                    "categoryEdited": false
+                  },
+                  "after": {
+                    "id": "fictional-import",
+                    "accountId": "fictional-account",
+                    "accountName": "旅行 🍏",
+                    "date": "2026-11-01",
+                    "merchant": "  Fictional placeholder  ",
+                    "merchantLogo": null,
+                    "amount": 1234,
+                    "currency": "USD",
+                    "categoryId": null,
+                    "pending": false,
+                    "reviewed": false,
+                    "note": "[YNAB] exact  ",
+                    "source": "ynab",
+                    "isTransfer": false,
+                    "inferredTransfer": false,
+                    "deleted": true,
+                    "categoryEdited": false,
+                    "voided": true
+                  }
+                }
+              ],
+              "balanceChanges": [
+                {
+                  "accountId": "fictional-account",
+                  "currency": "USD",
+                  "accountType": "depository",
+                  "before": 10000,
+                  "after": 10000
+                }
+              ]
+            }
+          }
+        },
+        {
+          "input": {
+            "budget": "Fictional budget",
+            "transactionIds": [
+              "fictional-import"
+            ],
+            "revision": "preview-revision",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "requestId": "fictional-intent",
+            "agent": "Codex",
+            "batch": "correction"
+          },
+          "output": {
+            "budget": "Fictional budget",
+            "budgetId": "fictional",
+            "revision": "saved-revision",
+            "dryRun": false,
+            "transactionIds": [
+              "fictional-import"
+            ],
+            "data": {
+              "action": "void",
+              "count": 1,
+              "changed": 1,
+              "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+              "changes": [
+                {
+                  "id": "fictional-import",
+                  "before": {
+                    "id": "fictional-import",
+                    "accountId": "fictional-account",
+                    "accountName": "旅行 🍏",
+                    "date": "2026-11-01",
+                    "merchant": "  Fictional placeholder  ",
+                    "merchantLogo": null,
+                    "amount": 1234,
+                    "currency": "USD",
+                    "categoryId": null,
+                    "pending": false,
+                    "reviewed": false,
+                    "note": "[YNAB] exact  ",
+                    "source": "ynab",
+                    "isTransfer": false,
+                    "inferredTransfer": false,
+                    "deleted": false,
+                    "categoryEdited": false
+                  },
+                  "after": {
+                    "id": "fictional-import",
+                    "accountId": "fictional-account",
+                    "accountName": "旅行 🍏",
+                    "date": "2026-11-01",
+                    "merchant": "  Fictional placeholder  ",
+                    "merchantLogo": null,
+                    "amount": 1234,
+                    "currency": "USD",
+                    "categoryId": null,
+                    "pending": false,
+                    "reviewed": false,
+                    "note": "[YNAB] exact  ",
+                    "source": "ynab",
+                    "isTransfer": false,
+                    "inferredTransfer": false,
+                    "deleted": true,
+                    "categoryEdited": false,
+                    "voided": true
+                  }
+                }
+              ],
+              "balanceChanges": [
+                {
+                  "accountId": "fictional-account",
+                  "currency": "USD",
+                  "accountType": "depository",
+                  "before": 10000,
+                  "after": 10000
+                }
+              ]
+            },
+            "requestId": "fictional-intent",
+            "expectedRevision": "preview-revision",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "intent": {
+              "operation": "void_transactions",
+              "workspace": "personal",
+              "payload": {
+                "transactionIds": [
+                  "fictional-import"
+                ],
+                "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+              },
+              "expected_revision": "preview-revision",
+              "request_id": "fictional-intent",
+              "history": {
+                "actor": "Codex",
+                "actorKind": "agent",
+                "batchId": "correction"
+              }
+            }
+          }
+        }
+      ],
+      "side_effects": "Dry-run delegates preview_void_transactions and is read-only. Execution delegates void_transactions: one native atomic commit, revision, permanent exact audit entry and synchronous durable checkpoint. Both actions leave rows unreviewed, retain financial fields/source/annotations/transfer links, preserve imported balance snapshots and apply the explicit manual/demo balance policy. Assignments remain unchanged. No bank sync or future rule.",
+      "permissions": "Existing name-addressed local budget authority over verified HTTPS; optional self-declared agent and batch audit attribution. Financial rules remain in public core/SDK/storage.",
+      "scope": "One addressed budget/environment personal workspace. Explicit IDs never cross budgets; currencies are not combined. SQLite and JSON support through TransactionVoiding.",
+      "errors": [
+        "Invalid, missing, duplicate, oversized, same-state or incomplete pair selection rejects the whole batch before mutation; no inferred targets or silent splitting.",
+        "Unvoid requires an explicit user tombstone and refuses providerDeleted evidence. Unsupported backends fail before mutation.",
+        "Stale revision/fingerprint and conflicting request ID reuse fail. A timeout or invalid saved receipt remains uncertain; no automatic replay."
+      ],
+      "retry": "Retain the complete ordered IDs/action, original revision, fingerprint, request ID, agent and batch. Exact successful retries return the durable original receipt after restart without extra changes/history/saves. Never replace uncertain intent with fresh metadata.",
+      "availability": "CLI 2.24+, WHAB 2.82+, SQLite 1.30+ or JSON 1.22+ implementing native TransactionVoiding. Help and documentation work offline."
+    },
+    {
+      "name": "trnx.unvoid",
+      "kind": "local",
+      "summary": "Reversible transaction corrections (1–100 explicit stable IDs):\n  whab \"My budget\" trnx void TX1 TX2 --dry-run --format table\n  whab \"My budget\" trnx void TX1 TX2 --revision REV --fingerprint HASH --agent Codex\n  whab \"My budget\" trnx unvoid TX1 TX2 --dry-run\n  whab \"My budget\" trnx unvoid TX1 TX2 --agent Codex --batch correction\n\nUse void only for user-confirmed erroneous records. Discover live IDs with trnx\nlist; transaction names/payees are not identities. Preserve the exact IDs from\nthe receipt/history for unvoid. Void is reversible exclusion, not physical\ndeletion, a zero-amount edit, or a fabricated balancing transaction. Unvoid\nrestores explicitly voided records; it does not revive provider-only deletions.\n\nEvery selected record is validated before ONE native atomic commit, revision\nadvancement, synchronous durable save and permanent exact before/after audit\nentry. Empty, oversized, duplicate, missing or disallowed selections reject ALL\nchanges. Batches are never split. Include both reciprocal transfer legs\nexplicitly; no counterpart, amount or link is invented. Imported, manual and\nzero-value records use the same explicit workflow.\n\n--dry-run returns the exact core before/after records and balanceChanges, plus\nthe observed revision and fingerprint, without mutation/history/save. Inspect\nboth records and balances before deciding. Bind that preview with --revision\nand --fingerprint; otherwise the CLI previews current state internally. Normal\nexecution is noninteractive. Stale revisions and changed fingerprints refuse\nthe complete operation. JSON is complete; tables show every proposed/saved\nrecord and account balance change in integer currency minor units.\n\nImported corrections preserve provider/imported account balance snapshots;\nmanual-entry corrections reverse/reapply their account balance effect. Inspect\nthe explicit balanceChanges rather than assuming voiding changes a bank balance.\nEach balance change names its accountType: assets reverse an outflow by adding\nits amount; liabilities reverse the amount owed. Unvoid applies the opposite.\nUnknown/null snapshots stay unknown when no balance adjustment is needed; a\nnonzero manual adjustment requires a known balance and otherwise rejects all.\nMonthly assignments remain exact, even if excluding false income reveals a\nfunding deficit; this command does not silently reallocate envelopes.\nNo bank sync, guessed reconciliation or future rule is created. Import identity,\nsource evidence, notes, merchant whitespace and financial fields are retained.\nExplicit tombstones prevent refresh/reimport from silently resurrecting a void.\nBoth void and unvoid leave affected transactions unreviewed. Existing reciprocal\npair links and categories remain intact; both legs must be restored together.\nUnvoid sets voided=false as an explicit restoration marker, so a later posted\nrefresh cannot inherit an old pending tombstone. It refuses a later provider-\ndeletion marker rather than overriding evidence.\n\nVerify the saved receipt and history list/show. Voided records are excluded\nfrom ordinary trnx list; use unvoid IDS --dry-run to inspect the retained rows.\nUnvoid and guarded history undo/redo retain permanent history and must satisfy\ncurrent financial/transfer rules. --agent labels the audit actor; --batch groups\nhistory entries and never combines separate commands into one commit.\n\nAfter an uncertain response, inspect receipt/history and retain the COMPLETE\noriginal intent: ordered IDs, action, --revision, --fingerprint, --request-id,\n--agent and --batch. Exact successful retries return the original durable receipt\nafter restart without duplicate changes/history/saves. Never retry automatically\nor replace an uncertain intent with a fresh revision/request ID. Conflicting\nrequest-ID reuse is refused. Unsupported backends fail before mutation.\nRequires CLI 2.24 / WHAB 2.82 and native SQLite 1.30 or JSON 1.22. Help is offline.\n",
+      "input": {
+        "type": "object",
+        "description": "Ordinary name-addressed CLI options; no JSON input or revision/request ID required for a new intent.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Existing budget name or stable ID; exact existing resolution, no fuzzy matching."
+          },
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "description": "1–100 explicit stable IDs in preserved order, including both reciprocal transfer legs. Never inferred or split.",
+            "items": {
+              "type": "string",
+              "description": "Stable transaction identity.",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false,
+            "description": "--dry-run performs the exact read-only core preview without mutation/history/save."
+          },
+          "revision": {
+            "type": "string",
+            "description": "--revision binds an observed preview, or retains the original revision for exact retry."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Exact core preview fingerprint. Internally obtained unless explicitly supplied using --fingerprint; preserve for recovery.",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "--request-id retains the original intent for recovery; otherwise the CLI generates one UUID."
+          },
+          "agent": {
+            "type": "string",
+            "description": "--agent labels the audit actor without changing category attribution."
+          },
+          "batch": {
+            "type": "string",
+            "description": "--batch groups history only, not commits."
+          },
+          "format": {
+            "type": "string",
+            "description": "Output presentation.",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json"
+          }
+        },
+        "required": [
+          "budget",
+          "transactionIds"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Verified CLI response. Additional request metadata appears after a saved operation.",
+        "properties": {
+          "budget": {
+            "type": "string",
+            "description": "Addressed name/ID."
+          },
+          "budgetId": {
+            "type": "string",
+            "description": "Resolved permanent budget identity."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Observed preview or saved revision."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "True only when no write was submitted."
+          },
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "description": "1–100 explicit stable IDs in preserved order, including both reciprocal transfer legs. Never inferred or split.",
+            "items": {
+              "type": "string",
+              "description": "Stable transaction identity.",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "data": {
+            "type": "object",
+            "description": "Exact complete atomic void/unvoid preview or durable receipt.",
+            "properties": {
+              "action": {
+                "type": "string",
+                "description": "Requested tombstone action.",
+                "enum": [
+                  "unvoid"
+                ]
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "Selected record count."
+              },
+              "changed": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "description": "Changed record count; same-state requests are refused unless replaying the original receipt."
+              },
+              "fingerprint": {
+                "type": "string",
+                "description": "Exact core preview fingerprint. Internally obtained unless explicitly supplied using --fingerprint; preserve for recovery.",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "changes": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 100,
+                "description": "Every selected record in input order.",
+                "items": {
+                  "type": "object",
+                  "description": "Exact retained before and after states.",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Permanent transaction ID."
+                    },
+                    "before": {
+                      "type": "object",
+                      "description": "Exact retained transaction, including source evidence and annotations; currency/accountName are public account context.",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Permanent identity."
+                        },
+                        "accountId": {
+                          "type": "string",
+                          "description": "Unchanged owning account identity."
+                        },
+                        "accountName": {
+                          "type": "string",
+                          "description": "Account display name."
+                        },
+                        "date": {
+                          "type": "string",
+                          "description": "Unchanged posting date.",
+                          "format": "date"
+                        },
+                        "merchant": {
+                          "type": "string",
+                          "description": "Unchanged merchant, including whitespace."
+                        },
+                        "merchantLogo": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Unchanged optional merchant artwork."
+                        },
+                        "amount": {
+                          "type": "integer",
+                          "description": "Unchanged signed minor units: positive outflow, negative inflow; zero supported."
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Account currency; never converted."
+                        },
+                        "categoryId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Unchanged category reference."
+                        },
+                        "categoryAgent": {
+                          "type": "string",
+                          "description": "Unchanged optional category attribution."
+                        },
+                        "pending": {
+                          "type": "boolean",
+                          "description": "Unchanged posting state."
+                        },
+                        "reviewed": {
+                          "type": "boolean",
+                          "description": "Always false after void or unvoid."
+                        },
+                        "note": {
+                          "type": "string",
+                          "description": "Unchanged memo verbatim."
+                        },
+                        "source": {
+                          "type": "string",
+                          "description": "Unchanged import/provider/manual source."
+                        },
+                        "isTransfer": {
+                          "type": "boolean",
+                          "description": "Unchanged explicit transfer treatment."
+                        },
+                        "inferredTransfer": {
+                          "type": "boolean",
+                          "description": "Unchanged import hint."
+                        },
+                        "deleted": {
+                          "type": "boolean",
+                          "description": "True while voided; false on explicit restoration."
+                        },
+                        "voided": {
+                          "type": "boolean",
+                          "description": "True is explicit user exclusion; unvoid sets false and retains that restoration decision."
+                        },
+                        "providerDeleted": {
+                          "type": "boolean",
+                          "description": "Read-only provider removal evidence; true blocks unvoid."
+                        },
+                        "categoryEdited": {
+                          "type": "boolean",
+                          "description": "Unchanged category edit provenance."
+                        },
+                        "original": {
+                          "type": "object",
+                          "description": "Unchanged source evidence, if present."
+                        },
+                        "transferPeerId": {
+                          "type": "string",
+                          "description": "Unchanged reciprocal peer; both legs must be selected."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "accountId",
+                        "accountName",
+                        "date",
+                        "merchant",
+                        "merchantLogo",
+                        "amount",
+                        "currency",
+                        "categoryId",
+                        "pending",
+                        "reviewed",
+                        "note",
+                        "source",
+                        "isTransfer",
+                        "inferredTransfer",
+                        "deleted"
+                      ],
+                      "additionalProperties": true
+                    },
+                    "after": {
+                      "type": "object",
+                      "description": "Exact retained transaction, including source evidence and annotations; currency/accountName are public account context.",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Permanent identity."
+                        },
+                        "accountId": {
+                          "type": "string",
+                          "description": "Unchanged owning account identity."
+                        },
+                        "accountName": {
+                          "type": "string",
+                          "description": "Account display name."
+                        },
+                        "date": {
+                          "type": "string",
+                          "description": "Unchanged posting date.",
+                          "format": "date"
+                        },
+                        "merchant": {
+                          "type": "string",
+                          "description": "Unchanged merchant, including whitespace."
+                        },
+                        "merchantLogo": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Unchanged optional merchant artwork."
+                        },
+                        "amount": {
+                          "type": "integer",
+                          "description": "Unchanged signed minor units: positive outflow, negative inflow; zero supported."
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Account currency; never converted."
+                        },
+                        "categoryId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Unchanged category reference."
+                        },
+                        "categoryAgent": {
+                          "type": "string",
+                          "description": "Unchanged optional category attribution."
+                        },
+                        "pending": {
+                          "type": "boolean",
+                          "description": "Unchanged posting state."
+                        },
+                        "reviewed": {
+                          "type": "boolean",
+                          "description": "Always false after void or unvoid."
+                        },
+                        "note": {
+                          "type": "string",
+                          "description": "Unchanged memo verbatim."
+                        },
+                        "source": {
+                          "type": "string",
+                          "description": "Unchanged import/provider/manual source."
+                        },
+                        "isTransfer": {
+                          "type": "boolean",
+                          "description": "Unchanged explicit transfer treatment."
+                        },
+                        "inferredTransfer": {
+                          "type": "boolean",
+                          "description": "Unchanged import hint."
+                        },
+                        "deleted": {
+                          "type": "boolean",
+                          "description": "True while voided; false on explicit restoration."
+                        },
+                        "voided": {
+                          "type": "boolean",
+                          "description": "True is explicit user exclusion; unvoid sets false and retains that restoration decision."
+                        },
+                        "providerDeleted": {
+                          "type": "boolean",
+                          "description": "Read-only provider removal evidence; true blocks unvoid."
+                        },
+                        "categoryEdited": {
+                          "type": "boolean",
+                          "description": "Unchanged category edit provenance."
+                        },
+                        "original": {
+                          "type": "object",
+                          "description": "Unchanged source evidence, if present."
+                        },
+                        "transferPeerId": {
+                          "type": "string",
+                          "description": "Unchanged reciprocal peer; both legs must be selected."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "accountId",
+                        "accountName",
+                        "date",
+                        "merchant",
+                        "merchantLogo",
+                        "amount",
+                        "currency",
+                        "categoryId",
+                        "pending",
+                        "reviewed",
+                        "note",
+                        "source",
+                        "isTransfer",
+                        "inferredTransfer",
+                        "deleted"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "before",
+                    "after"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "balanceChanges": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 100,
+                "description": "Every touched account exactly once, including unchanged imported balances.",
+                "items": {
+                  "type": "object",
+                  "description": "Exact account balance result; imported snapshots stay unchanged; manual/demo effects use this account type.",
+                  "properties": {
+                    "accountId": {
+                      "type": "string",
+                      "description": "Touched account identity."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "description": "Account currency."
+                    },
+                    "accountType": {
+                      "type": "string",
+                      "description": "Existing domain account classification."
+                    },
+                    "before": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Previous balance in currency minor units, or null when unknown."
+                    },
+                    "after": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Resulting balance in currency minor units; null remains null without a manual adjustment."
+                    }
+                  },
+                  "required": [
+                    "accountId",
+                    "currency",
+                    "accountType",
+                    "before",
+                    "after"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "action",
+              "count",
+              "changed",
+              "fingerprint",
+              "changes",
+              "balanceChanges"
+            ],
+            "additionalProperties": false
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Original request identity; preserve for exact recovery."
+          },
+          "expectedRevision": {
+            "type": "string",
+            "description": "Original write guard."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "Exact core preview fingerprint. Internally obtained unless explicitly supplied using --fingerprint; preserve for recovery.",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "intent": {
+            "type": "object",
+            "description": "Complete original public command envelope, including actor/batch metadata. Retain verbatim for uncertain-write recovery."
+          }
+        },
+        "required": [
+          "budget",
+          "budgetId",
+          "revision",
+          "dryRun",
+          "transactionIds",
+          "data"
+        ],
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {
+            "budget": "Fictional budget",
+            "transactionIds": [
+              "fictional-import"
+            ],
+            "dryRun": true
+          },
+          "output": {
+            "budget": "Fictional budget",
+            "budgetId": "fictional",
+            "revision": "preview-revision",
+            "dryRun": true,
+            "transactionIds": [
+              "fictional-import"
+            ],
+            "data": {
+              "action": "unvoid",
+              "count": 1,
+              "changed": 1,
+              "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+              "changes": [
+                {
+                  "id": "fictional-import",
+                  "before": {
+                    "id": "fictional-import",
+                    "accountId": "fictional-account",
+                    "accountName": "旅行 🍏",
+                    "date": "2026-11-01",
+                    "merchant": "  Fictional placeholder  ",
+                    "merchantLogo": null,
+                    "amount": 1234,
+                    "currency": "USD",
+                    "categoryId": null,
+                    "pending": false,
+                    "reviewed": false,
+                    "note": "[YNAB] exact  ",
+                    "source": "ynab",
+                    "isTransfer": false,
+                    "inferredTransfer": false,
+                    "deleted": true,
+                    "categoryEdited": false,
+                    "voided": true
+                  },
+                  "after": {
+                    "id": "fictional-import",
+                    "accountId": "fictional-account",
+                    "accountName": "旅行 🍏",
+                    "date": "2026-11-01",
+                    "merchant": "  Fictional placeholder  ",
+                    "merchantLogo": null,
+                    "amount": 1234,
+                    "currency": "USD",
+                    "categoryId": null,
+                    "pending": false,
+                    "reviewed": false,
+                    "note": "[YNAB] exact  ",
+                    "source": "ynab",
+                    "isTransfer": false,
+                    "inferredTransfer": false,
+                    "deleted": false,
+                    "categoryEdited": false,
+                    "voided": false
+                  }
+                }
+              ],
+              "balanceChanges": [
+                {
+                  "accountId": "fictional-account",
+                  "currency": "USD",
+                  "accountType": "depository",
+                  "before": 10000,
+                  "after": 10000
+                }
+              ]
+            }
+          }
+        },
+        {
+          "input": {
+            "budget": "Fictional budget",
+            "transactionIds": [
+              "fictional-import"
+            ],
+            "revision": "preview-revision",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "requestId": "fictional-intent",
+            "agent": "Codex",
+            "batch": "correction"
+          },
+          "output": {
+            "budget": "Fictional budget",
+            "budgetId": "fictional",
+            "revision": "saved-revision",
+            "dryRun": false,
+            "transactionIds": [
+              "fictional-import"
+            ],
+            "data": {
+              "action": "unvoid",
+              "count": 1,
+              "changed": 1,
+              "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+              "changes": [
+                {
+                  "id": "fictional-import",
+                  "before": {
+                    "id": "fictional-import",
+                    "accountId": "fictional-account",
+                    "accountName": "旅行 🍏",
+                    "date": "2026-11-01",
+                    "merchant": "  Fictional placeholder  ",
+                    "merchantLogo": null,
+                    "amount": 1234,
+                    "currency": "USD",
+                    "categoryId": null,
+                    "pending": false,
+                    "reviewed": false,
+                    "note": "[YNAB] exact  ",
+                    "source": "ynab",
+                    "isTransfer": false,
+                    "inferredTransfer": false,
+                    "deleted": true,
+                    "categoryEdited": false,
+                    "voided": true
+                  },
+                  "after": {
+                    "id": "fictional-import",
+                    "accountId": "fictional-account",
+                    "accountName": "旅行 🍏",
+                    "date": "2026-11-01",
+                    "merchant": "  Fictional placeholder  ",
+                    "merchantLogo": null,
+                    "amount": 1234,
+                    "currency": "USD",
+                    "categoryId": null,
+                    "pending": false,
+                    "reviewed": false,
+                    "note": "[YNAB] exact  ",
+                    "source": "ynab",
+                    "isTransfer": false,
+                    "inferredTransfer": false,
+                    "deleted": false,
+                    "categoryEdited": false,
+                    "voided": false
+                  }
+                }
+              ],
+              "balanceChanges": [
+                {
+                  "accountId": "fictional-account",
+                  "currency": "USD",
+                  "accountType": "depository",
+                  "before": 10000,
+                  "after": 10000
+                }
+              ]
+            },
+            "requestId": "fictional-intent",
+            "expectedRevision": "preview-revision",
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "intent": {
+              "operation": "unvoid_transactions",
+              "workspace": "personal",
+              "payload": {
+                "transactionIds": [
+                  "fictional-import"
+                ],
+                "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+              },
+              "expected_revision": "preview-revision",
+              "request_id": "fictional-intent",
+              "history": {
+                "actor": "Codex",
+                "actorKind": "agent",
+                "batchId": "correction"
+              }
+            }
+          }
+        }
+      ],
+      "side_effects": "Dry-run delegates preview_unvoid_transactions and is read-only. Execution delegates unvoid_transactions: one native atomic commit, revision, permanent exact audit entry and synchronous durable checkpoint. Both actions leave rows unreviewed, retain financial fields/source/annotations/transfer links, preserve imported balance snapshots and apply the explicit manual/demo balance policy. Assignments remain unchanged. No bank sync or future rule.",
+      "permissions": "Existing name-addressed local budget authority over verified HTTPS; optional self-declared agent and batch audit attribution. Financial rules remain in public core/SDK/storage.",
+      "scope": "One addressed budget/environment personal workspace. Explicit IDs never cross budgets; currencies are not combined. SQLite and JSON support through TransactionVoiding.",
+      "errors": [
+        "Invalid, missing, duplicate, oversized, same-state or incomplete pair selection rejects the whole batch before mutation; no inferred targets or silent splitting.",
+        "Unvoid requires an explicit user tombstone and refuses providerDeleted evidence. Unsupported backends fail before mutation.",
+        "Stale revision/fingerprint and conflicting request ID reuse fail. A timeout or invalid saved receipt remains uncertain; no automatic replay."
+      ],
+      "retry": "Retain the complete ordered IDs/action, original revision, fingerprint, request ID, agent and batch. Exact successful retries return the durable original receipt after restart without extra changes/history/saves. Never replace uncertain intent with fresh metadata.",
+      "availability": "CLI 2.24+, WHAB 2.82+, SQLite 1.30+ or JSON 1.22+ implementing native TransactionVoiding. Help and documentation work offline."
     }
   ]
 }
