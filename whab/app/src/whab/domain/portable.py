@@ -107,7 +107,7 @@ def validate_portable_budget(data: object) -> dict:
             account["type"] = "other"
         accounts[index] = normalize_account(account)
     categories = _records(data["categories"], CATEGORY_FIELDS, 10000, optional=frozenset({"kind"}))
-    transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000, optional=frozenset({"original", "categoryAgent", "transferPeerId"}))
+    transactions = _records(data["transactions"], TRANSACTION_FIELDS, 250000, optional=frozenset({"original", "categoryAgent", "transferPeerId", "voided", "providerDeleted"}))
     assignments = _records(data["assignments"], ASSIGNMENT_FIELDS, 250000)
     future_funding = _records(data.get("futureFunding", []), FUTURE_FUNDING_FIELDS, 250000)
     rollover_modes = _records(data.get("rolloverModes", []), ROLLOVER_MODE_FIELDS, 250000)
@@ -137,6 +137,14 @@ def validate_portable_budget(data: object) -> dict:
         _text(category["group"])
         money(category["target"], category["currency"])
     for transaction in transactions:
+        if 'voided' in transaction and type(transaction['voided']) is not bool:
+            raise StoreError('Transaction void status must be boolean when present.')
+        if 'providerDeleted' in transaction and transaction['providerDeleted'] is not True:
+            raise StoreError('Provider removal marker must be true when present.')
+        if transaction.get('voided') and (not transaction['deleted'] or transaction['reviewed']):
+            raise StoreError('Voided transactions must remain deleted and unreviewed.')
+        if transaction.get('providerDeleted') and not transaction.get('voided'):
+            raise StoreError('Provider removal metadata requires an explicitly voided transaction.')
         if "transferPeerId" in transaction:
             _text(transaction["transferPeerId"])
         _text(transaction["accountId"])

@@ -15,7 +15,7 @@ from whab_plugin_cli import console
     'non-reviewed', 'unreviewed', 'uncategorized', 'uncategorised', 'list',
     'categories', 'categorize', 'categorise', 'note', 'edit', 'create', 'review',
     'review-audit', 'edit-many', 'transfers', 'match-transfer', 'unmatch-transfer',
-    'match-transfers', 'transfer-audit', 'repair-transfers',
+    'match-transfers', 'transfer-audit', 'repair-transfers', 'void', 'unvoid',
 ])
 def test_selected_transaction_help_matches_full_parser(action):
     arguments = ['BUDGET', 'Fictional budget', 'trnx', action, '--help']
@@ -49,25 +49,34 @@ def test_shallow_or_projected_help_matches_complete_parser(arguments):
 @pytest.mark.parametrize('arguments,unrelated', [
     (['--help'], ['whab_plugin_cli.account_commands', 'whab_plugin_cli.category_commands',
                  'whab_plugin_cli.transaction_search', 'whab_plugin_cli.history_commands',
-                 'whab_plugin_cli.bulk_transfers', 'whab_plugin_cli.transfer_integrity']),
+                 'whab_plugin_cli.bulk_transfers', 'whab_plugin_cli.transfer_integrity',
+                 'whab_plugin_cli.transaction_voids']),
     (['Fictional budget', 'trnx', '--help'], []),
     (['Fictional budget', 'trnx', 'list', '--help'], [
         'whab_plugin_cli.bulk_commands', 'whab_plugin_cli.record_edits',
         'whab_plugin_cli.transfer_commands', 'whab_plugin_cli.transaction_changes',
         'whab_plugin_cli.review_commands', 'whab.domain.formatting',
         'whab_plugin_cli.bulk_transfers', 'whab_plugin_cli.transfer_integrity',
+        'whab_plugin_cli.transaction_voids',
     ]),
     (['Fictional budget', 'trnx', 'categorize', '--help'], [
         'whab_plugin_cli.record_edits', 'whab_plugin_cli.transfer_commands',
         'whab_plugin_cli.transaction_changes', 'whab_plugin_cli.review_commands',
         'whab_plugin_cli.account_commands', 'whab.domain.bulk',
         'whab_plugin_cli.bulk_transfers', 'whab_plugin_cli.transfer_integrity',
+        'whab_plugin_cli.transaction_voids',
     ]),
     (['Fictional budget', 'trnx', 'match-transfers', '--help'], [
         'whab_plugin_cli.account_commands', 'whab_plugin_cli.bulk_commands',
         'whab_plugin_cli.record_edits', 'whab_plugin_cli.transaction_changes',
-        'whab_plugin_cli.review_commands',
+        'whab_plugin_cli.review_commands', 'whab_plugin_cli.transaction_voids',
     ]),
+    *[(['Fictional budget', 'trnx', action, '--help'], [
+        'whab_plugin_cli.account_commands', 'whab_plugin_cli.bulk_commands',
+        'whab_plugin_cli.record_edits', 'whab_plugin_cli.transaction_changes',
+        'whab_plugin_cli.review_commands', 'whab_plugin_cli.bulk_transfers',
+        'whab_plugin_cli.transfer_integrity', 'whab_plugin_cli.transaction_commands',
+    ]) for action in ('void', 'unvoid')],
 ])
 def test_fresh_help_defers_transport_and_unrelated_commands(tmp_path, arguments, unrelated):
     code = '''
@@ -97,7 +106,7 @@ def test_unknown_transaction_action_retains_complete_discovery(capsys):
     assert exited.value.code == 2
     diagnostic = capsys.readouterr().err
     for action in ('list', 'categorize', 'edit-many', 'note', 'review', 'match-transfer',
-                   'match-transfers', 'transfer-audit', 'repair-transfers'):
+                   'match-transfers', 'transfer-audit', 'repair-transfers', 'void', 'unvoid'):
         assert action in diagnostic
 
 
@@ -108,6 +117,8 @@ def test_unknown_transaction_action_retains_complete_discovery(capsys):
     (['BUDGET', 'Fictional', 'trnx', 'match-transfers', '--help'], set()),
     (['BUDGET', 'Fictional', 'trnx', 'transfer-audit', '--help'], set()),
     (['BUDGET', 'Fictional', 'trnx', 'repair-transfers', '--help'], set()),
+    (['BUDGET', 'Fictional', 'trnx', 'void', 'bank', '--help'], set()),
+    (['BUDGET', 'Fictional', 'trnx', 'unvoid', 'plugin', '--help'], set()),
     (['budget', 'create', 'bank'], {'cli'}),
     (['--help'], set()),
     (['BUDGET', 'Fictional', 'bank', 'connections', 'plaid'], None),

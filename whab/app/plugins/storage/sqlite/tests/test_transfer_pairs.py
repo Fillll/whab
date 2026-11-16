@@ -67,7 +67,7 @@ def portable_version(files):
     from whab_plugin_sqlite.portable_journal import MAGIC
 
     if files['budget.sqlite'].startswith(MAGIC):
-        return 3
+        return 4
     with closing(sqlite3.connect(':memory:')) as image:
         image.deserialize(files['budget.sqlite'])
         return image.execute('PRAGMA user_version').fetchone()[0]
@@ -77,12 +77,12 @@ def test_portable_transfer_fence_preserves_legacy_and_fences_first_bounded_save(
     store, path, Store = transfer_store
     store.edit_transaction('personal', 'out-0', note='Fictional warm history')
     legacy = store.export_budget_files()
-    assert portable_version(legacy) == (3 if Store is SQLiteStore else 1)
+    assert portable_version(legacy) == (4 if Store is SQLiteStore else 1)
     restored = Store(tmp_path / ('legacy-restored' + path.suffix), month='2026-11')
     try:
         restored.restore_budget_files('personal', legacy)
         assert restored.export_budget('personal')['transactions'] == store.export_budget('personal')['transactions']
-        assert portable_version(restored.export_budget_files()) == (3 if Store is SQLiteStore else 1)
+        assert portable_version(restored.export_budget_files()) == (4 if Store is SQLiteStore else 1)
         if Store is SQLiteStore:
             from whab_plugin_sqlite.portable import read_files
             from whab_plugin_sqlite.portable_journal import read
@@ -96,13 +96,13 @@ def test_portable_transfer_fence_preserves_legacy_and_fences_first_bounded_save(
             bounded.setattr(store, 'export_budget', lambda *_: pytest.fail('First paired save must use the existing bounded image delta.'))
         store.apply_transfer_matches('personal', [{'outId': 'out-0', 'inId': 'in-0'}])
         current = store.export_budget_files()
-    assert portable_version(current) == (3 if Store is SQLiteStore else 2)
-    assert portable_version(legacy) == (3 if Store is SQLiteStore else 1)
+    assert portable_version(current) == (4 if Store is SQLiteStore else 2)
+    assert portable_version(legacy) == (4 if Store is SQLiteStore else 1)
     restored = Store(tmp_path / ('paired-restored' + path.suffix), month='2026-11')
     try:
         restored.restore_budget_files('personal', current)
         assert restored.export_budget('personal')['transactions'] == store.export_budget('personal')['transactions']
-        assert portable_version(restored.export_budget_files()) == (3 if Store is SQLiteStore else 2)
+        assert portable_version(restored.export_budget_files()) == (4 if Store is SQLiteStore else 2)
         if Store is SQLiteStore:
             raw = {'budget.sqlite': read(restored.export_budget_files()['budget.sqlite'])[0]}
             assert portable_version(raw) == 2
@@ -197,7 +197,7 @@ def test_mixed_existing_zero_pairs_are_atomic_reviewed_replayable_and_portable(t
             assert {key: value for key, value in row.items() if key not in {'reviewed', 'transferPeerId'}} == {
                 key: value for key, value in previous.items() if key != 'reviewed'}
         files = store.export_budget_files()
-        assert portable_version(files) == (3 if Store is SQLiteStore else 2)
+        assert portable_version(files) == (4 if Store is SQLiteStore else 2)
     finally:
         store.close()
     reopened = Store(path, month='2026-11')
@@ -491,29 +491,29 @@ def test_native_format_fence_survives_history_only_pairs_and_restoration(transfe
                 else json.loads(backend.path.read_bytes())['formatVersion'])
     pairs = [{'outId': 'out-0', 'inId': 'in-0'}]
     store.apply_transfer_matches('personal', pairs)
-    assert version(store) == (6 if Store is SQLiteStore else 5)
-    assert portable_version(store.export_budget_files()) == (3 if Store is SQLiteStore else 2)
+    assert version(store) == (7 if Store is SQLiteStore else 5)
+    assert portable_version(store.export_budget_files()) == (4 if Store is SQLiteStore else 2)
     entry = next(row for row in store.budget_history('personal')['entries'] if row['operation'] == 'match_transfers')
     plan = store.history_preview('personal', 'undo', entry['id'])
     store.history_apply('personal', 'undo', entry['id'], plan['fingerprint'])
     assert not any(row.get('transferPeerId') for row in store.transactions('personal'))
-    assert version(store) == (6 if Store is SQLiteStore else 5)
-    assert portable_version(store.export_budget_files()) == (3 if Store is SQLiteStore else 2)
+    assert version(store) == (7 if Store is SQLiteStore else 5)
+    assert portable_version(store.export_budget_files()) == (4 if Store is SQLiteStore else 2)
     restored = Store(tmp_path / ('history-restored' + path.suffix), month='2026-11')
     local = Store(tmp_path / ('history-local' + path.suffix), month='2026-11', initial_role='staged')
     try:
         restored.restore_budget_files('personal', store.export_budget_files())
-        assert version(restored) == (6 if Store is SQLiteStore else 5)
-        assert portable_version(restored.export_budget_files()) == (3 if Store is SQLiteStore else 2)
+        assert version(restored) == (7 if Store is SQLiteStore else 5)
+        assert portable_version(restored.export_budget_files()) == (4 if Store is SQLiteStore else 2)
         local.import_local('fictional-transfer-history', store.export_local())
-        assert version(local) == (6 if Store is SQLiteStore else 5)
+        assert version(local) == (7 if Store is SQLiteStore else 5)
     finally:
         restored.close()
         local.close()
     store.close()
     readonly = Store(path, month='2026-11', read_only=True)
     try:
-        assert version(readonly) == (6 if Store is SQLiteStore else 5)
+        assert version(readonly) == (7 if Store is SQLiteStore else 5)
     finally:
         readonly.close()
 

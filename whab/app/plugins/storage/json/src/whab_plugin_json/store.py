@@ -87,7 +87,7 @@ class Store(Authority):
             self._disk_identity = self._identity() if raw is not None else None
             if raw is not None:
                 self._data = codec.decode(raw)
-                if read_only and self._data["formatVersion"] not in {3, 4, 5, 6}:
+                if read_only and self._data["formatVersion"] not in {3, 4, 5, 6, 7}:
                     raise StoreError("Read-only readiness requires the current native JSON schema; upgrade it explicitly first.")
                 if self._data["formatVersion"] == 1:
                     preserve_schema_one(self.path, raw)
@@ -176,6 +176,7 @@ class Store(Authority):
         # only in permanent audit history, including restored/local-transfer data.
         kinds = set()
         retained_pairs = False
+        retained_voids = False
         for state in candidate['workspaces'].values():
             kinds.update(row.get('kind') for row in state['categories'].values())
             journal = state.get('history') or {}
@@ -184,11 +185,13 @@ class Store(Authority):
                          for change in entry['changes'] if change['path'][0] == 'categories'
                          for row in (change['before'], change['after']) if row is not None)
             retained_pairs = retained_pairs or codec.retains_pairs(state)
+            retained_voids = retained_voids or codec.retains_voids(state)
         if 'opening_balance' in kinds:
             candidate = {**candidate, 'formatVersion': max(candidate['formatVersion'], 4)}
         if retained_pairs:
             candidate = {**candidate, 'formatVersion': max(candidate['formatVersion'], 5)}
-
+        if retained_voids:
+            candidate = {**candidate, 'formatVersion': max(candidate['formatVersion'], 6)}
         raw, candidate = codec.encode(candidate)
         try:
             descriptor, temporary = tempfile.mkstemp(prefix=".whab-json-", dir=self.path.parent)
@@ -317,6 +320,18 @@ class Store(Authority):
 
     def supports_bulk_transfer_matching(self):
         return True
+
+    def supports_transaction_voiding(self):
+        return True
+
+    def preview_transaction_void(self, workspace, transaction_ids, action):
+        from whab.domain.transaction_voids import plan
+        return plan(self._read(workspace), transaction_ids, action=action)
+
+    def apply_transaction_void(self, workspace, transaction_ids, action, fingerprint):
+        from whab.domain.transaction_voids import plan
+        return self._mutate(workspace, lambda state: plan(state, transaction_ids, action=action,
+            fingerprint=fingerprint, apply=True), history_operation=action + '_transactions')
 
     def supports_transfer_integrity(self):
         return True

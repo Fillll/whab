@@ -10,14 +10,15 @@ from hashlib import sha256
 
 from whab.plugins import StoreError
 
-MAGIC = b'WHAB-SQLITE-3\x00\r\n'
+MAGIC = b'WHAB-SQLITE-4\x00\r\n'
 MAX_BYTES = 50 * 1024 * 1024
 MAX_JOURNAL_BYTES = 4 * 1024 * 1024
 MAX_FRAMES = 512
 HEADER_BYTES = len(MAGIC) + 8 + 32
 OPERATIONS = frozenset({'edit_transaction', 'edit_transaction_details', 'update_account',
                         'edit_transactions', 'classify_accounts', 'change_transactions',
-                        'review_transactions', 'append_transaction_note', 'match_transfers'})
+                        'review_transactions', 'append_transaction_note', 'match_transfers',
+                        'void_transactions', 'unvoid_transactions'})
 
 
 def snapshot(raw):

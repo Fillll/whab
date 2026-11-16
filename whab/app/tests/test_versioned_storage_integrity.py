@@ -13,9 +13,15 @@ from whab.plugins.storage_transfer import evidence_record, read_evidence
 
 
 @pytest.mark.parametrize('role', ['staged', 'copy'])
-def test_merkle_sqlite_source_transfers_to_json_and_reopens_with_exact_evidence(tmp_path, role):
+@pytest.mark.parametrize('voided', [False, True], ids=['ordinary', 'voided'])
+def test_merkle_sqlite_source_transfers_to_json_and_reopens_with_exact_evidence(tmp_path, role, voided):
     source = SqliteStore(tmp_path / 'fictional.sqlite', month='2026-10')
-    source.add_account('personal', {'name': 'Fictional savings', 'type': 'depository', 'balance': 123})
+    account = source.add_account('personal', {'name': 'Fictional savings', 'type': 'depository', 'balance': 123})
+    if voided:
+        identifier = source.add_transaction('personal', {'accountId': account, 'date': '2026-10-01',
+            'merchant': 'Fictional retained transaction', 'amount': 1, 'categoryId': 'groceries'})
+        proposal = source.preview_transaction_void('personal', [identifier], 'void')
+        source.apply_transaction_void('personal', [identifier], 'void', proposal['fingerprint'])
     destination = JsonStore(tmp_path / 'fictional.json', month='2026-10', initial_role=role)
     before = destination.commit_evidence()
     try:
@@ -34,6 +40,10 @@ def test_merkle_sqlite_source_transfers_to_json_and_reopens_with_exact_evidence(
         destination = JsonStore(tmp_path / 'fictional.json')
         assert destination.commit_evidence() == evidence
         assert destination.export_local().source == evidence
+        if voided:
+            assert destination.export_budget()['transactions'][0]['voided']
+        import json
+        assert json.loads(destination.path.read_bytes())['formatVersion'] == 7
         if role == 'staged':
             destination.set_role('fictional-transfer', evidence, 'primary', authority_epoch=str(uuid4()))
             destination.add_account('personal', {'name': 'Fictional second', 'type': 'depository', 'balance': 0})
@@ -165,13 +175,92 @@ def test_legacy_transfer_format_five_keeps_sha_evidence_through_copy_reopen_and_
         after = destination.commit_evidence()
         assert after.generation == before.generation + 1
         assert after.digest_version == (2 if destination_class is SqliteStore else 1)
-        assert native_version() == (6 if destination_class is SqliteStore else 5)
+        assert native_version() == (7 if destination_class is SqliteStore else 5)
         assert all(row['transferPairValid'] for row in destination.transactions('personal'))
         assert destination.execute_operation(operation).receipt == receipt
         destination.close()
         destination = destination_class(target_path)
         assert destination.commit_evidence() == after
         assert destination.execute_operation(operation).receipt == receipt
+    finally:
+        source.close()
+        destination.close()
+
+
+@pytest.mark.parametrize('destination_class', [SqliteStore, JsonStore], ids=['sqlite', 'json'])
+@pytest.mark.parametrize('role', ['staged', 'copy'])
+def test_legacy_tombstone_format_six_retains_sha_receipts_and_archives_through_migration(tmp_path, destination_class, role):
+    import json
+
+    from tests.receipt_images import png
+    from whab.domain.history import validate_history
+    from whab.plugins.storage_transfer import (
+        StorageOperation,
+        canonical_storage_json,
+        local_state_digest,
+    )
+
+    source = JsonStore(tmp_path / 'legacy-void.json', month='2026-11')
+    target = tmp_path / 'destination'
+    destination = destination_class(target, month='2026-11', initial_role=role)
+    try:
+        account = source.add_account('personal', {'name': 'Fictional cash', 'type': 'depository', 'balance': 10000})
+        identifier = source.add_transaction('personal', {'accountId': account, 'date': '2026-11-01',
+            'merchant': 'Fictional purchase', 'amount': 100, 'categoryId': 'groceries'})
+        source.save_receipt('personal', identifier, png())
+        before = source.commit_evidence()
+        command = StorageOperation('legacy-void', before.authority_epoch, before.generation,
+            'personal', 'apply_transaction_void', canonical_storage_json({
+                'transactionIds': [identifier], 'action': 'void',
+                'fingerprint': source.preview_transaction_void('personal', [identifier], 'void')['fingerprint'],
+            }))
+        receipt = source.execute_operation(command).receipt
+        assert json.loads(source.path.read_bytes())['formatVersion'] == 6
+        assert receipt.evidence.digest_version == 1
+        source.close()
+        source = JsonStore(tmp_path / 'legacy-void.json', read_only=True)
+        assert source.commit_evidence() == receipt.evidence
+        snapshot = source.export_local()
+        if role == 'copy':
+            watermark = destination.apply_replica(str(uuid4()), snapshot, 'a' * 64,
+                destination.commit_evidence(), namespace_generation=0)
+            assert watermark.digest_version == 1
+        else:
+            destination.import_local('legacy-void-copy', snapshot)
+        copied = destination.commit_evidence()
+        assert copied.digest_version == 1 and copied.state_digest == snapshot.source.state_digest
+        def native_version():
+            return (destination._authority_metadata()['formatVersion'] if destination_class is SqliteStore
+                    else json.loads(destination.path.read_bytes())['formatVersion'])
+        assert native_version() == 6
+        destination.close()
+        destination = destination_class(target, read_only=True)
+        assert destination.commit_evidence() == copied and native_version() == 6
+        assert destination.transactions('personal') == []
+        destination.close()
+        destination = destination_class(target)
+        transition = 'legacy-void-promote' if role == 'copy' else 'legacy-void-copy'
+        if role == 'copy':
+            destination.prepare_promotion(transition, copied, watermark)
+        destination.set_role(transition, copied, 'primary', authority_epoch=str(uuid4()))
+        assert destination.execute_operation(command).receipt == receipt
+        before = destination.commit_evidence()
+        proposal = destination.preview_transaction_void('personal', [identifier], 'unvoid')
+        destination.apply_transaction_void('personal', [identifier], 'unvoid', proposal['fingerprint'])
+        evidence = destination.commit_evidence()
+        assert evidence.generation == before.generation + 1
+        assert evidence.digest_version == (2 if destination_class is SqliteStore else 1)
+        assert native_version() == (7 if destination_class is SqliteStore else 6)
+        transferred = destination.export_local()
+        assert evidence.state_digest == local_state_digest(transferred.financial, transferred.protected, version=evidence.digest_version)
+        assert destination.get_receipt('personal', identifier) == png()
+        assert destination.execute_operation(command).receipt == receipt
+        validate_history(destination.export_budget()['history'])
+        destination.close()
+        destination = destination_class(target)
+        assert destination.commit_evidence() == evidence
+        assert destination.execute_operation(command).receipt == receipt
+        assert destination.get_receipt('personal', identifier) == png()
     finally:
         source.close()
         destination.close()

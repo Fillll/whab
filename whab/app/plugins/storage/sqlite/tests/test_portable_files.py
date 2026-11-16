@@ -129,7 +129,7 @@ def test_database_image_size_is_bounded_on_export_and_read(store, monkeypatch):
     "CREATE TRIGGER unexpected AFTER INSERT ON accounts BEGIN DELETE FROM categories; END",
     "ALTER TABLE accounts ADD COLUMN unexpected TEXT",
     "DROP INDEX tx_month",
-    "PRAGMA user_version=3",
+    "PRAGMA user_version=4",
 ])
 def test_untrusted_schema_objects_migrations_and_versions_are_rejected_before_ledger_restore(store, payload, statement):
     files = altered(payload, [(statement, ())])

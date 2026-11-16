@@ -1324,6 +1324,72 @@ reuse or stale expired receipts fail. Guarded undo/redo reverses the edited reco
 new records and balance changes together; any conflict refuses the whole reversal.
 Worker RPC and supported HTTPS transports carry the same public operations.
 
+## Reversible transaction voids
+
+WHAB 2.82 adds the optional public `TransactionVoiding` capability. SQLite 1.30+
+and JSON 1.22+ implement it; other authorities refuse before mutation.
+
+```python
+supports_transaction_voiding() -> bool
+preview_transaction_void(workspace, transaction_ids, action) -> dict
+apply_transaction_void(workspace, transaction_ids, action, fingerprint) -> dict
+```
+
+`action` is `void` or `unvoid`. The public queries `preview_void_transactions` and
+`preview_unvoid_transactions` accept `{transactionIds}`; commands
+`void_transactions` and `unvoid_transactions` also require `fingerprint`.
+`transaction_void_policy` reports version 1, `maxTransactions: 100` and
+`durableTombstones: true`. Remote capability inspection preserves an observed
+revision. Worker and authenticated HTTPS transports use the same contract.
+
+Every command addresses 1–100 explicit distinct IDs in one native transaction,
+revision advancement, exact before/after audit entry and synchronous durable save.
+No adapter may split the batch or loop over individual commits. Results contain
+`action`, `count`, `changed`, `fingerprint`, ordered `changes` with full public
+`before`/`after` records, and `balanceChanges` with account ID/type/currency and
+before/after integer balance (or null). Preview makes no reservation or write.
+
+Void preserves permanent identity, amounts, dates, merchant whitespace, category,
+notes, imported evidence, attachments and pair links; it sets `voided: true`,
+`deleted: true`, `reviewed: false`. Registers and financial projections exclude it.
+Unvoid sets `voided: false` and restores the same record, still unreviewed.
+The retained false marker prevents later posted refreshes from re-inheriting an
+older pending tombstone; subsequent provider removal may still exclude the row.
+Provider-only deleted rows cannot be unvoided. Refresh/reimport preserves user
+voids. Later provider removal sets `providerDeleted: true` and blocks unvoid;
+provider restoration of the same ID can clear that marker without clearing the
+user void. Pending-to-posted changes carry the exclusion to the new provider ID
+and retain the original pending tombstone.
+
+Imported-source corrections preserve account snapshots, including stale/unknown
+status. Manual/demo entries reverse their existing balance effect on void and
+restore it on unvoid: cash/assets add/subtract the signed outflow amount, and
+positive-owed liabilities do the opposite. Preview includes unchanged imported
+balances. Existing monthly assignments remain exact, so correcting false income
+may reveal a deficit; subsequent assignment guards remain enforced. No snapshot
+verification, account reopening, bank sync, fabricated reversal or new zero row
+occurs. Existing zero records can be voided.
+
+Both reciprocal transfer legs must be explicit. Invalid links or orphan Transfer
+categories require separate repair first. Paired tombstones retain both links;
+unvoid validates the complete restored graph. Missing, duplicate, invalid,
+incomplete or stale targets reject the whole batch. Guarded history reversals
+retain the same pair, tombstone and balance safety.
+
+Exact retries retain ordered IDs, action, revision, fingerprint, request ID and
+actor/batch context, and return the original durable receipt after restart without
+another change/history/save. Never replay uncertainty with a fresh intent.
+WHAB 2.82 introduced native format 6 and conditional portable payload format 3
+to prevent older readers from dropping tombstones. SQLite 1.31 uses native Merkle
+format 7 and portable envelope 4 while retaining raw version-3 tombstone snapshots.
+JSON preserves native format 6 for legacy evidence or format 7 for Merkle copies,
+and portable version 3. Current readers still accept older budgets.
+
+Ordinary transaction search continues to exclude deleted records. Verify voided
+records through the complete saved receipt, `history list/show`, or an exact
+`unvoid --dry-run` using their retained IDs. The [CLI guide](../app/plugins/interface/cli/README.md)
+and offline command help provide copyable examples.
+
 ## Reviewed transfer matching
 
 WHAB 2.81 adds `TransferIntegrity` alongside the existing `TransferMatching` SDK.
@@ -1562,12 +1628,13 @@ atomic persistence, annotations, original/import records and native receipts.
 
 ## Incremental integrity
 
-SQLite 1.30 adds portable envelope format 3 (`WHAB-SQLITE-3`), accepting earlier
-raw SQLite payload versions 1/2. The envelope itself fences older readers even
+SQLite 1.31 adds portable envelope format 4 (`WHAB-SQLITE-4`), accepting earlier
+raw SQLite payload versions 1/2/3. The envelope itself fences older readers even
 when its first appended audit entry introduces a transfer pair. Compacted bases
-retain the earlier version-2 pair/history fence. JSON portable formats are unchanged.
+retain the earlier version-2 pair/history fence or version-3 tombstone fence.
+JSON portable formats are unchanged.
 
-WHAB 2.82 adds `CommitEvidence.digest_version` and
+WHAB 2.83 adds `CommitEvidence.digest_version` and
 `ReplicaWatermark.digest_version`. Omitted fields mean version 1 and retain the
 exact previous wire encoding and canonical SHA-256 calculation. Version 2 uses
 the deterministic Merkle format in
@@ -1604,11 +1671,11 @@ only their ancestor paths. Arrays retain counts and ordering; insertions,
 unknown writes and invalidated native generations rebuild. Cached hashes are
 not persistent authority and never bypass schema validation on reopen.
 
-SQLite adopts native metadata format 6 in the same commit as its next financial
+SQLite adopts native metadata format 7 in the same commit as its next financial
 mutation, without changing identity or advancing the revision merely on open.
-It retains version-1 evidence for untouched native formats 1–5; format 5 remains
-the earlier transfer-semantics fence and never implies Merkle evidence. JSON
-native format 6 supports version-2 local transfers and copies, preserving the
+It retains version-1 evidence for untouched native formats 1–6; formats 5 and 6 remain
+the earlier transfer and tombstone fences and never imply Merkle evidence. JSON
+native format 7 supports version-2 local transfers and copies, preserving the
 source version through promotion and subsequent writes. Older native readers
 reject these new formats; upgrade the stopped host and selected storage plugin
 together. This is not a storage-backend migration.

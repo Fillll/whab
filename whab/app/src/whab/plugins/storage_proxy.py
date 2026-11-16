@@ -26,6 +26,7 @@ from .storage_worker import StorageWorker, storage_error
 from .storage_worker_codec import CONTROL_WRITES, METHODS
 
 _MUTATIONS = {
+    "apply_transaction_void": (("workspace", "transaction_ids", "action", "fingerprint"), {}),
     "change_transactions": (("workspace", "edits", "creates"), {"preserve_balances": False}),
     "apply_transfer_match": (("workspace", "transaction_ids", "action", "fingerprint"), {}),
     "apply_transfer_matches": (("workspace", "pairs"), {"reviewed": False, "fingerprint": None}),

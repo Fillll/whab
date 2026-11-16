@@ -56,7 +56,7 @@ successful retries return the original durable receipt after restart, without a
 second mutation/history/save. Never retry with fresh intent. Conflicting reuse
 is refused. Unsupported authoritative backends fail before mutation. Legacy paired-
 transfer portable formats require WHAB 2.81 or newer. Current SQLite journal saves
-require WHAB 2.82 with SQLite 1.30 or newer; older readers refuse them. Help works
+require WHAB 2.83 with SQLite 1.31 or newer; older readers refuse them. Help works
 offline. Use match-transfer for one pair with its existing result shape, or
 match-transfers for a batch and optional review in the same commit.
 '''

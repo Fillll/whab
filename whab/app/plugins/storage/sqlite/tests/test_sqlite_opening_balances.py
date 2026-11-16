@@ -159,10 +159,10 @@ def test_native_failure_rolls_back_category_history_receipt_and_format_floor(tmp
             store.execute_operation(command)
         assert store.export_budget('personal') == before and store.commit_evidence() == evidence
         assert store.operation_receipt(command.operation_id) is None
-        assert store._authority_metadata()['formatVersion'] == 6
+        assert store._authority_metadata()['formatVersion'] == 7
         store.db.execute('DROP TRIGGER fictional_classification_failure')
         assert store.execute_operation(command).receipt.evidence.generation == evidence.generation + 1
-        assert store._authority_metadata()['formatVersion'] == 6
+        assert store._authority_metadata()['formatVersion'] == 7
     finally:
         store.close()
 
@@ -202,7 +202,7 @@ os._exit(17)
         receipt = store.execute_operation(command).receipt
         assert receipt.evidence == evidence
         assert store.export_budget('personal') == before and store.commit_evidence() == evidence
-        assert store._authority_metadata()['formatVersion'] == 6
+        assert store._authority_metadata()['formatVersion'] == 7
         assert len([entry for entry in store.budget_history('personal')['entries'] if entry['operation'] == 'classify_category']) == 1
     finally:
         store.close()

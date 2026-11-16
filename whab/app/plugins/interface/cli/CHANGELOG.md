@@ -1,11 +1,18 @@
 # Changelog
 
-## 2.23.1 — 2026-11-15
+## 2.24.1 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)
 
 - Build only the requested transaction parser and defer execution imports during offline help. Inspect the actual command position when selecting plugin documentation so a budget or merchant named bank does not trigger unrelated discovery. Keep complete group help, external discovery and existing single-record syntax.
 - Make 1–100-record atomic account classification prominent in command help; existing atomic bulk categorization and mixed edits share the improved native commit and durable save path.
+
+## 2.24.0 — 2026-11-15
+
+PR: [#215](https://github.com/Fillll/whab/pull/215)
+
+- Add ordinary atomic `trnx void` and `trnx unvoid` for 1–100 explicit IDs, exact read-only records/balance previews, guarded revisions/fingerprints, actor/batch attribution and durable exact retry recovery.
+- Verify complete saved receipts, preserve imported balance snapshots and source evidence, require both transfer legs explicitly, and document manual balance changes, tombstone retention and unreviewed restoration throughout offline help and operation examples.
 
 ## 2.23.0 — 2026-11-15
 

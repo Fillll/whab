@@ -585,3 +585,22 @@ def test_preparation_discards_unchanged_and_oversized_images(ledger, monkeypatch
         execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Bounded preparation'}, 'oversized-preparation')
     assert getattr(store, '_prepared_portable_changes', None) is None
     assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')
+
+
+def test_portable_header_counts_toward_limit_before_history_reserve_compaction(ledger, monkeypatch):
+    from whab_plugin_sqlite import portable_journal
+
+    store, _ = ledger
+    original = store.export_budget_files()['budget.sqlite']
+    base, entries = read_journal(original)
+    assert not entries and len(base) < len(original) - 1
+    limit = len(original) - 1
+    monkeypatch.setattr(portable, 'MAX_DATABASE_BYTES', limit)
+    monkeypatch.setattr(portable_journal, 'MAX_BYTES', limit)
+    compacted = store.export_budget_files()['budget.sqlite']
+    assert len(compacted) <= limit
+    assert portable.read_files({'budget.sqlite': compacted}) == store.export_budget()
+    with sqlite3.connect(':memory:') as image:
+        image.deserialize(read_journal(compacted)[0])
+        assert image.execute('PRAGMA freelist_count').fetchone()[0] == 0
+        assert not {'voided', 'provider_deleted'} & {row[1] for row in image.execute('PRAGMA table_info(transactions)')}

@@ -467,3 +467,27 @@ Native SQLite/JSON advertise optional `ClassifiedReview`; the public `review_pol
 query probes the authority. Unsupported storage/remote authorities fail before
 classification/review writes. Financial rules remain in core; adapters retain
 atomic persistence, annotations, original/import records and native receipts.
+
+## Reversibly void an erroneous transaction
+
+Use explicit IDs from `trnx list` and inspect the exact proposal:
+
+```sh
+whab "My budget" trnx void TX1 TX2 --agent Codex --dry-run
+whab "My budget" trnx void TX1 TX2 --agent Codex --revision REV --fingerprint HASH
+whab "My budget" trnx unvoid TX1 TX2 --agent Codex --dry-run
+```
+
+Each command accepts 1–100 IDs and makes one atomic commit and durable save; both
+legs of a matched transfer must be supplied. Imported account snapshots stay
+unchanged. Manual entries reverse/restore their existing balance effect, shown in
+`balanceChanges`. Amounts, identities, memos, categories and source evidence remain
+intact; unvoid leaves transactions unreviewed. Monthly assignments are preserved,
+so removing false income can reveal a deficit. No bank synchronization is started.
+
+A user void survives future refresh/import; provider-only removals cannot be
+unvoided. Use the saved receipt and `history list/show` to inspect excluded rows,
+which ordinary transaction search omits. Exact recovery retains the original
+request ID, IDs, revision, fingerprint and attribution; never create a fresh
+intent after an uncertain response. See `trnx void --help`, `trnx unvoid --help`
+and the [public void contract](plugins.md#reversible-transaction-voids).

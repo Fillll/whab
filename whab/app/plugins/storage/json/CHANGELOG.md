@@ -1,10 +1,20 @@
 # Changelog
 
-## 1.22.0 — 2026-11-15
+## 1.23.0 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)
 
-- Preserve versioned logical integrity across native local imports and copies from SQLite, retaining legacy evidence and exact durable receipts. Use native format 6 for version-2 evidence, retain legacy format-5 transfer fences and reject mismatched receipt and copy integrity versions.
+- Preserve versioned logical integrity across native local imports and copies from SQLite, retaining legacy evidence and exact durable receipts. Use native format 7 for version-2 evidence, retain legacy transfer and void fences and reject mismatched receipt and copy integrity versions.
+
+## 1.22.0 — 2026-11-15
+
+PR: [#215](https://github.com/Fillll/whab/pull/215)
+
+- Add atomic reversible void/unvoid for 1–100 explicit transaction IDs, exact before/after and balance previews, one native commit, permanent audit history and restart-safe exact retries.
+- Preserve imported account balance snapshots, source evidence, attachments and reciprocal archived pairs; reverse and restore the existing balance effect of manual/demo entries. Explicit unvoid leaves records unreviewed.
+- Retain explicit tombstones across provider refresh and pending-to-posted replacement; distinguish provider removals and refuse unsafe restoration.
+- Fence older readers with native format 6 and portable payload version 3 while void intent remains in current state or audit history. Continue reading prior portable formats.
+
 
 ## 1.21.0 — 2026-11-15
 

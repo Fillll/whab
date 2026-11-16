@@ -111,7 +111,7 @@ def main():
                 saved = session.path.read_bytes()
                 artifacts = [('snapshot', saved, backend == 'sqlite')]
                 if backend == 'sqlite':
-                    # Current SQLite always saves a format-3 envelope. Retain a
+                    # Current SQLite always saves a format-4 envelope. Retain a
                     # genuine legacy raw-image acceptance check separately.
                     container = decode_container(saved)
                     base_image, entries = read_journal(container.files['plugins/sqlite/budget.sqlite'])

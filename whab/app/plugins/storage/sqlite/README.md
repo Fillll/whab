@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.82 or newer for the public local-authority and
+This version requires WHAB 2.83 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 
@@ -46,7 +46,7 @@ Preserve integer currency minor units, separate currency totals, workspace/envir
 
 ## Portable files and restoration
 
-Portable plugin budget containers use `export_budget_files()` and `restore_budget_files(workspace, files)`. SQLite owns a single `budget.sqlite` payload (at most 50 MiB). From SQLite 1.30 / WHAB 2.82, payload format 3 wraps a sanitized SQLite snapshot and checksummed financial change records. Earlier raw SQLite images with user_version 1 or 2 remain readable. New snapshots rebuild a fresh database from a coherent validated ledger; export never copies the live database. The image contains personal ledger history, currencies, allocations and annotations, with no demo ledger, bank connections, tokens, cursors or account connection metadata. The source ledger and its active connections remain unchanged. Older portable schemas may omit any of the additive register indexes; present indexes still require exact supported SQL.
+Portable plugin budget containers use `export_budget_files()` and `restore_budget_files(workspace, files)`. SQLite owns a single `budget.sqlite` payload (at most 50 MiB). From SQLite 1.31 / WHAB 2.83, payload format 4 wraps a sanitized SQLite snapshot and checksummed financial change records. Earlier raw SQLite images with user_version 1, 2 or 3 remain readable. New snapshots rebuild a fresh database from a coherent validated ledger; export never copies the live database. The image contains personal ledger history, currencies, allocations and annotations, with no demo ledger, bank connections, tokens, cursors or account connection metadata. The source ledger and its active connections remain unchanged. Older portable schemas may omit any of the additive register indexes; present indexes still require exact supported SQL.
 
 Accounts persist their core `onBudget` scope and optional `subtype`. Existing ledgers and earlier portable images infer on-budget scope for checking/savings (`depository`) and credit cards (`credit`), and off-budget scope for other account types. New account classifications survive reopening, portable roundtrips and provider refreshes. Scope controls envelope budgeting independently of the account's asset or liability type.
 
@@ -243,7 +243,7 @@ changes and triggers require rebuilding it under the next read snapshot. Failed
 index maintenance discards the cache and cannot fail an already-committed edit.
 
 Native evidence is reused only while SQLite total-change and data-version stamps
-agree. On the first financial write, native metadata advances to format 6 and
+agree. On the first financial write, native metadata advances to format 7 and
 selects version-2 logical Merkle hashes. Known bounded edits update changed record
 leaves and their ancestors; retained history baselines and audit entries are
 immutable. Unknown scopes, outside SQL, triggers and rollbacks discard cached
@@ -261,14 +261,14 @@ retain complete-history validation. Atomic
 transaction and account batches share one native transaction, revision, receipt,
 audit entry and checkpoint; `--batch` remains only a history grouping label.
 
-Portable format 3 begins with `WHAB-SQLITE-3`, a bounded SQLite snapshot length and
+Portable format 4 begins with `WHAB-SQLITE-4`, a bounded SQLite snapshot length and
 SHA-256 checksum, followed by that sanitized snapshot. Each appended frame has
 its own length, SHA-256 checksum and JSON audit entries. Supported edits replace
 existing account or transaction rows. Independent opening validates the snapshot
 schema and every frame, checks exact prior records and the complete audit chain,
 then validates the final ledger and receipt references. Nested envelopes, damaged
 frames, unknown fields and unsupported changes are rejected without executing
-stored SQL. Earlier image-only readers refuse the new header; use SQLite 1.30+
+stored SQL. Earlier image-only readers refuse the new header; use SQLite 1.31+
 to open these saved files.
 
 Provider accounts in a saved image remain detached and stale. Replay checks the
@@ -586,16 +586,16 @@ invalid counterpart must be selected. History reversal remains guarded and canno
 reintroduce an invalid reviewed/Transfer classification. No repair invents or
 deletes transactions, reclassifies an account, or triggers bank synchronization.
 
-Native format 5 (and the newer Merkle format 6) fences older readers once paired transfers are retained in current
+Native format 5 (and the newer Merkle format 7) fences older readers once paired transfers are retained in current
 state or audit history. The floor never decreases after undo/unmatching and is
 retained by saved-file and complete local restoration. Existing older native
 ledgers remain readable for explicit audit; opening them does not repair records.
 
-Saved `.whab` files fence older financial interpretations with the new format-3
+Saved `.whab` files fence older financial interpretations with the new format-4
 envelope, including a first pairing appended to a pair-free snapshot. When
 compacted, the enclosed sanitized SQLite snapshot uses `PRAGMA user_version=2`
-while pairs remain in current records or permanent history; pair-free snapshots
-use version 1. Earlier raw versions 1/2 remain readable. Older plugins reject the
+while pairs remain in current records or permanent history; retained tombstones
+use version 3 and other snapshots use version 1. Earlier raw versions 1/2/3 remain readable. Older plugins reject the
 new envelope before restoring records into a destination. Plugin `state_version=1`
 remains unchanged because settings, state and ledger record schemas are unchanged;
 the payload header declares interpretation independently of namespace migrations
@@ -606,4 +606,53 @@ WHAB 2.80.0 source from local Git history, with fictional saved containers only:
 
 ```sh
 .venv/bin/python plugins/storage/sqlite/scripts/check_transfer_portable_compatibility.py
+```
+
+
+## Reversible transaction voids
+
+WHAB 2.82+ exposes `TransactionVoiding.supports_transaction_voiding`,
+`preview_transaction_void(workspace, transaction_ids, action)` and
+`apply_transaction_void(workspace, transaction_ids, action, fingerprint)`.
+The action is `void` or `unvoid`. Select 1–100 distinct stable transaction IDs
+from one budget/workspace; incomplete transfer pairs, missing/duplicate IDs,
+invalid states and stale fingerprints reject the entire operation before mutation.
+
+Each batch uses one observed revision, request ID, native commit and synchronous
+portable checkpoint. Preview reports exact `changes` and `balanceChanges`, including
+unchanged imported snapshots. Manual/demo entries reverse their existing signed
+cash or liability balance effect on void and restore it on unvoid; no amount,
+transaction, date, account, category, memo or source evidence is invented.
+
+Voided transactions retain identity, attachments and financial/source fields with
+`voided: true`, `deleted: true` and `reviewed: false`. Both explicitly selected
+reciprocal transfer legs retain their archived links. Unvoid restores both together
+and leaves them unreviewed. An explicit `voided: false` restoration marker prevents
+an older pending tombstone from re-voiding the posted identity on later sync. Provider refresh cannot silently resurrect a void:
+same-ID changes preserve the archived record, posted replacements inherit the
+explicit exclusion, and the original pending tombstone remains. `providerDeleted`
+records an actual source removal, preventing unvoid until a later source update
+restores that identity. Voiding itself never starts bank synchronization.
+
+Exact retries return the original durable receipt after restart without another
+history entry, revision or save. Conflicting request reuse and stale state fail.
+Never retry an uncertain mutation with a new request ID. Permanent exact before/after
+history supports guarded undo/redo; restoration cannot bypass provider-removal rules.
+
+Legacy native format 6 and raw portable version 3 fence older readers while void intent
+exists in current records or retained history, including after unvoid/undo. Existing
+version-1/2/3 raw portable files remain readable. New native commits use Merkle
+format 7 and saved files use envelope 4; compacted tombstone snapshots retain raw
+version 3. Void/unvoid appends preserve archived receipt images and independently
+validate final tombstone records on reopen. Plugin namespace state version stays 1:
+the internal payload header declares the new tombstone capability and fails before
+an older reader can mutate the destination. SQLite's first bounded void save appends its exact audited replacements
+without exporting unrelated ledger records. Compaction runs VACUUM after final
+schema selection, and the 50 MiB bound includes the journal envelope header.
+
+```sh
+whab "Fictional budget" trnx void TX1 TX2 --dry-run --agent Codex
+whab "Fictional budget" trnx void TX1 TX2 --agent Codex
+whab "Fictional budget" trnx unvoid TX1 TX2 --dry-run --agent Codex
+whab "Fictional budget" trnx unvoid TX1 TX2 --agent Codex
 ```

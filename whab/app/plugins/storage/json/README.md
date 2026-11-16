@@ -526,14 +526,14 @@ as part of an edit, creation, preview, retry or audit reversal. Existing annotat
 
 ## Versioned integrity compatibility
 
-JSON 1.22 supports WHAB 2.82's
+JSON 1.23 supports WHAB 2.83's
 [versioned integrity records](../../../../docs/plugins.md#incremental-integrity).
-Existing JSON formats 1–5 retain their canonical SHA-256 evidence; format 5
-is the earlier transfer-semantics fence. An explicit
+Existing JSON formats 1–6 retain their canonical SHA-256 evidence; format 5
+is the earlier transfer-semantics fence and format 6 retains tombstone intent. An explicit
 local transfer or copy from a Merkle source retains that source's algorithm in
-native format 6, including receipts, copy watermarks, reopen and promotion.
+native format 7, including receipts, copy watermarks, reopen and promotion.
 Subsequent writes preserve that version and mixed financial audit history.
-Older JSON readers reject format 6 rather than misinterpret its evidence. Update
+Older JSON readers reject format 7 rather than misinterpret its evidence. Update
 the stopped host and storage plugin together; opening a budget alone does not
 advance its financial generation or silently select another backend.
 
@@ -600,4 +600,48 @@ Git history, using fictional saved containers only:
 
 ```sh
 .venv/bin/python plugins/storage/sqlite/scripts/check_transfer_portable_compatibility.py
+```
+
+
+## Reversible transaction voids
+
+WHAB 2.82+ exposes `TransactionVoiding.supports_transaction_voiding`,
+`preview_transaction_void(workspace, transaction_ids, action)` and
+`apply_transaction_void(workspace, transaction_ids, action, fingerprint)`.
+The action is `void` or `unvoid`. Select 1–100 distinct stable transaction IDs
+from one budget/workspace; incomplete transfer pairs, missing/duplicate IDs,
+invalid states and stale fingerprints reject the entire operation before mutation.
+
+Each batch uses one observed revision, request ID, native commit and synchronous
+portable checkpoint. Preview reports exact `changes` and `balanceChanges`, including
+unchanged imported snapshots. Manual/demo entries reverse their existing signed
+cash or liability balance effect on void and restore it on unvoid; no amount,
+transaction, date, account, category, memo or source evidence is invented.
+
+Voided transactions retain identity, attachments and financial/source fields with
+`voided: true`, `deleted: true` and `reviewed: false`. Both explicitly selected
+reciprocal transfer legs retain their archived links. Unvoid restores both together
+and leaves them unreviewed. An explicit `voided: false` restoration marker prevents
+an older pending tombstone from re-voiding the posted identity on later sync. Provider refresh cannot silently resurrect a void:
+same-ID changes preserve the archived record, posted replacements inherit the
+explicit exclusion, and the original pending tombstone remains. `providerDeleted`
+records an actual source removal, preventing unvoid until a later source update
+restores that identity. Voiding itself never starts bank synchronization.
+
+Exact retries return the original durable receipt after restart without another
+history entry, revision or save. Conflicting request reuse and stale state fail.
+Never retry an uncertain mutation with a new request ID. Permanent exact before/after
+history supports guarded undo/redo; restoration cannot bypass provider-removal rules.
+
+Native format 6 and portable payload version 3 fence older readers while void intent
+exists in current records or retained history, including after unvoid/undo. Existing
+version-1/2 portable files remain readable. Plugin namespace state version stays 1:
+the internal payload header declares the new tombstone capability and fails before
+an older reader can mutate the destination. JSON writes a fully validated detached candidate and atomically replaces its native file.
+
+```sh
+whab "Fictional budget" trnx void TX1 TX2 --dry-run --agent Codex
+whab "Fictional budget" trnx void TX1 TX2 --agent Codex
+whab "Fictional budget" trnx unvoid TX1 TX2 --dry-run --agent Codex
+whab "Fictional budget" trnx unvoid TX1 TX2 --agent Codex
 ```

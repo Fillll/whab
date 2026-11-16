@@ -221,7 +221,7 @@ def test_journal_cannot_leave_a_receipt_pointing_at_deleted_transaction(saved):
     next(row for row in after['transactions'] if row['id'] == ids[0])['deleted'] = True
     entry = append_history(before.get('history'), before, after, {'operation': 'edit_transaction'})['entries'][-1]
     value = journal.append(raw, [entry], 0)
-    with pytest.raises(StoreError, match='active transaction'):
+    with pytest.raises(StoreError, match='active or explicitly voided transaction'):
         portable.read_files({'budget.sqlite': value})
 
 

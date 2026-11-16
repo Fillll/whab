@@ -40,10 +40,12 @@ from fastapi.testclient import TestClient
 target = Path(sys.argv[1]).resolve()
 with patch.object(metadata.EntryPoint, "load", side_effect=AssertionError("Documentation must not load hooks")):
     operation_catalog = installed_catalog()
-assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 50
+assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 55
 assert {"change_transactions", "preview_transaction_changes", "transaction_change_policy",
         "transfer_policy", "preview_transfer_matches", "match_transfers",
-        "transfer_audit", "preview_transfer_repair", "repair_transfers"} <= {
+        "transfer_audit", "preview_transfer_repair", "repair_transfers",
+        "preview_void_transactions", "void_transactions", "preview_unvoid_transactions",
+        "unvoid_transactions", "transaction_void_policy"} <= {
     row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}
 }
 assert {row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] == "local"} == {
@@ -78,6 +80,8 @@ for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
              ["fictional", "trnx", "match-transfers", "--help"],
              ["fictional", "trnx", "transfer-audit", "--help"],
              ["fictional", "trnx", "repair-transfers", "--help"],
+             ["fictional", "trnx", "void", "--help"],
+             ["fictional", "trnx", "unvoid", "--help"],
              ["fictional", "category", "--help"],
              ["fictional", "category", "list", "--help"],
              ["fictional", "category", "group", "--help"],
@@ -100,6 +104,10 @@ for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
     assert "usage:" in output.getvalue()
     if args[1:3] == ["trnx", "list"]:
         assert "complete=true" in output.getvalue() and "16 MiB" in output.getvalue()
+    if args[1:3] in (["trnx", "void"], ["trnx", "unvoid"]):
+        for text in ("balanceChanges", "ONE native atomic commit", "--revision",
+                     "--fingerprint", "--request-id", "tombstones", "Help is offline"):
+            assert text in output.getvalue(), (args, text)
 assert any(entry.name == "whab" for entry in metadata.distribution("whab_plugin_cli").entry_points)
 assert Path(whab.__file__).resolve().is_relative_to(target)
 assert metadata.version("whab") == whab.__version__ == expected["whab"]["version"]

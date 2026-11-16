@@ -1,11 +1,19 @@
 # Changelog
 
-## 2.82.0 — 2026-11-15
+## 2.83.0 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)
 
 - Add versioned incremental state and audit integrity with compatible old receipts, explicit algorithm evidence, independent transfer/copy verification and first-write migration. Preserve stale-revision refusal and exact replay across restarts.
 - Verify appended portable payloads using independent SHA-256 prefix state and retain synchronous complete-file saves. Extend fictional performance benchmarks with identical input seeds and saved-file, history and retry proofs.
+
+## 2.82.0 — 2026-11-15
+
+PR: [#215](https://github.com/Fillll/whab/pull/215)
+
+- Add reversible, guarded transaction void/unvoid for 1–100 explicit IDs, with exact record/balance previews, native atomic history, one save and restart-safe exact retries.
+- Keep user tombstones across bank refresh/import and portable restoration, distinguish later provider deletion, preserve imported balance snapshots, and require both matched-transfer legs.
+- Expose the same capability through public SDK, worker and HTTPS contracts; preserve manual-entry balance rules, source evidence, attachments and guarded audit reversals.
 
 ## 2.81.0 — 2026-11-15
 

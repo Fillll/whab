@@ -1,14 +1,24 @@
 # SQLite budget storage plugin changelog
 
-## 1.30.0 — 2026-11-15
+## 1.31.0 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)
 
-- Update changed record hashes and their tree paths for bounded native edits, with cache invalidation after external writes, triggers and rollback. Preserve old metadata on open and fence earlier writers after the first format-6 financial commit.
+- Update changed record hashes and their tree paths for bounded native edits, with cache invalidation after external writes, triggers and rollback. Preserve old metadata on open and fence earlier writers after the first format-7 financial commit.
 - Keep single-account scope edits and bulk classifications on indexed metadata reads while preserving confirmed-transfer guards, including implicit scope changes.
 - Reuse fully validated portable records during atomic cold restoration, and recognize populated local caches without loading their full transaction history. Every incoming file still receives independent validation before reuse.
 - Carry the locally constructed append and copied SHA state through commit promotion, avoiding repeated full-image prefix scans while retaining independent host verification and rollback behavior.
-- Store a sanitized SQLite snapshot plus bounded checksummed audit additions in portable format 3. Compact without dropping history or receipts, validate independent restores, and keep every acknowledged edit inside the synchronously saved `.whab` file. Earlier raw SQLite payloads remain readable; new payloads require SQLite 1.30 or newer.
+- Store a sanitized SQLite snapshot plus bounded checksummed audit additions in portable format 4. Compact without dropping history or receipts, validate independent restores, and keep every acknowledged edit inside the synchronously saved `.whab` file. Earlier raw SQLite payloads remain readable; new payloads require SQLite 1.31 or newer.
+
+## 1.30.0 — 2026-11-15
+
+PR: [#215](https://github.com/Fillll/whab/pull/215)
+
+- Add atomic reversible void/unvoid for 1–100 explicit transaction IDs, exact before/after and balance previews, one native commit, permanent audit history and restart-safe exact retries.
+- Preserve imported account balance snapshots, source evidence, attachments and reciprocal archived pairs; reverse and restore the existing balance effect of manual/demo entries. Explicit unvoid leaves records unreviewed.
+- Retain explicit tombstones across provider refresh and pending-to-posted replacement; distinguish provider removals and refuse unsafe restoration.
+- Fence older readers with native format 6 and portable payload version 3 while void intent remains in current state or audit history. Continue reading prior portable formats.
+
 
 ## 1.29.0 — 2026-11-15
 

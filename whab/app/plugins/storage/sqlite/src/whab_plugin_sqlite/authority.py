@@ -100,7 +100,7 @@ class Authority:
         if type(row[0]) is not bytes:
             raise StoreError("Invalid SQLite storage authority metadata.")
         metadata = read_storage_json(row[0])
-        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3, 4, 5, 6}:
+        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3, 4, 5, 6, 7}:
             raise StoreError("Invalid SQLite storage authority metadata.")
         if metadata.keys() != {
             "formatVersion", "budgetId", "environment", "instanceId", "authorityEpoch", "generation",
@@ -161,7 +161,7 @@ class Authority:
     def _metadata_evidence(metadata, digest):
         return CommitEvidence(metadata["budgetId"], metadata["environment"], metadata["instanceId"],
                               metadata["authorityEpoch"], metadata["generation"], metadata["operationId"],
-                              metadata["role"], digest, 2 if metadata["formatVersion"] >= 6 else 1)
+                              metadata["role"], digest, 2 if metadata["formatVersion"] >= 7 else 1)
 
     def _local_states(self):
         states = {name: self._read_state(name) for name in ("personal", "demo")}
@@ -197,14 +197,14 @@ class Authority:
     def _current_evidence(self, metadata=None):
         stamp = (self.db.total_changes, self.db.execute("PRAGMA data_version").fetchone()[0])
         metadata = metadata or self._authority_metadata()
-        version = 2 if metadata['formatVersion'] >= 6 else 1
+        version = 2 if metadata['formatVersion'] >= 7 else 1
         if getattr(self, '_evidence_stamp', None) != stamp or getattr(self, '_evidence_version', None) != version:
             transaction = self._writing
             selected = transaction.get('selected') if transaction is not None else None
             reusable = (selected is not None and selected[0] in transaction.get('history_after', {})
                         and getattr(self, '_native_state_stamp', None) == transaction['before_stamp'])
             reusable = reusable and transaction.get('history_operation') in {
-                'edit_transaction', 'edit_transaction_details', 'review_transactions', 'update_account', 'edit_transactions', 'classify_accounts', 'match_transfers',
+                'edit_transaction', 'edit_transaction_details', 'review_transactions', 'update_account', 'edit_transactions', 'classify_accounts', 'match_transfers', 'void_transactions', 'unvoid_transactions',
             }
             if reusable:
                 from whab.domain.history import financial
@@ -321,7 +321,7 @@ class Authority:
                     selected = None
                 yield transaction
                 if transaction["dirty"]:
-                    metadata["formatVersion"] = 6
+                    metadata["formatVersion"] = 7
                     if transaction.get('selected') is not None:
                         workspace, selected = transaction['selected']
                     from whab.domain.history import record_financial
@@ -388,7 +388,7 @@ class Authority:
                                 new["history"] = journal
                                 if journal is not original_journal:
                                     from .history_writes import save_history
-                                    save_history(self, name, journal, original_journal, cache_valid=name in cached and selected is not None and info['operation'] in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts', 'match_transfers'})
+                                    save_history(self, name, journal, original_journal, cache_valid=name in cached and selected is not None and info['operation'] in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts', 'match_transfers', 'void_transactions', 'unvoid_transactions'})
                         if selected is not None:
                             self._history_row_positions[name] = (new['transactions'], positions)
                         history_after[name] = new
@@ -495,6 +495,9 @@ class Authority:
             from whab.domain.transfer_matching import validate_pairs
             pairs = validate_pairs(payload['pairs'], reviewed=payload.get('reviewed', False))
             selected = [identifier for pair in pairs for identifier in (pair['outId'], pair['inId'])]
+        elif name == 'apply_transaction_void':
+            from whab.domain.transaction_voids import validate_void_ids
+            selected = validate_void_ids(payload['transactionIds'])
         elif name == 'classify_accounts':
             selected = ()
         with self._authority_write(workspace=operation.workspace, transaction_ids=selected) as transaction:
@@ -580,8 +583,8 @@ class Authority:
             states = self._check_local_target(metadata, snapshot)
             source = snapshot.source
             # Select the source algorithm before population, so _write_state
-            # can retain the independent transfer-semantics floor (format 5).
-            metadata['formatVersion'] = 6 if source.digest_version == 2 else 4
+            # can retain the independent transfer/void floors (formats 5/6).
+            metadata['formatVersion'] = 7 if source.digest_version == 2 else 4
             self._replace_local_states(states, snapshot.receipts)
             metadata.update(generation=source.generation, operationId=source.operation_id,
                             authorityEpoch=source.authority_epoch, empty=False, transitionId=transfer_id,
@@ -623,7 +626,7 @@ class Authority:
             )
             if replayed:
                 return watermark
-            metadata['formatVersion'] = 6 if snapshot.source.digest_version == 2 else 4
+            metadata['formatVersion'] = 7 if snapshot.source.digest_version == 2 else 4
             self._replace_local_states(decode_local_state(snapshot.financial, snapshot.protected), snapshot.receipts)
             metadata.update(generation=snapshot.source.generation, operationId=snapshot.source.operation_id,
                             authorityEpoch=snapshot.source.authority_epoch, empty=False,
