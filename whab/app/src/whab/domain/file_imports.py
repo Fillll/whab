@@ -134,6 +134,10 @@ def validate_workspace_import(data: WorkspaceImport) -> WorkspaceImport:
     from .review import review_status
     category_map = {row['id']: row for row in categories}
     for transaction in transactions:
+        if category_map.get(transaction.get('categoryId'), {}).get('kind') == 'transfer':
+            # A workspace importer supplies no reciprocal link contract. Preserve
+            # its transfer evidence and source memo, without inventing a pair.
+            transaction.update(categoryId=None, isTransfer=True, inferredTransfer=True, reviewed=False)
         if not review_status(transaction, category_map)['eligible']:
             transaction['reviewed'] = False
     assignment_keys = set()

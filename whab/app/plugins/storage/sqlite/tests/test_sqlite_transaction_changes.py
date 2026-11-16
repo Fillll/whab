@@ -32,7 +32,7 @@ def seed(store):
         accounts=(account,), categories=categories, transactions=(transaction, payment), assignments=(), budget_start_month='2026-10'))
     edits = [{'transactionId': transaction['id'], 'amount': -80000}]
     creates = [{'creationId': CREATION_ID, 'accountId': account['id'], 'date': transaction['date'],
-                'merchant': 'Fictional lender', 'amount': -20000, 'currency': 'USD', 'categoryId': 'transfers',
+                'merchant': 'Fictional lender', 'amount': -20000, 'currency': 'USD', 'categoryId': 'residence',
                 'note': transaction['note'], 'categoryAgent': 'Codex'}]
     return edits, creates
 

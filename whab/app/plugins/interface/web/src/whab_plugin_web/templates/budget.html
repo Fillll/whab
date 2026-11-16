@@ -116,6 +116,20 @@
                 </td>
               {% endfor %}
             </tr>
+            {% if periods|selectattr('summary.transferFunding')|list %}
+            <tr class="budget-overview-row" data-budget-key="transfer-funding">
+              <th scope="row">Transfer funding</th>
+              {% for period in periods %}
+                {% set transfer_funding = period.summary.transferFunding|default(0) %}
+                <td colspan="{{ period.column_count }}" class="month-start{% if transfer_funding<0 %} negative{% endif %}" data-budget-key="{{ period.month }}">
+                  <span data-private-amount>{{ money_number(transfer_funding) }}</span>
+                  {% call summary_details(period, 'Transfer funding') %}
+                    <p>Confirmed transfer legs change eligible budget funds on their posted dates. Moves between on-budget cash accounts in the same month cancel out; moves across months or the budget boundary can change this month's funding. This is separate from income and spending. Credit overpayments and unverified cash do not create spendable funds.</p>
+                  {% endcall %}
+                </td>
+              {% endfor %}
+            </tr>
+            {% endif %}
             <tr class="budget-overview-row budget-carried-in-row" data-budget-key="carried-in">
               <th scope="row">Carried in</th>
               {% for period in periods %}
@@ -191,12 +205,13 @@
                         <dl>
                           <div><dt>Income</dt><dd>{{ equation_amount(period.summary.income, '+') }}</dd></div>
                           <div><dt>Opening funding</dt><dd{% if period.summary.openingFunding<0 %} class="negative"{% endif %}>{{ equation_amount(period.summary.openingFunding, '+') }}</dd></div>
+                          {% if period.summary.transferFunding|default(0) %}<div><dt>Transfer funding</dt><dd{% if period.summary.transferFunding<0 %} class="negative"{% endif %}>{{ equation_amount(period.summary.transferFunding, '+') }}</dd></div>{% endif %}
                           <div><dt>Carried in</dt><dd{% if period.carried_in<0 %} class="negative"{% endif %}>{{ equation_amount(period.carried_in, '+') }}</dd></div>
                           <div><dt>Assigned for next month</dt><dd>{{ equation_amount(period.summary.assignedNextMonth, '−') }}</dd></div>
                           <div><dt>Assigned this month</dt><dd>{{ equation_amount(period.summary.assigned, '−') }}</dd></div>
                           <div class="budget-summary-total"><dt>Available to assign</dt><dd{% if period.summary.readyToAssign<0 %} class="negative"{% endif %}>{{ equation_amount(period.summary.readyToAssign, '=') }}</dd></div>
                         </dl>
-                        <p>Income + Opening funding + Carried in − Assigned for next month − Assigned this month.</p>
+                        <p>Income + Opening funding{% if period.summary.transferFunding|default(0) %} + Transfer funding{% endif %} + Carried in − Assigned for next month − Assigned this month.</p>
                         <p>{% if period.summary.readyToAssign<0 %}A negative amount means this month's funding pool does not cover its category assignments and next-month set-aside. Review carried-in deficits, income and assignments before assigning more.{% else %}This is the unassigned money remaining in {{ month_label(period.month) }}'s funding pool.{% endif %} By-category carryover stays in its categories and is excluded from this pool.</p>
                         {% if valid_money(period.summary.fundingCapacity) and period.summary.fundingCapacity<period.summary.readyToAssign %}<p>Some funds are needed to cover spending or account reserves. Review category overspending, uncategorized spending, and account balances before assigning more money.</p>{% if period.summary.fundingCapacity<0 %}<p class="negative">Available after spending and account reserves: <span data-private-amount>{{ money_number(period.summary.fundingCapacity) }}</span>.</p>{% endif %}{% endif %}
                       {% endcall %}

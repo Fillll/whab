@@ -281,16 +281,23 @@ not bypass the category batch limit or split its save.
 With WHAB 2.75+ and Web 1.53+, select 2–100 loaded transactions and change the
 category in any selected row to apply that exact category to the whole selection.
 Changing an unselected row still changes only that row. Clearing the category
-clears it for the selected records. Pending records can be categorized, and review
-status stays unchanged. The selection bar explains this behavior before editing.
+clears it for the selected records. Pending records can be categorized. Review
+stays unchanged only while the saved and proposed classifications are both
+eligible; otherwise it is cleared. The selection bar explains bulk behavior before editing.
 
 This uses the existing public `edit_transactions` operation: one observed revision,
 one request ID, one native commit/checkpoint and one reversible audit entry. Every
-target is validated first. Any missing/duplicate/disallowed target, invalid category,
-matched transfer or unsupported backend rejects the entire selection; more than 100
+target is validated first. Any missing/duplicate/disallowed target, invalid category
+or unsupported backend rejects the entire selection; more than 100
 is refused without splitting or a fallback to separate edits. Notes, merchant
 whitespace, amounts, dates, accounts and transaction identities are preserved.
 Manual categorization clears prior category-agent/provisional suggestion badges.
+
+A verified transfer pair can receive a Transfer category or keep its pair without
+a category. An unmatched transaction cannot receive a Transfer category. A mixed
+selection must satisfy those rules for every row; otherwise the whole save fails.
+Choose **Unmatch** before assigning Expense, Income or Opening Balance to a paired
+transaction. Broken legacy links require an explicit audited repair.
 
 The browser obtains the exact native preview internally before submitting. A stale
 first request asks for refresh and another explicit choice. An uncertain response
@@ -415,6 +422,15 @@ For a fictional preview, serve this plugin folder as described above and open `/
 
 The fictional `/tests/fixtures/transaction-row-heights.html` preview uses the shipped register stylesheet to check equal header/cell heights, inline category markers and stable row geometry after dismissal. Cases cover light/dark, single/multiple accounts, desktop/narrow widths, long text, multiline memos and low-score markers; it never opens a budget or contacts a model provider.
 
+For transfer controls and funding explanations, run
+`.venv/bin/python plugins/interface/web/tests/fixtures/build_transfer_preview.py --output /tmp/whab-transfer-ui-static`
+from `whab/app`, then serve that isolated output directory with a loopback static
+server. The four light/dark pages render shipped templates with fictional data;
+category choices and funding disclosures work, while saves and navigation are
+disabled. Check a paired row with its archived counterpart outside the month,
+an unmatched row, disabled unclassified review, and the separate Transfer funding
+row at desktop and compact widths. HTTPS/native tests verify actual saves.
+
 
 ### Currency and month range
 
@@ -486,43 +502,26 @@ changes and retained across reopen and exports. Earlier changes are not backfill
 
 ## Reviewed transfer matching
 
-WHAB 2.74 introduces optional public `TransferMatching` SDK capability. The financial
-core owns equal nonzero opposite amounts, same currency and budget scope, distinct
-active accounts, posted/nondeleted/uncategorized eligibility and the seven-day date
-window. Deterministic proposals are read-only and preserve every ambiguous alternative;
-merchant names and provider hints never prove a pair. Date/account filters select an
-anchor; its counterpart may lie outside those filters. Pagination returns total/next;
-over 1,000 candidates requires narrower filters. No initial-page background scan runs.
+**Suggest transfers** remains a read-only proposal panel. Explicit pair confirmation
+uses the core's reciprocal two-leg rules and leaves both transactions unreviewed.
+Automatic proposals exclude zero-value entries. The CLI can explicitly pair two
+already-existing posted zero entries without creating records or inferring direction.
+Valid pairs can involve historical closed accounts or different current budget
+scopes. Review availability uses the authority's complete pair verification even
+when the counterpart is outside the visible page/date filter. Imported hints and
+orphan Transfer categories cannot be reviewed as complete transfers.
 
-The interface plugins own presentation: Web's Transactions **Suggest transfers** panel
-shows both sides and requires **Review this pair**, then **Confirm transfer match**.
-CLI `trnx transfers`, `match-transfer --dry-run`, `match-transfer` and `unmatch-transfer`
-use the same public operations. Neither matching nor unmatching reviews a transaction:
-both become unreviewed for the normal review workflow. No bank synchronization or
-persistent future rule is created. Refunds may look identical and require judgment.
-Cross-currency, fees/splits and cross-budget-scope transfers need manual handling.
+The budget shows **Transfer funding** when confirmed dated movements affect eligible
+budget funds. Same-month cash movements within the budget cancel; cross-month and
+cross-scope movements can affect available funding without becoming ordinary income
+or spending. The Available to assign breakdown includes this component. Privacy
+masking and whole-unit comma formatting apply to it like all other money displays.
 
-Confirmation uses an observed revision and fingerprint, one native operation, one
-reversible before/after audit entry, one durable receipt and one synchronous checkpoint.
-Exact successful retries keep operation, IDs/order, action, fingerprint, revision,
-request ID and history attribution, including after restart. Unknown outcomes must
-retain that intent; no fresh-intent automatic replay. Unsupported backends/authorities
-fail before mutation. SQLite 1.24 and JSON 1.16 implement the capability through their
-existing native transactions; remote transports delegate to the authority.
-
-Optional `transferPeerId` is a reciprocal stable identity; absence preserves legacy
-records and historical digests. Match changes only this link, `isTransfer=true` and
-`reviewed=false`. Unmatch removes both links, restores each existing `inferredTransfer`
-hint and sets both unreviewed. IDs, amounts, dates, accounts, currencies, merchants
-(including whitespace), notes, category attribution, original metadata and receipts
-are retained. Unmatch before editing a paired amount/date/account/category or changing
-an account's budget scope. Ordinary notes/merchant/review edits preserve the pair.
-Provider corrections/removals that invalidate a pair remove both links and require
-fresh review; this never automatically creates another pair.
-
-The shared contract is necessary because no previous public operation could atomically
-link two transactions with reciprocal identity, validated preview and reversible audit.
-Storage internals stay behind SDK/native operations; interfaces never inspect databases.
+For explicit native bulk pairing and legacy audit/repair use the
+[CLI transfer workflow](../../../../docs/usage.md#reviewed-transfer-matching).
+The [SDK transfer contract](../../../../docs/plugins.md#reviewed-transfer-matching)
+owns eligibility, atomicity, exact retries and saved-data compatibility. No automatic
+pairing, cleanup, bank synchronization or persistent future rule is created.
 
 ## Income categories
 
@@ -539,19 +538,28 @@ command. Existing targets or any assignment rows block income conversion.
 
 ## Classification before review
 
-WHAB 2.79 supports Expense, Income, Transfer and Opening Balance child types (`kind` in public
+WHAB 2.81 supports Expense, Income, Transfer and Opening Balance child types (`kind` in public
 records, `--type` in CLI). Missing kind remains Expense. Income, Transfer and Opening Balance have
 no expense target or assignment rows. Transfer is explicit account movement,
-excluded from ordinary income/spending without changing account balances. It may
-be classified before pairing; matching still requires equal opposite posted
-amounts, different active accounts, same currency/budget scope and dates within
-seven days. Matching remains separate and never reviews automatically.
+excluded from ordinary income/spending without changing account balances. Transfer
+classification and review require exactly two valid reciprocal posted legs in
+different same-currency accounts, with equal opposite amounts and dates within
+seven days. Two existing zero entries can be explicitly paired; automatic proposals
+exclude them. Closed historical accounts and different current budget scopes are
+allowed without reopening or reclassification. Web pair confirmation leaves both
+legs unreviewed; the CLI supports explicit review in the same bulk matching commit.
 
-A posted, nondeleted transaction needs a valid child of any type, or a previously
-confirmed transfer pair, before explicit review. A bank hint alone is insufficient.
-Assigning classification does not manufacture review. Clearing it makes unreviewed
-in the same native operation. An explicit conflicting clear+review rejects the
-whole operation. Mixed batches validate their final proposed state atomically.
+A posted, nondeleted transaction needs a valid Expense, Income or Opening Balance
+child, or a complete valid Transfer pair, before explicit review. A bank hint or
+unpaired Transfer category is insufficient. Unmatched and new-row category pickers
+omit Transfer; valid pairs offer the optional Transfer labels and a matched empty
+option. Old invalid saved classifications remain visible for inspection.
+Assigning classification does not manufacture review. Removing the last eligible
+classification clears review in the same native operation; explicit clear+review
+then rejects the whole operation. Clearing an optional Transfer label on a valid
+pair retains its classification and review eligibility. Choosing Expense, Income
+or Opening Balance for a paired row requires unmatching first. Mixed batches
+validate their final proposed state atomically.
 Pending records cannot be reviewed. Undo/redo cannot restore a newly invalid review.
 
 Old saved reviewed/unclassified flags and historical audit hashes remain readable

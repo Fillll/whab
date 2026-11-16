@@ -2051,7 +2051,7 @@
             "type": "array",
             "minItems": 1,
             "maxItems": 100,
-            "description": "1\u2013100 explicit, distinct targets; at least one supported change per item. Never split.",
+            "description": "1–100 explicit, distinct targets; at least one supported change per item. Never split.",
             "items": {
               "type": "object",
               "description": "Operation parameters.",
@@ -2074,7 +2074,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "Self-declared categorizer label (1\u201380 printable characters); null clears; requires categoryId."
+                  "description": "Self-declared categorizer label (1–80 printable characters); null clears; requires categoryId."
                 },
                 "reviewed": {
                   "type": "boolean",
@@ -2111,7 +2111,7 @@
         "properties": {
           "count": {
             "type": "integer",
-            "description": "Explicit targets (1\u2013100)."
+            "description": "Explicit targets (1–100)."
           },
           "changed": {
             "type": "integer",
@@ -2164,7 +2164,7 @@
       "permissions": "Host-scoped optional SDK callback; never arbitrary native storage access through HTTP.",
       "scope": "Exactly one addressed budget/environment/workspace. IDs do not select another budget.",
       "errors": [
-        "1\u2013100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
+        "1–100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
         "Core category currency, account type/subtype/scope and annotation bounds apply. Unsupported backends fail before mutation.",
         "Stale revisions and conflicting request reuse fail. Uncertain responses may have committed; inspect history and preserve the original intent."
       ],
@@ -2191,7 +2191,7 @@
             "type": "array",
             "minItems": 1,
             "maxItems": 100,
-            "description": "1\u2013100 explicit, distinct targets; at least one supported change per item. Never split.",
+            "description": "1–100 explicit, distinct targets; at least one supported change per item. Never split.",
             "items": {
               "type": "object",
               "description": "Operation parameters.",
@@ -2249,7 +2249,7 @@
         "properties": {
           "count": {
             "type": "integer",
-            "description": "Explicit targets (1\u2013100)."
+            "description": "Explicit targets (1–100)."
           },
           "changed": {
             "type": "integer",
@@ -2301,7 +2301,7 @@
       "permissions": "Host-scoped optional SDK callback; never arbitrary native storage access through HTTP.",
       "scope": "Exactly one addressed budget/environment/workspace. IDs do not select another budget.",
       "errors": [
-        "1\u2013100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
+        "1–100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
         "Core category currency, account type/subtype/scope and annotation bounds apply. Unsupported backends fail before mutation.",
         "Stale revisions and conflicting request reuse fail. Uncertain responses may have committed; inspect history and preserve the original intent."
       ],
@@ -2357,7 +2357,7 @@
         "properties": {
           "count": {
             "type": "integer",
-            "description": "Explicit targets (1\u2013100)."
+            "description": "Explicit targets (1–100)."
           },
           "changed": {
             "type": "integer",
@@ -2409,7 +2409,7 @@
       "permissions": "Host-scoped optional SDK callback; never arbitrary native storage access through HTTP.",
       "scope": "Exactly one addressed budget/environment/workspace. IDs do not select another budget.",
       "errors": [
-        "1\u2013100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
+        "1–100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
         "Core category currency, account type/subtype/scope and annotation bounds apply. Unsupported backends fail before mutation.",
         "Stale revisions and conflicting request reuse fail. Uncertain responses may have committed; inspect history and preserve the original intent."
       ],
@@ -2441,7 +2441,7 @@
       "permissions": "Host-scoped optional SDK callback; never arbitrary native storage access through HTTP.",
       "scope": "Exactly one addressed budget/environment/workspace. IDs do not select another budget.",
       "errors": [
-        "1\u2013100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
+        "1–100 distinct targets; invalid/missing/deleted/foreign/duplicate/disallowed items reject the whole batch. No splitting or partial success.",
         "Core category currency, account type/subtype/scope and annotation bounds apply. Unsupported backends fail before mutation.",
         "Stale revisions and conflicting request reuse fail. Uncertain responses may have committed; inspect history and preserve the original intent."
       ],
@@ -2452,15 +2452,15 @@
       "permissions": "Optional public host-scoped SDK callback. Guarded writes use native StorageOperation/recorded_command with permanent audit history and receipts.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
-      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
       "name": "TransferMatching.transfer_candidates",
       "kind": "sdk",
-      "summary": "Read-only possible transfer pairs: equal opposite nonzero amounts, same currency/budget scope, different active accounts, posted/uncategorized/unmatched, within seven days. All alternatives remain proposals; no automatic match or review.",
+      "summary": "Read-only possible transfer pairs: equal opposite nonzero amounts, same currency, different accounts, posted/uncategorized/unmatched, within seven days. All alternatives remain proposals; no automatic match or review.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -2571,12 +2571,12 @@
       "permissions": "Optional public host-scoped SDK callback. Guarded writes use native StorageOperation/recorded_command with permanent audit history and receipts.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
-      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
       "name": "TransferMatching.preview_transfer_match",
       "kind": "sdk",
       "summary": "Inspect the exact proposed pair changes and fingerprint before explicit confirmation. Confirming links both IDs, marks transfer exclusion and leaves both unreviewed. Unmatching removes links and restores provider transfer hints, leaving both unreviewed.",
@@ -2687,15 +2687,15 @@
       "permissions": "Optional public host-scoped SDK callback. Guarded writes use native StorageOperation/recorded_command with permanent audit history and receipts.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
-      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
       "name": "TransferMatching.apply_transfer_match",
       "kind": "sdk",
-      "summary": "Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
+      "summary": "Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, source and original metadata. Matching preserves category attribution; unmatching clears any orphan Transfer label and that label's attribution. Both remain unreviewed for ordinary review.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -2810,12 +2810,12 @@
       "permissions": "Optional public host-scoped SDK callback. Guarded writes use native StorageOperation/recorded_command with permanent audit history and receipts.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
-      "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
       "name": "TransferMatching.supports_transfer_matching",
       "kind": "sdk",
       "summary": "Explicitly advertise atomic reversible transfer linking with coherent proposals, exact previews and durable receipts.",
@@ -3063,7 +3063,7 @@
           },
           "edits": {
             "type": "array",
-            "description": "Explicit existing edits. Total edits plus creates must be 1\u2013100; no silent split.",
+            "description": "Explicit existing edits. Total edits plus creates must be 1–100; no silent split.",
             "maxItems": 100,
             "items": {
               "type": "object",
@@ -3088,7 +3088,7 @@
                 },
                 "merchant": {
                   "type": "string",
-                  "description": "Explicit payee/merchant text (1\u2013200 characters); omitted edits preserve whitespace verbatim.",
+                  "description": "Explicit payee/merchant text (1–200 characters); omitted edits preserve whitespace verbatim.",
                   "minLength": 1,
                   "maxLength": 200
                 },
@@ -3112,7 +3112,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "Explicit category attribution (1\u201380 printable characters) or null; requires categoryId.",
+                  "description": "Explicit category attribution (1–80 printable characters) or null; requires categoryId.",
                   "minLength": 1,
                   "maxLength": 80
                 },
@@ -3166,7 +3166,7 @@
                 },
                 "merchant": {
                   "type": "string",
-                  "description": "Explicit payee/merchant text (1\u2013200 characters); omitted edits preserve whitespace verbatim.",
+                  "description": "Explicit payee/merchant text (1–200 characters); omitted edits preserve whitespace verbatim.",
                   "minLength": 1,
                   "maxLength": 200
                 },
@@ -3194,7 +3194,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "Explicit category attribution (1\u201380 printable characters) or null; requires categoryId.",
+                  "description": "Explicit category attribution (1–80 printable characters) or null; requires categoryId.",
                   "minLength": 1,
                   "maxLength": 80
                 },
@@ -3404,7 +3404,7 @@
       "retry": "Preview can repeat freely. Exact successful native retries return the original receipt after restart without another record, history entry, commit or save. Preserve request ID, expected revision, creation IDs, payload and history attribution; never replay uncertainty with a fresh intent.",
       "availability": "WHAB 2.78+, optional AtomicTransactionChanges; SQLite 1.27+ and JSON 1.19+ implement it.",
       "name": "AtomicTransactionChanges.change_transactions",
-      "summary": "Atomically edit and create 1\u2013100 ordinary transactions with one native commit, audit entry and durable receipt.",
+      "summary": "Atomically edit and create 1–100 ordinary transactions with one native commit, audit entry and durable receipt.",
       "input": {
         "type": "object",
         "description": "Native SDK arguments. Names must already be resolved; host supplies revision/request-ID guards and audit attribution.",
@@ -3419,7 +3419,7 @@
           },
           "edits": {
             "type": "array",
-            "description": "Explicit existing edits. Total edits plus creates must be 1\u2013100; no silent split.",
+            "description": "Explicit existing edits. Total edits plus creates must be 1–100; no silent split.",
             "maxItems": 100,
             "items": {
               "type": "object",
@@ -3444,7 +3444,7 @@
                 },
                 "merchant": {
                   "type": "string",
-                  "description": "Explicit payee/merchant text (1\u2013200 characters); omitted edits preserve whitespace verbatim.",
+                  "description": "Explicit payee/merchant text (1–200 characters); omitted edits preserve whitespace verbatim.",
                   "minLength": 1,
                   "maxLength": 200
                 },
@@ -3468,7 +3468,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "Explicit category attribution (1\u201380 printable characters) or null; requires categoryId.",
+                  "description": "Explicit category attribution (1–80 printable characters) or null; requires categoryId.",
                   "minLength": 1,
                   "maxLength": 80
                 },
@@ -3522,7 +3522,7 @@
                 },
                 "merchant": {
                   "type": "string",
-                  "description": "Explicit payee/merchant text (1\u2013200 characters); omitted edits preserve whitespace verbatim.",
+                  "description": "Explicit payee/merchant text (1–200 characters); omitted edits preserve whitespace verbatim.",
                   "minLength": 1,
                   "maxLength": 200
                 },
@@ -3550,7 +3550,7 @@
                     "string",
                     "null"
                   ],
-                  "description": "Explicit category attribution (1\u201380 printable characters) or null; requires categoryId.",
+                  "description": "Explicit category attribution (1–80 printable characters) or null; requires categoryId.",
                   "minLength": 1,
                   "maxLength": 80
                 },
@@ -3810,6 +3810,815 @@
       ],
       "retry": "Read-only probe. Recheck authoritative support after an update; no financial intent or request receipt is created.",
       "availability": "Optional OpeningBalanceClassification SDK, WHAB 2.79+; SQLite 1.28+ and JSON 1.20+. The public opening_balance_policy query probes the authoritative backend across supported transports."
+    },
+    {
+      "kind": "sdk",
+      "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
+      "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
+      "errors": [
+        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting."
+      ],
+      "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
+      "name": "TransferIntegrity.preview_transfer_matches",
+      "summary": "Preview 1–100 explicit transfer pairs as one validated native operation, retaining financial fields and exact transaction identities. Historical closed accounts and mixed current on/off-budget scopes are supported without changing accounts.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "outId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this budget/workspace."
+                },
+                "inId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this budget/workspace."
+                }
+              },
+              "required": [
+                "outId",
+                "inId"
+              ],
+              "additionalProperties": false,
+              "description": "Explicit pair identities and preserved account context."
+            },
+            "description": "Explicit disjoint pairs. For nonzero amounts, outId is a positive-minor-unit outflow and inId its equal negative inflow. Two existing zero-valued records may be explicitly paired without inferring direction; every ID occurs only once."
+          },
+          "reviewed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicitly mark every complete validated pair reviewed in the same commit. False leaves both legs unreviewed."
+          }
+        },
+        "required": [
+          "pairs"
+        ],
+        "additionalProperties": false,
+        "description": "Public callback parameters."
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "match",
+            "description": "The previewed or applied operation."
+          },
+          "pairCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of complete pairs in this atomic operation."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 200,
+            "description": "Number of addressed transaction records."
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "description": "Number of records whose saved fields change."
+          },
+          "reviewed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicitly mark every complete validated pair reviewed in the same commit. False leaves both legs unreviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact SHA-256 returned by the corresponding read-only preview."
+          },
+          "pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Explicit pair identities and preserved account context."
+            },
+            "description": "Each confirmed pair identifies whether it crosses current budget scope and any currently archived account IDs."
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "Exact complete before/after records for each addressed leg, including notes, original fields and category attribution.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this budget/workspace."
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact saved transaction before this operation."
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact proposed or saved transaction after this operation."
+                }
+              },
+              "required": [
+                "id",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false,
+              "description": "Exact transaction before/after records."
+            }
+          }
+        },
+        "required": [
+          "action",
+          "pairCount",
+          "count",
+          "changed",
+          "reviewed",
+          "fingerprint",
+          "pairs",
+          "changes"
+        ],
+        "additionalProperties": false,
+        "description": "Validated result returned by the public callback."
+      },
+      "examples": [
+        {
+          "input": {
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in"
+              }
+            ],
+            "reviewed": true
+          },
+          "output": {
+            "action": "match",
+            "pairCount": 1,
+            "count": 2,
+            "changed": 2,
+            "reviewed": true,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in",
+                "crossesBudgetScope": false,
+                "archivedAccounts": []
+              }
+            ],
+            "changes": [
+              {
+                "id": "fictional-out",
+                "before": {},
+                "after": {}
+              },
+              {
+                "id": "fictional-in",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read only. Shows exact before/after changes and fingerprint; does not reserve, match, review or save anything."
+    },
+    {
+      "kind": "sdk",
+      "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
+      "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
+      "errors": [
+        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
+        "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host. Keep the original request identity after an uncertain response."
+      ],
+      "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
+      "name": "TransferIntegrity.apply_transfer_matches",
+      "summary": "Commit 1–100 explicit transfer pairs as one validated native operation, retaining financial fields and exact transaction identities. Historical closed accounts and mixed current on/off-budget scopes are supported without changing accounts.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "outId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this budget/workspace."
+                },
+                "inId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this budget/workspace."
+                }
+              },
+              "required": [
+                "outId",
+                "inId"
+              ],
+              "additionalProperties": false,
+              "description": "Explicit pair identities and preserved account context."
+            },
+            "description": "Explicit disjoint pairs. For nonzero amounts, outId is a positive-minor-unit outflow and inId its equal negative inflow. Two existing zero-valued records may be explicitly paired without inferring direction; every ID occurs only once."
+          },
+          "reviewed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicitly mark every complete validated pair reviewed in the same commit. False leaves both legs unreviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact SHA-256 returned by the corresponding read-only preview."
+          }
+        },
+        "required": [
+          "pairs",
+          "fingerprint"
+        ],
+        "additionalProperties": false,
+        "description": "Public callback parameters."
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "match",
+            "description": "The previewed or applied operation."
+          },
+          "pairCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Number of complete pairs in this atomic operation."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 200,
+            "description": "Number of addressed transaction records."
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "description": "Number of records whose saved fields change."
+          },
+          "reviewed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicitly mark every complete validated pair reviewed in the same commit. False leaves both legs unreviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact SHA-256 returned by the corresponding read-only preview."
+          },
+          "pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Explicit pair identities and preserved account context."
+            },
+            "description": "Each confirmed pair identifies whether it crosses current budget scope and any currently archived account IDs."
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "Exact complete before/after records for each addressed leg, including notes, original fields and category attribution.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this budget/workspace."
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact saved transaction before this operation."
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact proposed or saved transaction after this operation."
+                }
+              },
+              "required": [
+                "id",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false,
+              "description": "Exact transaction before/after records."
+            }
+          }
+        },
+        "required": [
+          "action",
+          "pairCount",
+          "count",
+          "changed",
+          "reviewed",
+          "fingerprint",
+          "pairs",
+          "changes"
+        ],
+        "additionalProperties": false,
+        "description": "Validated result returned by the public callback."
+      },
+      "examples": [
+        {
+          "input": {
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in"
+              }
+            ],
+            "reviewed": true,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "output": {
+            "action": "match",
+            "pairCount": 1,
+            "count": 2,
+            "changed": 2,
+            "reviewed": true,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in",
+                "crossesBudgetScope": false,
+                "archivedAccounts": []
+              }
+            ],
+            "changes": [
+              {
+                "id": "fictional-out",
+                "before": {},
+                "after": {}
+              },
+              {
+                "id": "fictional-in",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One native transaction, one revision advancement, one coherent audit entry, one receipt and one synchronous durable checkpoint. Optional reviewed=true reviews both legs in that same commit. Paired records or retained pair history require native format 5 and portable payload version 2; older readers refuse these financial semantics. No bank synchronization."
+    },
+    {
+      "kind": "sdk",
+      "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
+      "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
+      "errors": [
+        "Select 1–200 distinct existing transaction IDs from this workspace. Missing, duplicated, valid or unrelated records refuse the whole repair; include every existing linked invalid counterpart explicitly. Repair never invents a leg or reviews a hint."
+      ],
+      "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
+      "name": "TransferIntegrity.preview_transfer_repair",
+      "summary": "Preview an explicit bounded repair of invalid legacy transfer classification/review/link state. Clear invalid links and Transfer category, leave unreviewed, preserve imported hints and every financial field.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Exact stable transaction ID in this budget/workspace."
+            },
+            "description": "Every explicit invalid transaction to repair, including all linked malformed counterparts."
+          }
+        },
+        "required": [
+          "transactionIds"
+        ],
+        "additionalProperties": false,
+        "description": "Public callback parameters."
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "repair",
+            "description": "The previewed or applied operation."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Number of addressed transaction records."
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "description": "Number of records whose saved fields change."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact SHA-256 returned by the corresponding read-only preview."
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "Exact complete before/after records for each addressed leg, including notes, original fields and category attribution.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this budget/workspace."
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact saved transaction before this operation."
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact proposed or saved transaction after this operation."
+                }
+              },
+              "required": [
+                "id",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false,
+              "description": "Exact transaction before/after records."
+            }
+          }
+        },
+        "required": [
+          "action",
+          "count",
+          "changed",
+          "fingerprint",
+          "changes"
+        ],
+        "additionalProperties": false,
+        "description": "Validated result returned by the public callback."
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-orphan"
+            ]
+          },
+          "output": {
+            "action": "repair",
+            "count": 1,
+            "changed": 1,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "changes": [
+              {
+                "id": "fictional-orphan",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read only. Nothing is repaired or saved."
+    },
+    {
+      "kind": "sdk",
+      "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
+      "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
+      "errors": [
+        "Select 1–200 distinct existing transaction IDs from this workspace. Missing, duplicated, valid or unrelated records refuse the whole repair; include every existing linked invalid counterpart explicitly. Repair never invents a leg or reviews a hint.",
+        "A stale revision/fingerprint, conflicting request reuse, external-write or uncertain-save state refuses mutation through the public guarded host. Keep the original request identity after an uncertain response."
+      ],
+      "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
+      "name": "TransferIntegrity.repair_transfers",
+      "summary": "Apply an explicit bounded repair of invalid legacy transfer classification/review/link state. Clear invalid links and Transfer category, leave unreviewed, preserve imported hints and every financial field.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Exact stable transaction ID in this budget/workspace."
+            },
+            "description": "Every explicit invalid transaction to repair, including all linked malformed counterparts."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact SHA-256 returned by the corresponding read-only preview."
+          }
+        },
+        "required": [
+          "transactionIds",
+          "fingerprint"
+        ],
+        "additionalProperties": false,
+        "description": "Public callback parameters."
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "repair",
+            "description": "The previewed or applied operation."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "Number of addressed transaction records."
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "description": "Number of records whose saved fields change."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact SHA-256 returned by the corresponding read-only preview."
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "description": "Exact complete before/after records for each addressed leg, including notes, original fields and category attribution.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this budget/workspace."
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact saved transaction before this operation."
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Exact proposed or saved transaction after this operation."
+                }
+              },
+              "required": [
+                "id",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false,
+              "description": "Exact transaction before/after records."
+            }
+          }
+        },
+        "required": [
+          "action",
+          "count",
+          "changed",
+          "fingerprint",
+          "changes"
+        ],
+        "additionalProperties": false,
+        "description": "Validated result returned by the public callback."
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-orphan"
+            ],
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "output": {
+            "action": "repair",
+            "count": 1,
+            "changed": 1,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "changes": [
+              {
+                "id": "fictional-orphan",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One guarded atomic commit/save with complete audit and receipt. Does not create counterparts or delete transactions; undo is refused when it would recreate invalid reviewed/Transfer state. Native format 5 and portable payload version 2 remain required while paired before/after history is retained."
+    },
+    {
+      "kind": "sdk",
+      "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
+      "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
+      "errors": [
+        "Only since, until, offset and limit are accepted. Dates must be valid inclusive bounds with since no later than until; offset must be a nonnegative integer and limit 1–100. An unavailable workspace or unreadable storage refuses the read; invalid transfer records are reported as issues instead of being rejected or repaired."
+      ],
+      "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
+      "name": "TransferIntegrity.transfer_audit",
+      "summary": "Read a complete explicitly paginated transfer-integrity audit, including legacy reviewed orphans and zero-value imported hints. An unpaired zero hint stays unreviewed; two existing zero records can be explicitly confirmed together without creating rows or inferring direction.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "since": {
+            "type": "string",
+            "format": "date",
+            "description": "Inclusive earliest date."
+          },
+          "until": {
+            "type": "string",
+            "format": "date",
+            "description": "Inclusive latest date."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Zero-based row offset for complete audit pagination."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 100,
+            "description": "Maximum rows in this explicit audit page."
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "description": "Public callback parameters."
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Audit issues in this page, including stable identity and actionable diagnostic."
+            },
+            "description": "Stable ID, exact public transaction, reason code/message and repairable flag. Includes zero_amount imported hints and malformed/absent links."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of matching audit issues before pagination."
+          },
+          "next": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Explicit next offset, or null when complete."
+          },
+          "zeroValuePolicy": {
+            "type": "string",
+            "description": "Explicit treatment of zero-value imported transfer hints."
+          }
+        },
+        "required": [
+          "issues",
+          "total",
+          "next",
+          "zeroValuePolicy"
+        ],
+        "additionalProperties": false,
+        "description": "Validated result returned by the public callback."
+      },
+      "examples": [
+        {
+          "input": {
+            "limit": 100
+          },
+          "output": {
+            "issues": [],
+            "total": 0,
+            "next": null,
+            "zeroValuePolicy": "Existing posted zero entries may be explicitly paired across different same-currency accounts and then reviewed. Unpaired zero hints remain unreviewed; no entries or direction are invented."
+          }
+        }
+      ],
+      "side_effects": "Read only. No silent repair, review or financial change."
+    },
+    {
+      "kind": "sdk",
+      "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
+      "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
+      "errors": [
+        "This is a capability probe, not record validation. A missing or false capability makes the public host refuse unsupported transfer operations before mutation; no transaction is inspected, created or repaired by the probe."
+      ],
+      "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
+      "name": "TransferIntegrity.supports_bulk_transfer_matching",
+      "summary": "Advertise native atomic bulk pairing and strict reciprocal two-leg transfer classification/review enforcement.",
+      "input": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false,
+        "description": "Public callback parameters."
+      },
+      "output": {
+        "type": "boolean",
+        "description": "True only when the complete public contract is supported."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": true
+        }
+      ],
+      "side_effects": "Read only capability declaration."
+    },
+    {
+      "kind": "sdk",
+      "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
+      "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
+      "errors": [
+        "This is a capability probe, not record validation. A missing or false capability makes the public host refuse unsupported transfer operations before mutation; no transaction is inspected, created or repaired by the probe."
+      ],
+      "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
+      "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
+      "name": "TransferIntegrity.supports_transfer_integrity",
+      "summary": "Advertise core-validated exactly-two-leg Transfer classification and review rules on every supported mutation path.",
+      "input": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false,
+        "description": "Public callback parameters."
+      },
+      "output": {
+        "type": "boolean",
+        "description": "True only when the complete public contract is supported."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": true
+        }
+      ],
+      "side_effects": "Read only capability declaration."
     }
   ]
 }

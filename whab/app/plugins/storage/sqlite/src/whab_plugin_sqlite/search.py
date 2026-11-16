@@ -82,6 +82,13 @@ def search_transactions(store, workspace, filters):
                 if response_bytes > filters['maxBytes']:
                     raise StoreError('Transaction results exceed 16 MiB. Restrict dates or merchant selection.')
             rows.append(transaction)
+        from .transfer_pairs import public_validity
+        public_validity(store, workspace, rows)
+        if filters.get('maxBytes') is not None and response_bytes + sum(
+            len(',"transferPairValid":') + len(json.dumps(row['transferPairValid']))
+            for row in rows if 'transferPairValid' in row
+        ) > filters['maxBytes']:
+            raise StoreError('Transaction results exceed 16 MiB. Restrict dates or merchant selection.')
         if uncategorized:
             return {**{name: counts[name] for name in ('total', 'pending', 'transferFlagged', 'postedNonTransfer')},
                     'returned': len(rows), 'bySource': [{'source': key, 'count': value} for key, value in sorted(by_source.items())],

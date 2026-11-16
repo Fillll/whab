@@ -107,8 +107,28 @@ def _currency_history(state: dict) -> dict:
     classified_income = defaultdict(int)
     unclassified_income = defaultdict(int)
     opening_funding = defaultdict(int)
+    transfer_funding = defaultdict(int)
     opening_credit = defaultdict(lambda: defaultdict(int))
     on_budget = {key for key, account in state["accounts"].items() if is_on_budget(account)}
+    from .transfer_matching import incoming_links, valid_pair
+    incoming = incoming_links(state['transactions'])
+    # A credit payment can reduce debt to zero, but overpayment is not cash.
+    # Reconstruct exact posted balances without altering the saved snapshots.
+    paired_accounts = {row['accountId'] for row in state['transactions'].values()
+                            if row.get('transferPeerId') in state['transactions']}
+    credit_balances = {key: account['balance'] for key, account in state['accounts'].items()
+                       if key in on_budget and key in paired_accounts and account['type'] == 'credit'}
+    for row in state['transactions'].values():
+        if row['accountId'] in credit_balances and not row.get('pending') and not row.get('deleted'):
+            credit_balances[row['accountId']] -= row['amount']
+    credit_effects = {}
+    credit_rows = [row for row in state['transactions'].values()
+                   if row['accountId'] in credit_balances and not row.get('pending') and not row.get('deleted')]
+    for row in sorted(credit_rows, key=lambda row: (row['date'], row['id'])):
+        before = credit_balances[row['accountId']]
+        after = before + row['amount']
+        credit_balances[row['accountId']] = after
+        credit_effects[row['id']] = max(0, before) - max(0, after)
     for row in state["transactions"].values():
         if row.get("deleted"):
             continue
@@ -129,6 +149,11 @@ def _currency_history(state: dict) -> dict:
                 opening_funding[source] -= amount
             continue
         if row.get("isTransfer") or kind == 'transfer':
+            if valid_pair(row, state['transactions'], state['accounts'], state['categories'], incoming=incoming):
+                if account['type'] == 'credit':
+                    transfer_funding[source] += credit_effects[row['id']]
+                elif account['type'] == 'depository' and not account.get('stale') and not account.get('balanceUnknown'):
+                    transfer_funding[source] -= amount
             continue
         if kind == 'income':
             if account.get('type') != 'credit':
@@ -144,11 +169,14 @@ def _currency_history(state: dict) -> dict:
     return {"transactions": transactions, "posted": posted, "spending": spending,
             "income": income, "spent": spent, "classifiedIncome": classified_income,
             "unclassifiedIncome": unclassified_income, "openingFunding": opening_funding,
+            "transferFunding": transfer_funding,
             "openingCredit": opening_credit}
 
 
 def _calculate_currency(state: dict, month: str, currency: str, history: dict) -> dict:
     accounts = [account.copy() for account in state["accounts"].values()]
+    from .transfer_matching import incoming_links, valid_pair
+    incoming = incoming_links(state['transactions'])
 
     start = state["budgetStartMonth"]
     carry_start = _carryover_start(state, month, currency)
@@ -198,6 +226,7 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         )
     income = history["income"].get(month, 0)
     opening_funding = history["openingFunding"].get(month, 0)
+    transfer_funding = history['transferFunding'].get(month, 0)
     next_month_funding = effective_month_funding(state, shift_month(month, 1), currency)
     carried_in_set_aside = effective_month_funding(state, month, currency) if month > start else 0
     carried_in = (
@@ -206,7 +235,7 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         if month >= start else 0
     )
     carried_in_unassigned = carried_in - carried_in_set_aside - balance_carryover
-    ready = income + opening_funding + carried_in - next_month_funding - sum(row["assigned"] for row in budget)
+    ready = income + opening_funding + transfer_funding + carried_in - next_month_funding - sum(row["assigned"] for row in budget)
     safe = _cash_capacity(state, month, currency, budget, history=history)
     if month < start:
         next_month_funding = ready = safe = 0
@@ -215,6 +244,7 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         "classifiedIncome": history["classifiedIncome"].get(month, 0),
         "unclassifiedIncome": history["unclassifiedIncome"].get(month, 0),
         "openingFunding": opening_funding,
+        "transferFunding": transfer_funding,
         "carriedIn": carried_in,
         "carriedInUnassigned": carried_in_unassigned,
         "carriedInSetAside": carried_in_set_aside,
@@ -233,7 +263,7 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
     for offset in range(-5, 1):
         m = shift_month(month, offset)
         trend.append({"month": m, "income": history["income"].get(m, 0), "spent": history["spent"].get(m, 0),
-                      "openingFunding": history["openingFunding"].get(m, 0)})
+                      "openingFunding": history["openingFunding"].get(m, 0), 'transferFunding': history['transferFunding'].get(m, 0)})
     return {
         "month": month,
         "budgetStartMonth": start,
@@ -244,7 +274,10 @@ def _calculate_currency(state: dict, month: str, currency: str, history: dict) -
         "accounts": accounts,
         "categories": [category.copy() for category in state["categories"].values()],
         "transactions": sorted(
-            [public_transaction({**row, "currency": currency}, categories=state["categories"]) for row in history["transactions"].get(month, ())],
+            [public_transaction({**row, "currency": currency,
+                                 **({'transferPairValid': valid_pair(row, state['transactions'], state['accounts'], state['categories'], incoming=incoming)}
+                                    if row.get('transferPeerId') else {})}, categories=state["categories"])
+             for row in history["transactions"].get(month, ())],
             key=lambda t: (t["date"], t["id"]), reverse=True,
         ),
         "budget": budget,
@@ -502,7 +535,7 @@ def select_currency(data: dict, currency: str = "USD") -> dict:
     account_ids = {a["id"] for a in accounts}
     category_ids = {c["id"] for c in categories}
     empty_summary = dict.fromkeys((
-        "income", "classifiedIncome", "unclassifiedIncome", "openingFunding", "carriedIn", "carriedInUnassigned", "carriedInSetAside", "fundingCapacity",
+        "income", "classifiedIncome", "unclassifiedIncome", "openingFunding", "transferFunding", "carriedIn", "carriedInUnassigned", "carriedInSetAside", "fundingCapacity",
         "previousOverspending", "balanceCarryover", "assignedNextMonth", "spent", "assigned",
         "available", "readyToAssign",
     ), 0)
@@ -525,6 +558,6 @@ def select_currency(data: dict, currency: str = "USD") -> dict:
             currency, empty_summary
         ),
         "trend": data.get("trendsByCurrency", {"USD": data["trend"]}).get(
-            currency, [{"month": row["month"], "income": 0, "spent": 0, "openingFunding": 0} for row in data["trend"]]
+            currency, [{"month": row["month"], "income": 0, "spent": 0, "openingFunding": 0, 'transferFunding': 0} for row in data["trend"]]
         ),
     }

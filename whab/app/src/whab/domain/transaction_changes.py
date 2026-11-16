@@ -128,8 +128,8 @@ def transaction_changes(state, edits, creates, *, preserve_balances=False, apply
         try:
             if before is None or before.get('deleted', False):
                 raise StoreError('Transaction not found in this workspace or deleted.')
-            if before.get('transferPeerId') and edit.keys() & {'accountId', 'date', 'amount', 'categoryId'}:
-                raise StoreError('Unmatch this transfer pair before changing its financial fields or category.')
+            if before.get('transferPeerId') and edit.keys() & {'accountId', 'date', 'amount'}:
+                raise StoreError('Unmatch this transfer pair before changing its financial fields.')
             old_account = touch(before['accountId'])
             new_account = touch(edit.get('accountId', before['accountId']))
             actual = {key: value for key, value in edit.items() if key in _FINANCIAL and value != before[key]}
@@ -147,7 +147,8 @@ def transaction_changes(state, edits, creates, *, preserve_balances=False, apply
             # balances. Final effects are summed and range-checked below.
             accounts = {new_account['id']: {**new_account, 'balance': 0},
                         old_account['id']: {**old_account, 'balance': _effect(old_account, before['amount'])}}
-            item_state = {**state, 'accounts': accounts, 'transactions': {identifier: deepcopy(before)}}
+            item_state = {**state, 'accounts': {**state['accounts'], **accounts},
+                          'transactions': {**state['transactions'], identifier: deepcopy(before)}}
             if patch:
                 if actual:
                     commands.edit_transaction_details(item_state, identifier, patch)

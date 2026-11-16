@@ -47,6 +47,7 @@ def public_transaction(transaction: dict, *, categories=None) -> dict:
             transaction = {**transaction, 'isTransfer': effective_transfer(transaction, categories)}
     return {
         **({"transferPeerId": transaction["transferPeerId"]} if transaction.get("transferPeerId") is not None else {}),
+        **({'transferPairValid': transaction['transferPairValid']} if 'transferPairValid' in transaction else {}),
         **category_agent_fields(transaction.get("categoryAgent")),
         **{
             key: transaction.get(key)
@@ -71,11 +72,15 @@ def public_transaction(transaction: dict, *, categories=None) -> dict:
 
 
 def transaction_rows(state: dict, month: str | None = None) -> list[dict]:
+    from .transfer_matching import incoming_links, valid_pair
+    incoming = incoming_links(state['transactions'])
     rows = [
         public_transaction(
             {
                 **transaction,
                 "currency": state["accounts"][transaction["accountId"]].get("currency", "USD"),
+                **({'transferPairValid': valid_pair(transaction, state['transactions'], state['accounts'], state['categories'], incoming=incoming)}
+                   if transaction.get('transferPeerId') else {}),
             }, categories=state["categories"],
         )
         for transaction in state["transactions"].values()

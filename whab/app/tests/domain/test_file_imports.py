@@ -202,3 +202,18 @@ def test_imported_parent_identifier_cannot_masquerade_as_an_assignable_child():
     data.categories[0]["id"] = category_group_id("Everyday")
     with pytest.raises(StoreError, match="child category identifier"):
         data.validated_copy()
+
+
+def test_new_imported_transfer_category_becomes_unreviewed_hint_without_losing_source_fields():
+    data = sample_import()
+    data.categories[0].update(kind='transfer', target=0)
+    transaction = data.transactions[0]
+    transaction.update(note=' [YNAB: reconciled]\nOriginal exact memo  ', merchant='  Fictional merchant  ')
+    before = transaction.copy()
+    result = replace(data, assignments=()).validated_copy()
+    actual = result.transactions[0]
+    assert actual['categoryId'] is None and actual['isTransfer'] and actual['inferredTransfer']
+    assert not actual['reviewed']
+    for field in ('id', 'accountId', 'date', 'merchant', 'amount', 'source', 'note', 'categoryEdited'):
+        assert actual[field] == before[field]
+    assert data.transactions[0] == before

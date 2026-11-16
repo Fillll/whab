@@ -105,6 +105,8 @@ def add_transaction(
     category = transaction.get("categoryId")
     if category is not None:
         child = ensure_child_category(state["categories"], category)
+        if child.get('kind') == 'transfer':
+            raise StoreError('A Transfer requires exactly two legs. Create the transactions without a Transfer category, then match the explicit pair.')
         if child.get("currency", "USD") != account.get("currency", "USD"):
             raise StoreError("Category currency must match the account currency.")
     if transaction_id in state["transactions"]:
@@ -139,21 +141,34 @@ def edit_transaction(
     transaction = state["transactions"].get(transaction_id)
     if not transaction or transaction.get("deleted"):
         raise StoreError("Transaction not found.")
-    if transaction.get('transferPeerId') and category_id is not UNSET:
-        raise StoreError('Unmatch this transfer pair before changing its category.')
     if category_id is not UNSET and category_id is not None:
         child = ensure_child_category(state["categories"], category_id)
         account = state["accounts"][transaction["accountId"]]
         if child.get("currency", "USD") != account.get("currency", "USD"):
             raise StoreError("Category currency must match the account currency.")
+    if transaction.get('transferPeerId') and category_id is not UNSET:
+        from .transfer_matching import valid_pair
+        if category_id is not None and state['categories'][category_id].get('kind') != 'transfer':
+            raise StoreError('Unmatch this transfer pair before choosing an Expense, Income or Opening Balance category.')
+        if not valid_pair(transaction, state['transactions'], state['accounts'], state['categories']):
+            raise StoreError('Audit and repair this invalid transfer pair before changing its category.')
     if reviewed is not None and not isinstance(reviewed, bool):
         raise StoreError("Invalid review status.")
     if note is not UNSET and (not isinstance(note, str) or len(note) > 1000):
         raise StoreError("Invalid note.")
     from .review import review_status
-    previous_eligible = review_status(transaction, state['categories'])['eligible']
+    context = {'transactions': state['transactions'], 'accounts': state['accounts']}
+    previous_eligible = review_status(transaction, state['categories'], **context)['eligible']
     candidate = {**transaction, **({'categoryId': category_id} if category_id is not UNSET else {})}
-    status = review_status(candidate, state['categories'])
+    if category_id is not UNSET:
+        candidate['isTransfer'] = bool(transaction.get('transferPeerId')) or (
+            state['categories'].get(category_id, {}).get('kind') == 'transfer'
+            if category_id is not None else transaction.get('inferredTransfer', False))
+    status = review_status(candidate, state['categories'], **context)
+    if category_id is not UNSET and state['categories'].get(category_id, {}).get('kind') == 'transfer':
+        from .transfer_matching import valid_pair
+        if not valid_pair(candidate, state['transactions'], state['accounts'], state['categories']):
+            raise StoreError('A Transfer category requires exactly two valid reciprocal legs. Match the counterpart first.')
     if reviewed is True and not status['eligible']:
         raise StoreError(f"{transaction_id}: {status['reason']}")
     if category_agent is not UNSET:
@@ -169,9 +184,7 @@ def edit_transaction(
         transaction.update(
             categoryId=category_id,
             categoryEdited=True,
-            isTransfer=state["categories"].get(category_id, {}).get("kind") == "transfer"
-            if category_id is not None
-            else transaction.get("inferredTransfer", False),
+            isTransfer=candidate['isTransfer'],
         )
     if reviewed is not None:
         transaction["reviewed"] = reviewed
@@ -193,8 +206,8 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
     transaction = state["transactions"].get(transaction_id)
     if not transaction or transaction.get("deleted"):
         raise StoreError("Transaction not found.")
-    if transaction.get('transferPeerId') and changes.keys() & {'accountId', 'amount', 'date', 'categoryId'}:
-        raise StoreError('Unmatch this transfer pair before changing its financial fields or category.')
+    if transaction.get('transferPeerId') and changes.keys() & {'accountId', 'amount', 'date'}:
+        raise StoreError('Unmatch this transfer pair before changing its financial fields.')
     # Keep the original annotations until their shared validator applies them;
     # eligibility must compare the saved classification with the proposed one.
     candidate = {**transaction, **{key: value for key, value in changes.items()
@@ -217,7 +230,7 @@ def edit_transaction_details(state: dict, transaction_id: str, changes: dict) ->
         raise StoreError("Transaction accounts must have the same currency.")
     # Annotation validation sees the new account/category pair, without exposing
     # a partly corrected record to the caller when any validation fails.
-    detached = {**state, "transactions": {transaction_id: candidate}}
+    detached = {**state, "transactions": {**state['transactions'], transaction_id: candidate}}
     edit_transaction(detached, transaction_id, changes.get('categoryId', UNSET),
                      changes.get("reviewed"), changes.get("note", UNSET),
                      category_agent=changes.get('categoryAgent', UNSET))

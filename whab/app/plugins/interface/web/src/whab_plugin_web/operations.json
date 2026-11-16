@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plugin_id": "web",
-  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation. Settings uses one responsive preferences window with persistent section navigation, direct browser-local Appearance and reviewed plugin changes. Account names in multi-account transaction rows show optional bank logos; sidebar accounts support browser-local custom ordering within budget-scope groups. The top-right eye masks monetary values across Web without changing financial data. Monetary displays round to comma-grouped whole currency units while editors and all saved/API values retain exact precision.",
+  "summary": "Visual budgeting interface with Shift-click transaction range selection, explicit local-draft recovery, atomic selected-row categorization, stable edited rows under filters, full-header sorting, browser-saved collapsible navigation and reviewed transfer proposals. Explicit Opening Balance categories remain distinct from Income/Transfer/Expense, with separate openingFunding budget and Insights display; zero opening entries remain explicitly reviewable without changing ordinary amount validation. Settings uses one responsive preferences window with persistent section navigation, direct browser-local Appearance and reviewed plugin changes. Account names in multi-account transaction rows show optional bank logos; sidebar accounts support browser-local custom ordering within budget-scope groups. The top-right eye masks monetary values across Web without changing financial data. Monetary displays round to comma-grouped whole currency units while editors and all saved/API values retain exact precision. Confirmed two-leg transfers expose signed dated transferFunding separately from income/spending, with complete graph verification for review eligibility.",
   "delegates": [
     "core"
   ],
@@ -56,7 +56,7 @@
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
@@ -64,7 +64,7 @@
       "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
       "name": "transfers.suggestions",
       "kind": "local",
-      "summary": "Transactions review panel: Read-only possible transfer pairs: equal opposite nonzero amounts, same currency/budget scope, different active accounts, posted/uncategorized/unmatched, within seven days. All alternatives remain proposals; no automatic match or review.",
+      "summary": "Transactions review panel: Read-only possible transfer pairs: equal opposite nonzero amounts, same currency, different accounts including historical closed/cross-scope accounts, posted/uncategorized/unmatched, within seven days. All alternatives remain proposals; no automatic match or review.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -175,7 +175,7 @@
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
@@ -291,7 +291,7 @@
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending/categorized entries, differing currencies, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
@@ -299,7 +299,7 @@
       "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
       "name": "transfers.confirm",
       "kind": "local",
-      "summary": "Transactions review panel: Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
+      "summary": "Transactions review panel: Explicitly confirm or unmatch two existing transactions in one atomic native operation. Preserve identities, financial fields, notes, source and original metadata. Matching preserves category attribution; unmatching clears any orphan Transfer label and its attribution. Both remain unreviewed for ordinary review. Complete valid pairs may assign or clear an optional Transfer label without unmatching; financial edits or choosing Expense, Income or Opening Balance require unmatching first. Historical closed/cross-scope accounts are supported. Explicit matching may pair two existing posted zero entries; automatic proposals exclude zeros.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -408,7 +408,7 @@
           }
         }
       ],
-      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
+      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, clears orphan Transfer classification and its attribution, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
     },
     {
       "name": "transactions.selected-category",

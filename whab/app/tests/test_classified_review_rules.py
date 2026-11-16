@@ -35,7 +35,7 @@ def test_unclassified_review_rejects_and_classification_never_manufactures_revie
     with pytest.raises(StoreError, match='Choose an Expense, Income, Transfer or Opening Balance'):
         command(ledger, 'review_transactions', {'transactionIds':[tx],'reviewed':True})
     assert store.export_budget() == before
-    for kind in ['expense','income','transfer']:
+    for kind in ['expense','income']:
         command(ledger,'edit_transaction',{'transactionId':tx,'categoryId':categories[kind]})
         assert next(row for row in store.transactions('personal') if row['id']==tx)['reviewed'] is False
         command(ledger,'review_transactions',{'transactionIds':[tx],'reviewed':True})
@@ -49,7 +49,7 @@ def test_unclassified_review_rejects_and_classification_never_manufactures_revie
 def test_combined_classification_review_atomic_failure_and_exact_replay(classified):
     store, ledger, _, categories, tx, _ = classified
     revision, request = ledger.revision, uuid4().hex
-    edits = {'edits':[{'transactionId':tx,'categoryId':categories['transfer'],'reviewed':True,'categoryAgent':'Codex'}]}
+    edits = {'edits':[{'transactionId':tx,'categoryId':categories['income'],'reviewed':True,'categoryAgent':'Codex'}]}
     generation = store.commit_evidence().generation
     saved = command(ledger,'edit_transactions',edits,revision=revision,request=request)
     assert saved['data']['changes'][0]['after']['reviewed'] is True
@@ -63,26 +63,22 @@ def test_combined_classification_review_atomic_failure_and_exact_replay(classifi
     assert store.transactions('personal')[0]['reviewed'] is False
 
 
-def test_transfer_type_is_explicit_and_matching_is_separate(classified):
+def test_transfer_type_requires_two_legs_before_classification_and_review(classified):
     store, ledger, accounts, categories, tx, _ = classified
-    command(ledger,'edit_transaction',{'transactionId':tx,'categoryId':categories['transfer'],'reviewed':True})
-    row = store.transactions('personal')[0]
-    assert row['isTransfer'] and 'transferPeerId' not in row
-    peer = ledger.add_transaction('personal',{'accountId':accounts[1],'date':'2026-11-13','merchant':'Fictional incoming','amount':-1234,'categoryId':categories['transfer']})
     before = store.export_budget()
-    summary = store.workspace('personal','2026-11')['summary']
-    assert summary['spent'] == summary['income'] == 0
-    assert all(row['categoryId'] != categories['transfer'] for row in store.workspace('personal','2026-11')['budget'])
-    preview = store.preview_transfer_match('personal',[tx,peer],'match')
+    with pytest.raises(StoreError, match='exactly two'):
+        command(ledger,'edit_transaction',{'transactionId':tx,'categoryId':categories['transfer'],'reviewed':True})
     assert store.export_budget() == before
+    peer = ledger.add_transaction('personal',{'accountId':accounts[1],'date':'2026-11-13','merchant':'Fictional incoming','amount':-1234,'categoryId':None})
+    preview = store.preview_transfer_match('personal',[tx,peer],'match')
     command(ledger,'match_transfer',{'transactionIds':[tx,peer],'action':'match','fingerprint':preview['fingerprint']})
     assert all(not row['reviewed'] for row in store.transactions('personal'))
     command(ledger,'review_transactions',{'transactionIds':[tx,peer],'reviewed':True})
-    with pytest.raises(StoreError, match='Unmatch'):
-        command(ledger,'classify_category',{'categoryId':categories['transfer'],'kind':'expense'})
+    summary = store.workspace('personal','2026-11')['summary']
+    assert summary['spent'] == summary['income'] == summary['transferFunding'] == 0
     preview = store.preview_transfer_match('personal',[tx,peer],'unmatch')
     command(ledger,'match_transfer',{'transactionIds':[tx,peer],'action':'unmatch','fingerprint':preview['fingerprint']})
-    assert all(row['categoryId']==categories['transfer'] and not row['reviewed'] for row in store.transactions('personal'))
+    assert all(row['categoryId'] is None and not row['reviewed'] for row in store.transactions('personal'))
 
 
 def test_legacy_flags_read_verbatim_and_cleanup_is_explicit_reversible_when_valid(classified, tmp_path):
@@ -136,9 +132,12 @@ def test_classifying_legacy_review_never_creates_review_via_either_edit_route(cl
         payload={'transactionId':tx,'categoryId':categories['transfer']}
         if agent is not None:
             payload['categoryAgent']=agent
+        with pytest.raises(StoreError, match='exactly two'):
+            command(LedgerService(store),'edit_transaction',payload)
+        payload['categoryId'] = categories['income']
         command(LedgerService(store),'edit_transaction',payload)
         row=store.transactions('personal')[0]
-        assert row['categoryId']==categories['transfer'] and row['reviewed'] is False
+        assert row['categoryId']==categories['income'] and row['reviewed'] is False
         assert row['merchant']=='  Fictional source  '
     finally:
         store.close()

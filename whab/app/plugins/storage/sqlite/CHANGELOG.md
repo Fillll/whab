@@ -1,5 +1,16 @@
 # SQLite budget storage plugin changelog
 
+## 1.29.0 — 2026-11-15
+
+PR: [#210](https://github.com/Fillll/whab/pull/210)
+
+- Commit 1–100 explicit disjoint transfer pairs with optional review as one native operation, exact preview/fingerprint, before/after audit and restart-safe retry receipt. Reject every invalid batch before mutation; support historical closed accounts and differing current budget scopes without changing accounts or financial fields.
+- Enforce graph-proven two-leg transfer review in native annotation paths and public register projections, including peers outside page filters. Add complete paginated zero-hint/orphan/link audits and guarded explicit legacy repairs.
+- Index incoming transfer references so bounded previews, annotation checks and register pages do not scan unrelated history; keep this runtime index out of portable budget images.
+- Keep native format 5 sticky while transfer pairs remain in current state or permanent history, including restored/local-transfer records; older native readers refuse unsupported semantics.
+- Fence sanitized paired-budget payloads with portable version 2, including the first incremental save and history-only pairs. Older installations refuse restoration; current readers preserve support for unchanged version-1 payloads.
+- Permit explicit confirmation and review of two existing posted zero-valued records under the same reciprocal-pair rules. Suggestions omit zeros, and pairing never invents a transaction, direction or amount.
+
 ## 1.28.0 — 2026-11-14
 
 PR: [#204](https://github.com/Fillll/whab/pull/204)

@@ -38,7 +38,7 @@ def populate(store):
     store.db.execute("UPDATE transactions SET pending=1 WHERE workspace='personal' AND id='bulk-2'")
     store.db.execute("UPDATE transactions SET deleted=1 WHERE workspace='personal' AND id='bulk-8'")
     store.db.execute(
-        "UPDATE transactions SET is_transfer=1,inferred_transfer=1,category_edited=0,merchant_logo='synthetic-logo' "
+        "UPDATE transactions SET is_transfer=0,inferred_transfer=1,category_edited=1,merchant_logo='synthetic-logo' "
         "WHERE workspace='personal' AND id='bulk-1'",
     )
     store.save_item("private-item", "synthetic-private-ciphertext", "Synthetic institution")

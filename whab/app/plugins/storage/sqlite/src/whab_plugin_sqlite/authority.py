@@ -100,7 +100,7 @@ class Authority:
         if type(row[0]) is not bytes:
             raise StoreError("Invalid SQLite storage authority metadata.")
         metadata = read_storage_json(row[0])
-        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3, 4}:
+        if type(metadata) is not dict or type(metadata.get("formatVersion")) is not int or metadata["formatVersion"] not in {1, 2, 3, 4, 5}:
             raise StoreError("Invalid SQLite storage authority metadata.")
         if metadata.keys() != {
             "formatVersion", "budgetId", "environment", "instanceId", "authorityEpoch", "generation",
@@ -202,7 +202,7 @@ class Authority:
             reusable = (selected is not None and selected[0] in transaction.get('history_after', {})
                         and getattr(self, '_native_state_stamp', None) == transaction['before_stamp'])
             reusable = reusable and transaction.get('history_operation') in {
-                'edit_transaction', 'edit_transaction_details', 'review_transactions', 'update_account', 'edit_transactions', 'classify_accounts',
+                'edit_transaction', 'edit_transaction_details', 'review_transactions', 'update_account', 'edit_transactions', 'classify_accounts', 'match_transfers',
             }
             if reusable:
                 from whab.domain.history import financial
@@ -285,7 +285,7 @@ class Authority:
                 names = (workspace,) if type(workspace) is str and workspace in {'personal', 'demo'} else ('personal', 'demo')
                 history_before = {name: cached[name] if name in cached else snapshot(self, name) for name in names if self.db.execute("SELECT 1 FROM meta WHERE workspace=?", (name,)).fetchone()} if financial else {}
                 history_after = dict(cached) if financial else {}
-                selected = (tuple(transaction_ids) if type(transaction_ids) in {tuple, list} and 0 <= len(transaction_ids) <= 100 and all(type(key) is str for key in transaction_ids) else None)
+                selected = (tuple(transaction_ids) if type(transaction_ids) in {tuple, list} and 0 <= len(transaction_ids) <= 200 and all(type(key) is str for key in transaction_ids) else None)
                 # User/legacy SQL triggers can touch additional rows; do not use
                 # bounded reads in their presence. Data-version/total-change
                 # checks invalidate cached heads after writes outside this scope.
@@ -356,7 +356,7 @@ class Authority:
                                 new["history"] = journal
                                 if journal is not original_journal:
                                     from .history_writes import save_history
-                                    save_history(self, name, journal, original_journal, cache_valid=name in cached and selected is not None and info['operation'] in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts'})
+                                    save_history(self, name, journal, original_journal, cache_valid=name in cached and selected is not None and info['operation'] in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts', 'match_transfers'})
                         if selected is not None:
                             self._history_row_positions[name] = (new['transactions'], positions)
                         history_after[name] = new
@@ -458,6 +458,10 @@ class Authority:
         if name == 'edit_transactions':
             from whab.domain.bulk import validate_edits
             selected = [row['transactionId'] for row in validate_edits(name, payload['edits'])]
+        elif name == 'apply_transfer_matches':
+            from whab.domain.transfer_matching import validate_pairs
+            pairs = validate_pairs(payload['pairs'], reviewed=payload.get('reviewed', False))
+            selected = [identifier for pair in pairs for identifier in (pair['outId'], pair['inId'])]
         elif name == 'classify_accounts':
             selected = ()
         with self._authority_write(workspace=operation.workspace, transaction_ids=selected) as transaction:

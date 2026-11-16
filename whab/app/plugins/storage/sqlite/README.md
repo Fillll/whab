@@ -1,6 +1,6 @@
 # SQLite storage plugin
 
-This version requires WHAB 2.72 or newer for the public local-authority and
+This version requires WHAB 2.81 or newer for the public local-authority and
 single-primary copy contracts. See [copies and promotion](../../../../docs/storage-replicas.md)
 for host-coordinated synchronization and explicit handover.
 
@@ -306,10 +306,12 @@ See [CLI examples, JSON fields and dry-run](../../interface/cli/README.md#atomic
 
 ## Reviewed transfer matching
 
-WHAB 2.74 introduces optional public `TransferMatching` SDK capability. The financial
-core owns equal nonzero opposite amounts, same currency and budget scope, distinct
-active accounts, posted/nondeleted/uncategorized eligibility and the seven-day date
-window. Deterministic proposals are read-only and preserve every ambiguous alternative;
+WHAB 2.74 introduced the optional public `TransferMatching` SDK capability.
+Current financial rules require equal opposite amounts, same currency, distinct
+accounts, posted/nondeleted eligibility and the seven-day date window. Existing
+Transfer categories are allowed; other classifications must be resolved first.
+Closed accounts and differing current budget scopes are supported. Explicit
+confirmation may pair two existing zero-valued records; suggestions omit zeros. Deterministic proposals are read-only and preserve every ambiguous alternative;
 merchant names and provider hints never prove a pair. Date/account filters select an
 anchor; its counterpart may lie outside those filters. Pagination returns total/next;
 over 1,000 candidates requires narrower filters. No initial-page background scan runs.
@@ -317,10 +319,11 @@ over 1,000 candidates requires narrower filters. No initial-page background scan
 The interface plugins own presentation: Web's Transactions **Suggest transfers** panel
 shows both sides and requires **Review this pair**, then **Confirm transfer match**.
 CLI `trnx transfers`, `match-transfer --dry-run`, `match-transfer` and `unmatch-transfer`
-use the same public operations. Neither matching nor unmatching reviews a transaction:
-both become unreviewed for the normal review workflow. No bank synchronization or
+use the same public operations. These single-pair commands leave both transactions
+unreviewed for the normal review workflow; bulk matching can explicitly review
+complete pairs in one commit. No bank synchronization or
 persistent future rule is created. Refunds may look identical and require judgment.
-Cross-currency, fees/splits and cross-budget-scope transfers need manual handling.
+Cross-currency and unequal fees/splits require separate explicit handling.
 
 Confirmation uses an observed revision and fingerprint, one native operation, one
 reversible before/after audit entry, one durable receipt and one synchronous checkpoint.
@@ -332,11 +335,13 @@ existing native transactions; remote transports delegate to the authority.
 
 Optional `transferPeerId` is a reciprocal stable identity; absence preserves legacy
 records and historical digests. Match changes only this link, `isTransfer=true` and
-`reviewed=false`. Unmatch removes both links, restores each existing `inferredTransfer`
-hint and sets both unreviewed. IDs, amounts, dates, accounts, currencies, merchants
-(including whitespace), notes, category attribution, original metadata and receipts
-are retained. Unmatch before editing a paired amount/date/account/category or changing
-an account's budget scope. Ordinary notes/merchant/review edits preserve the pair.
+`reviewed=false`. Unmatch removes both links, clears any now-orphan Transfer label
+and its category attribution, restores each existing `inferredTransfer` hint and
+sets both unreviewed. IDs, amounts, dates, accounts, currencies, merchants (including
+whitespace), notes, original metadata and receipts are retained. Unmatch before
+editing a paired amount/date/account, choosing Expense/Income/Opening Balance, or
+changing an account's budget scope. A valid pair may assign or clear its optional
+Transfer label without unmatching. Notes/merchant/review edits preserve the pair.
 Provider corrections/removals that invalidate a pair remove both links and require
 fresh review; this never automatically creates another pair.
 
@@ -371,19 +376,24 @@ older readers reject the new payload instead of dropping its financial type.
 
 ## Classification before review
 
-WHAB 2.77 supports Expense, Income and Transfer child types (`kind` in public
-records, `--type` in CLI). Missing kind remains Expense. Income and Transfer have
-no expense target or assignment rows. Transfer is explicit account movement,
-excluded from ordinary income/spending without changing account balances. It may
-be classified before pairing; matching still requires equal opposite posted
-amounts, different active accounts, same currency/budget scope and dates within
-seven days. Matching remains separate and never reviews automatically.
+WHAB 2.81 supports Expense, Income, Transfer and Opening Balance child types
+(`kind` in public records, `--type` in CLI). Missing kind remains Expense. Technical
+kinds have no expense target or assignment rows. Transfer is explicit account
+movement, excluded from ordinary income/spending without changing account balances.
+Transfer classification and review require exactly two valid reciprocal posted
+legs in different same-currency accounts, with equal opposite amounts and dates
+within seven days. Two existing zeros may be explicitly paired; proposals exclude
+zeros. Closed historical accounts and different current budget scopes are supported
+without reopening or reclassification. Single-pair matching leaves both unreviewed;
+bulk matching can explicitly review complete pairs in the same atomic commit.
 
-A posted, nondeleted transaction needs a valid child of any type, or a previously
-confirmed transfer pair, before explicit review. A bank hint alone is insufficient.
-Assigning classification does not manufacture review. Clearing it makes unreviewed
-in the same native operation. An explicit conflicting clear+review rejects the
-whole operation. Mixed batches validate their final proposed state atomically.
+A posted, nondeleted transaction needs a valid Expense, Income or Opening Balance
+child, or a complete valid Transfer pair, before explicit review. A bank hint or
+unpaired Transfer category is insufficient. Assigning classification does not
+manufacture review. Removing the last eligible classification clears review in the
+same native operation; explicit clear+review then rejects the whole operation.
+Clearing an optional Transfer label on a valid pair retains its classification and
+review eligibility. Mixed batches validate their final proposed state atomically.
 Pending records cannot be reviewed. Undo/redo cannot restore a newly invalid review.
 
 Old saved reviewed/unclassified flags and historical audit hashes remain readable
@@ -515,3 +525,70 @@ Provider removal/pending replacement continues the existing import contract, so
 inspect subsequent imported changes before another correction. No bank sync runs
 as part of an edit, creation, preview, retry or audit reversal. Existing annotation
 `edit_transactions` batches and their output shape remain compatible.
+
+
+## Atomic transfer pairs and integrity
+
+The optional public `TransferIntegrity` capability adds read-only
+`preview_transfer_matches(workspace, pairs, reviewed=False)` and native
+`apply_transfer_matches(workspace, pairs, reviewed=False, fingerprint=None)`.
+A batch contains 1–100 explicit `{"outId": "fictional-out",
+"inId": "fictional-in"}` pairs: every transaction ID is distinct,
+outflows are positive integer minor units, inflows negative, and paired amounts
+are equal and opposite. Two already saved zero-valued records can also be paired
+explicitly: the ID slots identify both records without inventing a direction or
+amount. No zero-valued record is created, and automatic suggestions omit zeros.
+Both records must be posted, nondeleted, in different
+accounts of the same currency and at most seven calendar days apart. Existing
+links, any incoming third leg, invalid categories or one invalid pair reject the
+whole batch before the first write. No counterpart is guessed and no oversized
+batch is split.
+
+Every accepted batch uses one native transaction, revision advancement, coherent
+audit entry, durable receipt and synchronous save. Complete before/after records
+retain identities, merchant whitespace, notes, original fields, financial amounts,
+account balances and category attribution. Guarded native request replay returns
+the original receipt after reopening without another save. Explicit `reviewed=True`
+reviews both legs of every validated pair in that same commit; otherwise matching
+leaves them unreviewed. Actor and batch labels describe the single audit entry.
+
+Historical pairs can involve an account that is now closed or accounts with
+different current budget scopes. Pairing does not reopen/reclassify accounts or
+change balances. Core separately accounts for the on-budget leg's signed funding
+flow on each posting date, including across month or scope boundaries; paired
+activity is excluded from income and spending. Ordinary Transfer classification and review require a valid
+reciprocal exactly-two-leg pair. Imported flags remain evidence only.
+
+`transfer_audit(workspace, parameters)` is read only, with inclusive `since`/`until`
+and explicit `offset`/`limit` pagination. It reports invalid, missing or shared
+links, orphan Transfer categories and unpaired zero-value imported hints. A zero
+hint stays unreviewed until an explicit valid existing zero-zero pair is confirmed
+or it is independently classified on other evidence. Nothing is repaired on read or open. `preview_transfer_repair(workspace, transaction_ids)` and guarded
+`repair_transfers(workspace, transaction_ids, fingerprint)` repair 1–200 explicit
+invalid rows by clearing invalid links/Transfer classification and leaving them
+unreviewed, preserving original hints and every financial field. Every connected
+invalid counterpart must be selected. History reversal remains guarded and cannot
+reintroduce an invalid reviewed/Transfer classification. No repair invents or
+deletes transactions, reclassifies an account, or triggers bank synchronization.
+
+Native format 5 fences older readers once paired transfers are retained in current
+state or audit history. The floor never decreases after undo/unmatching and is
+retained by saved-file and complete local restoration. Existing older native
+ledgers remain readable for explicit audit; opening them does not repair records.
+
+Saved `.whab` files also fence older financial interpretations: their sanitized
+SQLite payload uses `PRAGMA user_version=2` while pairs remain in current records
+or permanent history, including after undo/unmatching. The first bounded pairing
+updates this header in the prepared image without rebuilding unrelated history.
+Pair-free legacy payloads remain version 1; this plugin reads both versions.
+Older plugins reject version 2 before restoring records into the destination.
+Plugin `state_version=1` remains unchanged because settings, state and ledger
+record schemas are unchanged; the payload header declares the required financial
+interpretation, independently of namespace migrations and native authority format.
+
+Reproduce legacy acceptance and paired/history-only rejection using genuine
+WHAB 2.80.0 source from local Git history, with fictional saved containers only:
+
+```sh
+.venv/bin/python plugins/storage/sqlite/scripts/check_transfer_portable_compatibility.py
+```
