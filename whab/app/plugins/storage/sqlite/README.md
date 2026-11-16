@@ -290,8 +290,11 @@ synchronously. That file contains every acknowledged edit, including the current
 journal; it needs no sidecar or future compaction to restore. Unchanged compressed
 64 KiB blocks are reused. Append patches retain ordinary SHA-256 checksums: both
 storage and host copy their independently computed SHA state and hash only the
-new suffix after checking the exact previous bytes. A changed prefix requires
-full verification. Native commit failure cannot promote a prepared portable
+new suffix. Locally constructed appends retain their immutable base, exact suffix
+and copied SHA state through commit promotion, avoiding repeated full-prefix
+comparisons. The host independently checks the worker's base and resulting
+checksum; other export paths still check exact prefixes and fully verify changed
+ones. Native commit failure cannot promote a prepared portable
 image; checksum or encoding failure cannot publish the candidate archive.
 
 Writable native file connections recommend a 64 MiB SQLite page cache, allocated

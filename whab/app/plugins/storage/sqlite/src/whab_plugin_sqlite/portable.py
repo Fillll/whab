@@ -97,10 +97,17 @@ def _prepared_delta(cached, journal, hints, cached_digest):
     raw, hints = result
     cached_digest = _file_hash(cached[1], cached_digest)
     base = cached_digest[1]
-    value = _file_hash(raw, cached_digest)[1]
-    patch = {'name': _FILENAME, 'base': base, 'digest': value, 'size': len(raw),
-             'chunks': _changed_pages(cached[1], raw)}
-    return raw, hints, patch
+    # _build_image only returns the immutable base plus an audited suffix;
+    # compaction returns None. Keep that local construction evidence instead of
+    # scanning the full prefix again for hashing, diffing and commit promotion.
+    offset = len(cached[1])
+    suffix = raw[offset:]
+    state = cached_digest[2].copy()
+    state.update(suffix)
+    digest = (raw, state.hexdigest(), state)
+    patch = {'name': _FILENAME, 'base': base, 'digest': digest[1], 'size': len(raw),
+             'chunks': [[offset, suffix]]}
+    return raw, hints, patch, digest
 
 
 def _changed_pages(previous, raw):
@@ -139,11 +146,11 @@ def promote_prepared_image(store, transaction, stamp):
     prepared = transaction.get('prepared_portable')
     if prepared is None or stamp[1] != transaction['before_stamp'][1]:
         return
-    workspace, (raw, hints, patch) = prepared
+    workspace, (raw, hints, patch, digest) = prepared
     head = transaction['history_after'][workspace]['history']['entries'][-1]['hash']
     store._portable_images[workspace] = (stamp, raw, head)
     store._portable_history_positions[workspace] = hints
-    store._portable_file_digest = _file_hash(raw, getattr(store, '_portable_file_digest', None))
+    store._portable_file_digest = digest
     store._prepared_portable_changes = (workspace, stamp, patch)
 
 

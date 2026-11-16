@@ -520,6 +520,39 @@ def test_failed_optional_image_preparation_falls_back_without_affecting_commit(l
     assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')
 
 
+def test_prepared_append_keeps_verified_sha_state_without_rescanning_its_own_prefix(ledger, monkeypatch):
+    from copy import deepcopy
+    from hashlib import sha256
+
+    from whab.budgets.file_changes import apply_file_changes
+
+    store, _ = ledger
+    old = store.export_budget_file_changes('personal', {})['files']
+    prior_digest = store._portable_file_digest
+    previous = {'budget.sqlite': sha256(old['budget.sqlite']).hexdigest()}
+    row = store.transactions('personal')[0]
+    original_hash = portable._file_hash
+    def known_base_only(raw, cached=None):
+        assert raw is old['budget.sqlite'], 'The prepared suffix must carry its independently copied SHA state'
+        return original_hash(raw, cached)
+    with monkeypatch.context() as patch:
+        patch.setattr(portable, '_file_hash', known_base_only)
+        patch.setattr(portable, '_changed_pages', lambda *_: pytest.fail('A locally constructed append already has exact chunk bounds'))
+        execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Verified appended note'}, 'verified-append')
+        changes = store.export_budget_file_changes('personal', previous)
+    saved = store.export_budget_files()
+    assert changes['patches'][0]['chunks'] == [[len(old['budget.sqlite']), saved['budget.sqlite'][len(old['budget.sqlite']):]]]
+    assert prior_digest[2].hexdigest() == previous['budget.sqlite']
+    assert store._portable_file_digest[2].hexdigest() == sha256(saved['budget.sqlite']).hexdigest()
+    # The host's independent verification remains authoritative for worker data.
+    assert apply_file_changes(old, changes) == saved
+    corrupted = deepcopy(changes)
+    corrupted['patches'][0]['digest'] = 'f' * 64
+    with pytest.raises(StoreError, match='digest does not match'):
+        apply_file_changes(old, corrupted)
+    assert portable.read_files(saved) == store.export_budget('personal')
+
+
 def test_prepared_image_is_not_promoted_when_native_commit_rolls_back(ledger, monkeypatch):
     store, _ = ledger
     old = store.export_budget_files()
