@@ -1074,6 +1074,20 @@ The 250 ms p95 goal concerns warm bounded reads and edits on measured hardware.
 Complete unbounded output, cold activation and provider latency require separate
 measurements; their work grows with output, stored state or external services.
 
+For a before/after comparison, generate immutable fictional inputs once from the
+baseline checkout, then pass the same directory to each checkout's benchmark:
+
+```sh
+.venv/bin/python scripts/benchmark_cli_matrix.py --sizes 1000,14550,100000,110000 --prepare-fixtures /tmp/whab-fictional-seeds
+.venv/bin/python scripts/benchmark_cli_matrix.py --runs 100 --sizes 1000,14550,100000,110000 --fixtures-directory /tmp/whab-fictional-seeds
+```
+
+The bulk benchmark also accepts `--fixtures-directory`. Each run copies and checks
+the seed hashes, records installed versions and source identity, and flags source
+changes during measurement. Keep each checkout unchanged until its run finishes.
+The incremental-integrity comparison and its limitations are tracked in
+[PR #211](https://github.com/Fillll/whab/pull/211).
+
 
 ## Atomic bulk performance evidence
 
