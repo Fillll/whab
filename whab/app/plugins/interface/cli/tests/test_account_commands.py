@@ -27,6 +27,8 @@ def account_transport(monkeypatch, tmp_path):
                 raise httpx.ReadError('private transport data')
             if state['failure'] == 'stale':
                 return httpx.Response(409, json={'error': 'conflict'})
+            if state['failure'] == 'pending':
+                return httpx.Response(503, json={'detail': 'Command committed to native storage, but portable save is pending.'})
             intent = json.loads(request.content)
             row = next(row for row in rows if row['id'] == intent['payload']['accountId'])
             row.update({k: v for k, v in intent['payload'].items() if k != 'accountId'})
@@ -114,7 +116,7 @@ def test_invalid_domain_combinations_do_not_write(account_transport, capsys, nam
     assert all(r.method == 'GET' for r in account_transport[1])
 
 
-@pytest.mark.parametrize('failure', ['wrong-read', 'invalid-read', 'lost', 'stale', 'wrong-write', 'changed', 'changed-fields', 'changed-id'])
+@pytest.mark.parametrize('failure', ['wrong-read', 'invalid-read', 'lost', 'stale', 'pending', 'wrong-write', 'changed', 'changed-fields', 'changed-id'])
 def test_wrong_budget_stale_or_uncertain_mutation_never_replays(account_transport, capsys, failure):
     account_transport[0]['failure'] = failure
     assert run('classify', 'a', '--type', 'credit') == 1

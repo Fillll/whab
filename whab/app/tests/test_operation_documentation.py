@@ -239,6 +239,19 @@ def test_source_check_rejects_omitted_and_unshipped_resources(tmp_path):
     assert "Registered feature" in " ".join(module.check(root)[1])
     (package / "plugin.py").write_text('"""No additional actions."""\n')
     assert not module.check(root)[1]
+    ledger = root / "src/whab/services/ledger.py"
+    source = ledger.read_text()
+    # Both the acknowledgement wrapper and its private dispatcher stay checked.
+    for changed in (
+        source.replace('elif operation == "update_account":', 'elif operation == "undocumented_account":'),
+        source.replace('response, replayed = self._command(',
+                       'assert operation != "undocumented_wrapper"\n            response, replayed = self._command('),
+    ):
+        assert changed != source
+        ledger.write_text(changed)
+        assert "Core dispatch and documented operation names differ" in " ".join(module.check(root)[1])
+    ledger.write_text(source)
+    assert not module.check(root)[1]
 
 
 def test_parser_catalog_can_defer_versions_without_hiding_external_discovery(monkeypatch):

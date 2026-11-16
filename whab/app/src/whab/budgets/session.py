@@ -741,6 +741,19 @@ class TrackedStorage:
             if self.session:
                 self.session.store = backend
 
+    def confirm_saved(self, replayed):
+        """Acknowledge public commands only after the primary portable save.
+
+        Exact retries may finish a pending checkpoint without rerunning native
+        operations. Healthy retries retain their zero-write receipt path.
+        """
+        with self.lock:
+            if self.session is None:
+                return True
+            if replayed and self.session.status == "pending":
+                self.session.checkpoint()
+            return self.session.status == "saved"
+
     def __getattr__(self, name):
         member = getattr(self.store, name)
         if not callable(member):

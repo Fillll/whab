@@ -188,15 +188,26 @@ def test_cached_transaction_chunks_handle_growth_scope_and_bounded_replacements(
     assert encoder.encode({'transactions': None}, limit=10000) == canonical_storage_json({'transactions': None})
 
 
-def test_portable_images_near_the_size_bound_drop_the_append_reserve(ledger, monkeypatch):
+def test_portable_base_compacts_history_without_consuming_native_append_reserve(ledger):
+    import json
+
     store, _ = ledger
-    original = store.export_budget_files()['budget.sqlite']
-    row = store.transactions('personal')[0]
-    execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Bounded export'}, 'bounded-export')
-    monkeypatch.setattr(portable, 'MAX_DATABASE_BYTES', len(original) - 4096)
-    image = store.export_budget_files()['budget.sqlite']
-    assert len(image) <= len(original) - 4096
-    assert portable.read_files({'budget.sqlite': image}) == store.export_budget('personal')
+    expected = store.export_budget()
+    native_record = store.db.execute("SELECT record FROM budget_history WHERE workspace='personal'").fetchone()[0]
+    assert native_record.endswith(' ')
+    hints = dict(store._history_blob_positions)
+    evidence = store.commit_evidence()
+    files = store.export_budget_files()
+    with sqlite3.connect(':memory:') as image:
+        image.deserialize(read_journal(files['budget.sqlite'])[0])
+        record = image.execute("SELECT record FROM budget_history WHERE workspace='personal'").fetchone()[0]
+        assert record == json.dumps(expected['history'], ensure_ascii=True, separators=(',', ':'))
+        assert not record.endswith(' ')
+        assert image.execute('PRAGMA freelist_count').fetchone()[0] == 0
+    assert portable.read_files(files) == expected
+    assert store.commit_evidence() == evidence
+    assert store._history_blob_positions == hints
+    assert store.db.execute("SELECT record FROM budget_history WHERE workspace='personal'").fetchone()[0] == native_record
 
 
 def test_first_saved_ledger_and_direct_export_remain_compatible_with_file_patches():
@@ -587,20 +598,72 @@ def test_preparation_discards_unchanged_and_oversized_images(ledger, monkeypatch
     assert portable.read_files(store.export_budget_files()) == store.export_budget('personal')
 
 
-def test_portable_header_counts_toward_limit_before_history_reserve_compaction(ledger, monkeypatch):
+def test_compact_portable_image_still_enforces_header_inclusive_limit(ledger, monkeypatch):
     from whab_plugin_sqlite import portable_journal
 
     store, _ = ledger
     original = store.export_budget_files()['budget.sqlite']
     base, entries = read_journal(original)
     assert not entries and len(base) < len(original) - 1
+    before = store.commit_evidence()
     limit = len(original) - 1
     monkeypatch.setattr(portable, 'MAX_DATABASE_BYTES', limit)
     monkeypatch.setattr(portable_journal, 'MAX_BYTES', limit)
-    compacted = store.export_budget_files()['budget.sqlite']
-    assert len(compacted) <= limit
-    assert portable.read_files({'budget.sqlite': compacted}) == store.export_budget()
+    with pytest.raises(StoreError, match='size limit'):
+        store.export_budget_files()
+    assert store.commit_evidence() == before
+
+
+def test_compact_base_keeps_append_capacity_and_reads_legacy_padded_images(ledger, monkeypatch, tmp_path):
+    from whab_plugin_sqlite import portable_journal
+
+    store, _ = ledger
+    before = store.export_budget()
+    original = store.export_budget_files()['budget.sqlite']
+    base, entries = read_journal(original)
+    assert not entries
     with sqlite3.connect(':memory:') as image:
-        image.deserialize(read_journal(compacted)[0])
-        assert image.execute('PRAGMA freelist_count').fetchone()[0] == 0
-        assert not {'voided', 'provider_deleted'} & {row[1] for row in image.execute('PRAGMA table_info(transactions)')}
+        image.deserialize(base)
+        image.execute("UPDATE budget_history SET record=record||? WHERE workspace='personal'", (' ' * 65536,))
+        image.commit()
+        image.execute('VACUUM')
+        padded_base = image.serialize()
+    padded = portable_journal.snapshot(padded_base)
+    assert portable.read_files({'budget.sqlite': padded}) == before
+    assert portable.read_files({'budget.sqlite': padded_base}) == before
+    # The old immutable padding exceeds this cap, while the compact base leaves
+    # room for a real audit frame. The save must not rebuild unrelated records.
+    limit = len(original) + 2048
+    assert len(padded) > limit
+    row = before['transactions'][0]
+    with monkeypatch.context() as bounded:
+        bounded.setattr(portable, 'MAX_DATABASE_BYTES', limit)
+        bounded.setattr(portable_journal, 'MAX_BYTES', limit)
+        bounded.setattr(store, 'export_budget', lambda *args: pytest.fail('The compact base must append, not rebuild'))
+        execute(store, 'edit_transaction', {'transactionId': row['id'], 'note': 'Retained change'}, 'compact-capacity')
+        saved = store.export_budget_files()
+    new_base, changes = read_journal(saved['budget.sqlite'])
+    assert new_base == base and len(changes) == 1
+    assert len(saved['budget.sqlite']) <= limit
+    assert portable.read_files(saved) == store.export_budget()
+
+    # Legacy padding is parsed as JSON; restoration never imports BLOB offsets.
+    path = tmp_path / 'legacy-padded.sqlite'
+    restored = Store(path, month='2026-10')
+    try:
+        restored.restore_budget_files('personal', {'budget.sqlite': padded})
+        assert restored.export_budget() == before
+        evidence = restored.commit_evidence()
+        command = StorageOperation('legacy-padded-edit', evidence.authority_epoch, evidence.generation,
+            'personal', 'edit_transaction', canonical_storage_json({'transactionId': row['id'], 'note': 'After restore'}))
+        receipt = restored.execute_operation(command).receipt
+        record = restored.db.execute("SELECT record FROM budget_history WHERE workspace='personal'").fetchone()[0]
+        assert record.endswith(' ')
+        assert restored._history_blob_positions['personal'][2] > restored._history_blob_positions['personal'][1] + 2
+        assert portable.read_files(restored.export_budget_files()) == restored.export_budget()
+        restored.close()
+        restored = Store(path)
+        assert restored.commit_evidence() == receipt.evidence
+        assert restored.execute_operation(command).receipt == receipt
+    finally:
+        restored.close()

@@ -649,6 +649,9 @@ the internal payload header declares the new tombstone capability and fails befo
 an older reader can mutate the destination. SQLite's first bounded void save appends its exact audited replacements
 without exporting unrelated ledger records. Compaction runs VACUUM after final
 schema selection, and the 50 MiB bound includes the journal envelope header.
+Portable bases store compact audit JSON without native BLOB reserve padding;
+frames append outside that immutable base. Native history keeps its incremental
+append reserve, and older padded portable snapshots remain readable.
 
 ```sh
 whab "Fictional budget" trnx void TX1 TX2 --dry-run --agent Codex

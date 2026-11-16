@@ -5,7 +5,7 @@
 PR: [#211](https://github.com/Fillll/whab/pull/211)
 
 - Build only the requested transaction parser and defer execution imports during offline help. Inspect the actual command position when selecting plugin documentation so a budget or merchant named bank does not trigger unrelated discovery. Keep complete group help, external discovery and existing single-record syntax.
-- Make 1–100-record atomic account classification prominent in command help; existing atomic bulk categorization and mixed edits share the improved native commit and durable save path.
+- Make 1–100-record atomic account classification prominent in command help; existing atomic bulk categorization and mixed edits share the improved native commit and durable save path. Clarify exact recovery versus fresh intent, and retain the original intent when a portable save remains pending.
 
 ## 2.24.0 — 2026-11-15
 

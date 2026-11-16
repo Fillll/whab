@@ -72,7 +72,7 @@ def test_wrong_read_budget_does_not_write(setup, capsys):
     assert all(r.method == 'GET' for r in setup[0])
 
 
-@pytest.mark.parametrize('failure', [409, 'lost', 'wrong'])
+@pytest.mark.parametrize('failure', [409, 503, 'lost', 'wrong'])
 def test_failed_write_is_not_replayed_and_retains_intent(setup, capsys, failure):
     if failure == 'wrong':
         setup[1]['post_wrong'] = True

@@ -8,6 +8,8 @@ For a before/after comparison, run --prepare-fixtures /tmp/fictional-seeds once
 from the baseline source, then use --fixtures-directory /tmp/fictional-seeds in
 both source versions. Copies preserve identical input bytes and seed provenance;
 activation, first mutations and independent saved-file restoration still run.
+After each timed mutation, an untimed public budget-status read also requires
+every configured copy to be saved; final restoration alone is insufficient.
 """
 
 import argparse
@@ -38,6 +40,19 @@ from whab.initialization import initialize_home
 from whab.plugins.local import local_connection
 
 FIXTURE_FORMAT = 'whab-fictional-cli-performance-1'
+
+
+def verify_saved_status(connection, identifier):
+    """Read copy status without checkpointing or decoding portable budget bytes."""
+    response = connection.get(f'/budgets/{identifier}/api/budget')
+    response.raise_for_status()
+    budget = response.json()
+    assert budget.get('id') == identifier and budget.get('portable') is True, 'Save proof must identify the portable budget'
+    copies = budget.get('copies')
+    assert isinstance(copies, list) and copies, 'Save proof requires the budget file status'
+    assert copies[0].get('name') == 'Budget file', 'Save proof must include the primary budget file'
+    assert all(copy.get('status') == 'saved' for copy in copies), 'An acknowledged mutation must already be durably saved'
+    return True
 
 
 def source_identity():
@@ -147,7 +162,7 @@ def main():
         print(write_fixtures(args.prepare_fixtures, sizes, max(100, args.runs)))
         return
     initial_source = source_identity()
-    samples, cold = {}, {}
+    samples, cold, durability_checks = {}, {}, {}
     executable = str(Path(sys.executable).parent / 'whab')
     with TemporaryDirectory(prefix='whab-cli-matrix-') as directory:
         root = Path(directory)
@@ -192,6 +207,11 @@ def main():
                     return entries
                 cursor = page['next']
 
+        def saved(connection, budget, phase):
+            verify_saved_status(connection, budget['id'])
+            checks = durability_checks.setdefault(budget['name'], {})
+            checks[phase] = checks.get(phase, 0) + 1
+
         with patch.dict(os.environ, env, clear=True):
             initialize_home(home)
             budgets = [prepared_fixture(root, size, max(100, args.runs), args.fixtures_directory) for size in sizes]
@@ -201,12 +221,13 @@ def main():
             cli('Missing fictional budget', 'trnx', 'list', '--help', plain=True)
             for _ in range(args.runs):
                 cli('Missing fictional budget', 'trnx', 'list', '--help', plain=True, sample='help_before')
-            with local_connection(home, 'sandbox'):
+            with local_connection(home, 'sandbox') as connection:
                 for budget in budgets:
                     target = budget['name']
                     start = perf_counter()
                     cli(target, 'category', 'list')
                     cold[target] = {'activation_ms': (perf_counter() - start) * 1000, 'fixture': budget['fixture']}
+                    saved(connection, budget, 'activation')
                     start = perf_counter()
                     assert cli(target, 'trnx', 'list', '--merchant', 'Selective fictional merchant')['returned'] == 13
                     cold[target]['merchant_index_ms'] = (perf_counter() - start) * 1000
@@ -218,7 +239,12 @@ def main():
                     for budget in order:
                         target = budget['name']
                         def run(*command, label):
-                            return cli(target, *command, sample=f'{budget["transactions"]}:{label}')
+                            sample = f'{budget["transactions"]}:{label}'
+                            result = cli(target, *command, sample=sample)
+                            if label in {'categorize', 'classify'}:
+                                saved(connection, budget, 'timed_mutation')
+                                samples[sample][-1]['durable_status_verified'] = True
+                            return result
                         monthly = run('trnx', 'list', '--month', '2026-05', label='monthly list')
                         assert monthly['complete'] and monthly['returned'] == monthly['total'] == 300
                         merchants = run('trnx', 'list', '--merchant', 'Selective fictional merchant', label='merchant search')
@@ -232,8 +258,10 @@ def main():
                             retry = cli(target, 'trnx', 'categorize', 'tx-000000', '--category', 'Fixture / Group 56', '--agent', 'Benchmark',
                                         '--revision', change['expectedRevision'], '--request-id', change['requestId'])
                             assert retry == change
+                            saved(connection, budget, 'retry_before_restart')
                             cli(target, 'trnx', 'categorize', 'tx-000000', '--clear', '--revision', change['expectedRevision'],
                                 '--request-id', 'fictional-stale', expected_error=b'Categorization was not confirmed')
+                            saved(connection, budget, 'stale_before_restart')
                 for budget in budgets:
                     budget['history'] = history(budget['name'])
                     assert len(budget['history']) == 2 * args.runs
@@ -242,13 +270,14 @@ def main():
             while endpoint.exists() and monotonic() < deadline:
                 sleep(.1)
             assert not endpoint.exists()
-            with local_connection(home, 'sandbox'):
+            with local_connection(home, 'sandbox') as connection:
                 for budget in budgets:
                     target, change = budget['name'], budget['intent']
                     assert history(target) == budget['history']
                     retry = cli(target, 'trnx', 'categorize', 'tx-000000', '--category', 'Fixture / Group 56', '--agent', 'Benchmark',
                                 '--revision', change['expectedRevision'], '--request-id', change['requestId'])
                     assert retry == change
+                    saved(connection, budget, 'retry_after_restart')
             deadline = monotonic() + 20
             while endpoint.exists() and monotonic() < deadline:
                 sleep(.1)
@@ -271,7 +300,10 @@ def main():
                       'python': platform.python_version(), 'platform': platform.platform(), 'logical_cpus': os.cpu_count(),
                       'versions': {name: version(name) for name in ('whab', 'whab_plugin_cli', 'whab_plugin_sqlite')},
                       'transactions': sizes, 'accounts': max(100, args.runs), 'categories': 57, 'runs': args.runs,
-                      'seed': 20261110, 'cold': cold, 'saved_results_verified': True, 'commands': report}, indent=2))
+                      'seed': 20261110, 'cold': cold, 'saved_results_verified': True,
+                      'durability_verification': {'checks': durability_checks,
+                          'scope': 'Public budget-copy status asserted saved after every timed mutation, cold activation and categorization retry/refusal. These small reads run outside CLI wall timers and perform no checkpoint or full-file decode; they can affect inter-command pacing. Final independent saved-container restoration remains separate.'},
+                      'commands': report}, indent=2))
 
 
 if __name__ == '__main__':

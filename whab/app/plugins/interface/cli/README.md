@@ -1146,7 +1146,10 @@ system load, with separate help-only samples before and after the workflow.
 Activation and initial merchant-index construction are reported separately.
 Each size receives distinct real edits, stale-intent checks and exact retries;
 the saved files and audit entries are verified after restart and by independent
-restoration into empty stores. `--sizes` accepts a comma-separated list up to the
+restoration into empty stores. An additional public copy-status read requires
+saved state after every mutation. These small reads run outside the command
+timer and can affect pacing; final restoration alone does not prove that each
+earlier acknowledgement completed its save. `--sizes` accepts a comma-separated list up to the
 existing row bound; fixture images must still fit the existing 50 MiB limit.
 The 250 ms p95 goal concerns warm bounded reads and edits on measured hardware.
 Complete unbounded output, cold activation and provider latency require separate
@@ -1191,7 +1194,9 @@ read and guarded advanced edit. Every intent changes real fictional records.
 
 Measurements include startup, verified local HTTPS, output and the synchronous
 portable save. A small checkpoint-counter write and a public native evidence query
-after each successful checkpoint are included as diagnostic overhead. Provider
+after each returned checkpoint call are included as diagnostic overhead. Untimed
+public copy-status checks separately require every acknowledged mutation to be
+saved; checkpoint counts alone cannot prove that. Provider
 latency is excluded: no provider calls or household runtime is used. Cold host/fixture
 activation and each first bulk mutation are reported separately from warm p50/p95.
 Fresh identical fixtures after at most 2,000 bulk changed records, plus at most
@@ -1205,8 +1210,10 @@ The JSON comparison intentionally uses a smaller populated budget within its
 full-file persistence costs and limits; it is not a same-size backend speed comparison.
 The script emits raw per-process timings, total batch p50/p95, per-record costs,
 workflow savings, commit/checkpoint counts, cold timings and independent restoration
-evidence. The final measured tables, target misses and validation evidence are in
-[PR #188](https://github.com/Fillll/whab/pull/188). The 250 ms p95 is a measured target,
+evidence. Historical bulk measurements are in
+[PR #188](https://github.com/Fillll/whab/pull/188); current incremental-save measurements,
+target misses and validation evidence are in [PR #211](https://github.com/Fillll/whab/pull/211).
+The 250 ms p95 is a measured target,
 not a promise for arbitrary hardware, maximum memo sizes, cold work or full-file JSON.
 
 ## Reviewed transfer proposals and atomic pairing

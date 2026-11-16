@@ -19,6 +19,48 @@ def benchmark(monkeypatch):
     return module
 
 
+@pytest.mark.parametrize('fault', [None, 'pending_primary', 'pending_copy', 'missing_copies',
+                                  'wrong_budget', 'not_portable', 'missing_primary'])
+def test_per_command_save_proof_rejects_pending_or_wrong_budget(benchmark, fault):
+    projection = {'id': 'fictional', 'portable': True,
+                  'copies': [{'name': 'Budget file', 'status': 'saved'},
+                             {'name': 'Fictional copy', 'status': 'saved'}]}
+    if fault == 'pending_primary':
+        projection['copies'][0]['status'] = 'pending'
+    elif fault == 'pending_copy':
+        projection['copies'][1]['status'] = 'pending'
+    elif fault == 'missing_copies':
+        projection['copies'] = []
+    elif fault == 'wrong_budget':
+        projection['id'] = 'different'
+    elif fault == 'not_portable':
+        projection['portable'] = False
+    elif fault == 'missing_primary':
+        projection['copies'].pop(0)
+    requests = []
+
+    def get(path):
+        requests.append(path)
+        return SimpleNamespace(json=lambda: deepcopy(projection), raise_for_status=lambda: None)
+
+    connection = SimpleNamespace(get=get)
+    if fault:
+        with pytest.raises(AssertionError):
+            benchmark.verify_saved_status(connection, 'fictional')
+    else:
+        assert benchmark.verify_saved_status(connection, 'fictional') is True
+    assert requests == ['/budgets/fictional/api/budget']
+
+
+def test_per_command_save_proof_rejects_transport_failure(benchmark):
+    def failed_status():
+        raise RuntimeError('Fictional request was refused')
+
+    connection = SimpleNamespace(get=lambda path: SimpleNamespace(raise_for_status=failed_status))
+    with pytest.raises(RuntimeError, match='request was refused'):
+        benchmark.verify_saved_status(connection, 'fictional')
+
+
 @pytest.mark.parametrize("fault", [None, "receipt", "stale", "conflict", "revision", "save"])
 def test_retry_proof_rejects_changed_receipts_or_extra_mutations(benchmark, fault):
     result = {"budgetId": "fictional", "revision": "saved", "data": {"count": 1},

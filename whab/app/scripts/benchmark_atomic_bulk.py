@@ -4,6 +4,8 @@ Run: .venv/bin/python scripts/benchmark_atomic_bulk.py --runs 100 --transactions
 Writes reproducible raw JSON outside the checkout. Each command/size has 100 fresh
 processes; equivalent separate-command workflows run separately. Cold activation,
 first mutation, provider exclusion and instrumentation overhead are reported.
+After each acknowledged mutation, an untimed public copy-status read requires
+saved state; checkpoint callback counts alone do not establish durability.
 Use --fixtures-directory with seeds prepared by benchmark_cli_matrix.py to share
 identical original input across source versions, without reusing runtime caches.
 """
@@ -24,7 +26,7 @@ from time import monotonic, perf_counter, sleep
 from unittest.mock import patch
 from uuid import uuid4
 
-from benchmark_cli_matrix import fixture, prepared_fixture, source_identity
+from benchmark_cli_matrix import fixture, prepared_fixture, source_identity, verify_saved_status
 
 from whab.budgets.container import decode_container
 from whab.initialization import initialize_home
@@ -32,7 +34,7 @@ from whab.plugins.local import local_connection
 
 
 def host(home, metrics):
-    """Measure successful checkpoint calls and native generations, never records."""
+    """Measure returned checkpoint calls and native generations, never records."""
     from whab.budgets.session import BudgetSession
     from whab.config import Settings
     from whab.hosting import run_host
@@ -176,7 +178,7 @@ def json_fixture(root, total):
 
 def case_segment(command, size, args):
     executable = str(Path(sys.executable).parent / "whab")
-    samples, separate, cold, expected = [], [], {}, {}
+    samples, separate, cold, expected, durability_checks = [], [], {}, {}, {}
     with TemporaryDirectory(prefix="whab-atomic-benchmark-") as directory:
         root = Path(directory)
         home = root / "runtime"
@@ -198,6 +200,10 @@ def case_segment(command, size, args):
 
         def counts():
             return json.loads(metrics.read_text())
+
+        def saved(phase):
+            verify_saved_status(connection, budget['id'])
+            durability_checks[phase] = durability_checks.get(phase, 0) + 1
 
         def cli(*parts, stdin=None):
             started = perf_counter()
@@ -238,9 +244,9 @@ def case_segment(command, size, args):
                                (iteration * size if start is None else start) + size)
             ]
 
-        def bulk(edits):
+        def bulk(edits, *, phase='timed_mutation'):
             if command == "classify":
-                return cli(
+                result, elapsed = cli(
                     target,
                     "account",
                     "classify",
@@ -252,8 +258,8 @@ def case_segment(command, size, args):
                     "--agent",
                     "Benchmark",
                 )
-            if command == "categorize":
-                return cli(
+            elif command == "categorize":
+                result, elapsed = cli(
                     target,
                     "trnx",
                     "categorize",
@@ -264,16 +270,19 @@ def case_segment(command, size, args):
                     "Benchmark",
                     "--atomic",
                 )
-            return cli(
-                target,
-                "trnx",
-                "edit-many",
-                "--file",
-                "-",
-                "--agent",
-                "Benchmark",
-                stdin=json.dumps({"edits": edits}),
-            )
+            else:
+                result, elapsed = cli(
+                    target,
+                    "trnx",
+                    "edit-many",
+                    "--file",
+                    "-",
+                    "--agent",
+                    "Benchmark",
+                    stdin=json.dumps({"edits": edits}),
+                )
+            saved(phase)
+            return result, elapsed
 
         with patch.dict(os.environ, env, clear=True):
             initialize_home(home)
@@ -321,7 +330,7 @@ def case_segment(command, size, args):
                     # never rewrite a registry or runtime metadata during setup.
                     path = home / "budgets" / budget["id"] / "sandbox" / "opened.whab"
                     # Cold native/portable cache construction is separate, never hidden.
-                    result, elapsed = bulk(changes(0))
+                    result, elapsed = bulk(changes(0), phase='cold_mutation')
                     cold["first_mutation_ms"] = elapsed
                     for row in result["data"]["changes"]:
                         expected[row["id"]] = deepcopy(row["after"])
@@ -335,6 +344,7 @@ def case_segment(command, size, args):
                             "wall_ms": elapsed,
                             "checkpoints": after["checkpoints"] - before["checkpoints"],
                             "native_commits": after["generation"] - before["generation"],
+                            "durable_status_verified": True,
                         }
                         assert sample["checkpoints"] == sample["native_commits"] == 1
                         assert result["data"]["count"] == size
@@ -345,6 +355,7 @@ def case_segment(command, size, args):
                         history_count += 1
                     retry_result = result
                     retry_before_restart = verify_retry(connection, budget["id"], retry_result, counts)
+                    saved('retry_before_restart')
                     # Identical annotations and target order; separate commits deliberately.
                     for i in range(args.separate_runs):
                         edits = changes(args.runs + i + 1, start=args.runs * size)
@@ -389,6 +400,7 @@ def case_segment(command, size, args):
                                 )
                                 # Include the ordinary read/revision workflow in elapsed below.
                                 duration += read_duration
+                            saved('separate_mutation')
                             elapsed += duration
                             identifier = edit.get("transactionId", edit.get("accountId"))
                             expected[identifier].update(
@@ -403,6 +415,7 @@ def case_segment(command, size, args):
                             "wall_ms": elapsed,
                             "checkpoints": after["checkpoints"] - before["checkpoints"],
                             "native_commits": after["generation"] - before["generation"],
+                            "durable_status_checks": size,
                         }
                         assert sample["checkpoints"] == sample["native_commits"] == size
                         separate.append(sample)
@@ -422,6 +435,7 @@ def case_segment(command, size, args):
                 with local_connection(home, "sandbox", timeout=120) as connection:
                     assert read_history(connection, budget["id"]) == history
                     retry_after_restart = verify_retry(connection, budget["id"], retry_result, counts)
+                    saved('retry_after_restart')
                     assert read_history(connection, budget["id"]) == history
             finally:
                 process.terminate()
@@ -451,6 +465,7 @@ def case_segment(command, size, args):
             "saved_verification": restored,
             "fixture": budget.get("fixture"),
             "retry_verification": {"before_restart": retry_before_restart, "after_restart": retry_after_restart},
+            "durability_verification": durability_checks,
             "distinct_transaction_targets": len(expected) if command != "classify" else None,
             "account_target_reuse": command == "classify",
             "bulk_samples": samples,
@@ -492,6 +507,7 @@ def case(command, size, args):
         "cold": [segment["cold"] for segment in segments],
         "saved_verification": [segment["saved_verification"] for segment in segments],
         "retry_verification": [segment["retry_verification"] for segment in segments],
+        "durability_verification": [segment["durability_verification"] for segment in segments],
         "distinct_transaction_targets": [segment["distinct_transaction_targets"] for segment in segments],
         "bulk_samples": samples,
         "separate_samples": separate,
@@ -557,7 +573,7 @@ def main():
         "cli": version("whab_plugin_cli"),
         "transactions": args.transactions,
         "storage": args.storage,
-        "notes": "End-to-end fresh processes, verified HTTPS and synchronous save. Native evidence query plus a small count-file write after each checkpoint are included instrumentation overhead. Provider latency excluded (no calls). Cold first mutation excluded from warm samples. Fresh fixture segments bound retained history below native/portable limits. Transaction samples change distinct records within each segment; account samples alternate classifications on the same accounts. Untimed exact retry, conflict, stale revision, restart, complete history and independent saved-file checks accompany every segment. Separate p95 uses only the stated number of workflow repetitions.",
+        "notes": "End-to-end fresh processes, verified HTTPS and synchronous save. Native evidence query plus a small count-file write after each checkpoint are included instrumentation overhead. Provider latency excluded (no calls). Cold first mutation excluded from warm samples. Fresh fixture segments bound retained history below native/portable limits. Transaction samples change distinct records within each segment; account samples alternate classifications on the same accounts. Untimed public budget-copy status checks require saved state after every cold, timed and separate mutation and after retry/refusal verification; these reads can affect inter-command pacing but perform no checkpoint or full-file decode. Untimed exact retry, conflict, stale revision, restart, complete history and independent saved-file checks accompany every segment. Separate p95 uses only the stated number of workflow repetitions.",
         "cases": [],
     }
     for command in commands:

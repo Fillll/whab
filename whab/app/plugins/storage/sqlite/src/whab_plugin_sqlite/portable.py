@@ -226,8 +226,10 @@ def export_files(store, workspace):
         clean.db.execute("ALTER TABLE items DROP COLUMN sync_settings")
         clean.db.execute("ALTER TABLE items DROP COLUMN closed_account_cursors")
         if snapshot.get('history'):
-            from .history_writes import save_history
-            save_history(clean, 'personal', snapshot['history'], None, cache_valid=False)
+            # This sanitized base is immutable: later audit entries append to the
+            # outer journal, so native incremental-BLOB padding wastes capacity.
+            clean.db.execute("UPDATE budget_history SET record=? WHERE workspace='personal'",
+                             (json.dumps(snapshot['history'], ensure_ascii=True, separators=(',', ':')),))
         from .transaction_voids import retains_voids
         from .transfer_pairs import retains_pairs
         version = _FORMAT_VERSION if retains_voids(snapshot) else 2 if retains_pairs(snapshot) else 1
@@ -238,11 +240,6 @@ def export_files(store, workspace):
         clean.db.execute("VACUUM")
         raw = clean.db.serialize()
         from .portable_journal import HEADER_BYTES
-        if len(raw) + HEADER_BYTES > MAX_DATABASE_BYTES and snapshot.get('history'):
-            clean.db.execute("UPDATE budget_history SET record=? WHERE workspace='personal'", (json.dumps(snapshot['history'], separators=(',', ':')),))
-            clean.db.execute("VACUUM")
-            raw = clean.db.serialize()
-            clean._history_blob_positions = {}
         if len(raw) + HEADER_BYTES > MAX_DATABASE_BYTES:
             raise StoreError("This SQLite budget exceeds the portable database size limit.")
         from .portable_journal import snapshot as wrap_snapshot

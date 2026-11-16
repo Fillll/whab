@@ -5,7 +5,8 @@
 PR: [#211](https://github.com/Fillll/whab/pull/211)
 
 - Add versioned incremental state and audit integrity with compatible old receipts, explicit algorithm evidence, independent transfer/copy verification and first-write migration. Preserve stale-revision refusal and exact replay across restarts.
-- Verify appended portable payloads using independent SHA-256 prefix state and retain synchronous complete-file saves. Extend fictional performance benchmarks with identical input seeds and saved-file, history and retry proofs.
+- Verify appended portable payloads using independent SHA-256 prefix state and retain synchronous complete-file saves. Extend fictional performance benchmarks with identical input seeds, per-mutation save-status checks and independent saved-file, history and retry proofs.
+- Report an explicit pending-save error when a ledger command commits but its primary portable file is not saved. Preserve the original receipt and let an exact retry finish the pending save without another financial change; healthy retries perform no extra checkpoint.
 
 ## 2.82.0 — 2026-11-15
 
