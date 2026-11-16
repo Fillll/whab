@@ -159,7 +159,7 @@ def test_accounts_present_budget_scope_types_and_net_worth_with_reclassification
     assert 'aria-label="Off-budget accounts"' in text
     assert 'aria-label="Account totals in USD"' in text
     assert '<dt>Assets · USD</dt><dd><span data-private-amount>$8,500</span></dd>' in text
-    assert '<dt>Liabilities · USD</dt><dd><span data-private-amount>$1,000</span></dd>' in text
+    assert '<dt>Liabilities · USD</dt><dd><span data-private-amount>-$1,000</span></dd>' in text
     assert '<dt>Net worth · USD</dt><dd><span data-private-amount>$7,500</span></dd>' in text
     assert '401(k)' in text and 'Brokerage' in text and 'Mortgage' in text
     assert 'Certificate of deposit (CD)' in text

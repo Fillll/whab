@@ -1,6 +1,6 @@
 # Web interface plugin
 
-Distributed independently as `whab_plugin_web`; this version requires WHAB 2.80+. Bounded register and account metadata reads require WHAB 2.14 or newer. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
+Distributed independently as `whab_plugin_web`; this version requires WHAB 2.84+. Bounded register and account metadata reads require WHAB 2.14 or newer. Its version and dependency compatibility range are defined in [pyproject.toml](pyproject.toml); its dated history belongs in [CHANGELOG.md](CHANGELOG.md). Material changes confined to this plugin update its version and changelog, without an app version or app changelog change.
 
 `src/whab_plugin_web/` owns the bundled visual descriptor, view models, icons, Jinja templates and browser assets. Keep rendering and presentation tests alongside them in this folder. The host owns HTTPS routes and access guards through the public UI contract. Every request requires TLS; ordinary visual/private routes remain loopback-only, with only bearer-authorized remote protocol and verified bank-webhook routes exempt from local Host/origin checks.
 
@@ -360,7 +360,11 @@ Receipts are optional storage-owned attachments: JPEG, PNG or PDF up to 5 MiB ea
 
 Transactions display merchant artwork supplied by the enabled Plaid plugin through a local image route. The payee name and editable memo remain visible; artwork loads independently and falls back to the merchant's initial on failure. Transactions without supplied artwork keep their text-only presentation.
 
-Accounts and the sidebar separate **On-budget** everyday accounts from **Off-budget** assets and debts. On-budget checking, savings and credit accounts participate in budget income and spending. Off-budget investments, retirement accounts, property, loans and deposits (including CDs) contribute to net worth while their transactions remain available for review. Assets, liabilities and net worth use current known balances in the selected currency; stale and unavailable snapshots are excluded. Currencies are never combined. The sidebar shows each account’s recorded balance rounded to the nearest whole currency unit, with half units rounded away from zero and debts shown as negative amounts. It omits decimal places and approximation markers; hover or screen-reader text explains whether a balance is current, last known or estimated from YNAB’s exported transactions. YNAB estimates retain their exported sign, even after account classification, and remain excluded from funding and net-worth totals until a verified balance is available. Accounts with no usable balance continue to show `—`.
+Accounts and the sidebar separate **On-budget** everyday accounts from **Off-budget** assets and debts. On-budget checking, savings and credit accounts participate in budget income and spending. Off-budget investments, retirement accounts, property, loans and deposits (including CDs) contribute to net worth while their transactions remain available for review. Assets, liabilities and net worth use current known balances, separately for each currency. Stale, unavailable and imported estimates are excluded. The sidebar and Accounts rows share the core `account_balance_position` projection: money owned is positive, money owed is negative. A canonical loan balance of 500,000 USD cents displays as `-$5,000`; a canonical card balance of -12,345 cents is an overpayment displayed as `$123`; an asset overdraft of -12,345 cents displays as `-$123`. Loans, mortgages, credit cards and other liabilities follow the same rule. The displayed Liabilities total is negative; the public API retains its positive-amount-owed aggregate. No stored balances or transaction cash-flow signs change.
+
+YNAB exports already contain signed balance estimates. Their sign is preserved after classification, even if legacy availability flags are missing or false, and their status stays **Estimated from imported transactions**. They never become current totals merely because of those flags. Supported bank mapping replaces the imported provenance with its normalized snapshot. Other stale balances are **Last known balance**; missing or unknown balances are **Balance unavailable**. The Accounts rows and sidebar expose the same status through visible text, tooltips and accessible labels. Presentation cannot establish reconciliation or verify an estimate.
+
+Displayed account balances use comma grouping and whole units, with halves rounded away from zero; exact cents remain in editors. Privacy mode uses the same fixed `$X,XXX` or `CODE X,XXX` mask for every sign, magnitude and availability state. Neither privacy toggles nor display rounding writes to the ledger.
 
 Choose an individual sidebar account to open its transactions across all dates. The account picker and heading identify the register; use the period picker for This month, Previous month or custom inclusive date bounds. The main **Accounts** navigation opens account management. Account and date filters remain in the address, and switching currency clears the account selection.
 
@@ -430,6 +434,17 @@ category choices and funding disclosures work, while saves and navigation are
 disabled. Check a paired row with its archived counterpart outside the month,
 an unmatched row, disabled unclassified review, and the separate Transfer funding
 row at desktop and compact widths. HTTPS/native tests verify actual saves.
+
+For signed account balances, run
+`.venv/bin/python plugins/interface/web/tests/fixtures/build_account_balances_preview.py --output /tmp/whab-account-balances-static`
+from `whab/app`, then serve that isolated directory with a loopback static server.
+The builder uses installed templates, CSS, privacy, sidebar and money-display controls, and emits
+four light/dark pages plus `expected-values.json`. Check the listed amounts,
+evidence labels and currency totals at 1440px and 390px, with amounts shown and
+hidden. Fictional cases cover debts, overpayments, overdrafts, zero, unavailable
+and stale balances, and already-signed imported estimates. The purchase displays
+`-1,235` and reveals exact `-1234.56` while editing. Saves, navigation and
+runtime requests are disabled; no production budget is opened.
 
 
 ### Currency and month range

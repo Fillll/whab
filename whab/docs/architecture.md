@@ -84,6 +84,16 @@ Application source paths in this guide are relative to `whab/app/`. Native platf
 
 `domain.commands` applies manual account, transaction, review and allocation rules to plain ledger state. Storage supplies identifiers and explicit time context, then commits the validated changes atomically; the financial behavior stays in the shared core.
 
+`domain.accounts.account_balance_position`, exported through `whab.plugins`,
+projects existing source conventions into owned-positive/owed-negative minor
+units and current/stale/estimated/unavailable evidence. Core account summaries
+reuse it and include only current positions. Web formats the same projection in
+the sidebar and Accounts rows. YNAB signed estimates retain their sign and never
+become verified totals because of absent legacy flags. This is a read-only
+projection; stored balance conventions, transaction signs and funding rules do
+not change. A shared helper is needed here so UI rows and domain totals cannot
+apply different interpretations to the same imported record.
+
 `domain.imports` defines the provider-neutral account, transaction and change records accepted by the ledger. Bank adapters normalize payloads; storage backends validate normalized records and merge current annotations inside their transaction. Domain rules import no plugin or adapter runtimes. App, host web, the generic bank facade and plugin runtime import no concrete storage, bank or visual implementation. Generic bank routes call `BankService`, public ledger operations pass through `LedgerService`, and page transport calls the selected UI's context builder. `LedgerService` validates the command vocabulary and serializes mutations over the selected `StorageBackend`; backends retain atomic persistence, referential validation and ingestion guarantees.
 
 See [CLI-first host lifecycle](host-lifecycle.md) for temporary hosts, authenticated local control, optional persistent interfaces and scheduled bank work.

@@ -13,6 +13,7 @@ from whab.plugins import (
     ACCOUNT_TYPES,
     ON_BUDGET_ACCOUNT_TYPES,
     SUPPORTED_CURRENCIES,
+    account_balance_position,
     currency_code,
     currency_minor_units,
     format_date,
@@ -219,6 +220,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
     category_map = {row["id"]: row for row in categories}
     category_kinds = {row["id"]: row.get("kind", "expense") for row in categories}
     all_accounts = data.get("allAccounts", data["accounts"])
+    account_positions = {account["id"]: account_balance_position(account) for account in all_accounts}
     currency = currency_code(data.get("currency", "USD"))
     budgets = {row["categoryId"]: row for row in data.get("budget", [])}
     selected = next((c for c in categories if c["id"] == selected), None)
@@ -363,9 +365,14 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "hidden_account_ids": data.get("viewPreferences", {}).get("hiddenAccountIds", []),
         "account_totals": data.get("accountSummariesByCurrency", {}),
         "all_accounts": all_accounts,
+        "account_positions": account_positions,
+        "account_balance_labels": {
+            "current": "Current balance",
+            "stale": "Last known balance",
+            "estimated": "Estimated from imported transactions · unverified",
+            "unavailable": "Balance unavailable",
+        },
         "currency_money": display_money,
-        "account_money": lambda account: display_money(account["balance"], account.get("currency", "USD")),
-        "account_sidebar_money": lambda value, account: sidebar_money(value, account.get("currency", "USD")),
         "budget_month_count": budget_month_count,
         "money": lambda value: display_money(value, currency),
         "sidebar_money": lambda value: sidebar_money(value, currency),

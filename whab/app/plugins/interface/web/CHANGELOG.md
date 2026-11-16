@@ -1,5 +1,12 @@
 # Web interface plugin changelog
 
+## 1.65.0 — 2026-11-15
+
+PR: [#216](https://github.com/Fillll/whab/pull/216)
+
+- Show the same signed financial position in the sidebar and Accounts rows: money owned is positive and debt is negative, including loans, mortgages, cards, overdrafts and credit overpayments. Display liability totals negatively.
+- Use the shared source-aware projection, label imported estimates and stale or unavailable balances consistently, and preserve fixed privacy masks, comma grouping, whole-unit display rounding and exact editor values.
+
 ## 1.64.0 — 2026-11-15
 
 PR: [#210](https://github.com/Fillll/whab/pull/210)

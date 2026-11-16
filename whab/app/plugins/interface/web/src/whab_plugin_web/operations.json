@@ -9,7 +9,7 @@
     {
       "name": "interface",
       "kind": "sdk",
-      "summary": "Provide the declared web interface or remote authority adapter. Opening Balance is available in category creation and transaction pickers; openingFunding is displayed separately from income and included in the documented Ready to Assign equation. Technical categories never appear as expense envelopes. Settings opens Plugins with direct Budgets, Appearance, Budget history and About navigation; details stay in place with Back, Close and keyboard focus restoration. Accounts has the canonical /budgets/BUDGET/accounts address; legacy month/currency suffixes remain accepted. Archived disabled controls do not block leaving the page; actual unfinished writes retain normal guards.",
+      "summary": "Provide the declared web interface or remote authority adapter. Opening Balance is available in category creation and transaction pickers; openingFunding is displayed separately from income and included in the documented Ready to Assign equation. Technical categories never appear as expense envelopes. Settings opens Plugins with direct Budgets, Appearance, Budget history and About navigation; details stay in place with Back, Close and keyboard focus restoration. Accounts has the canonical /budgets/BUDGET/accounts address; legacy month/currency suffixes remain accepted. Archived disabled controls do not block leaving the page; actual unfinished writes retain normal guards. Account rows and sidebar share account_balance_position: money owned positive, debt negative, with explicit current/stale/estimated/unavailable status. Liabilities totals display negatively while public aggregate fields retain their original convention. YNAB estimates keep their signed value and never enter current totals, even with legacy false/missing flags.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -42,7 +42,7 @@
           "output": null
         }
       ],
-      "side_effects": "The interface delegates explicit reads/mutations to public services; it does not define financial rules. Account, Payee, Category and Memo resize controls save only column keys and pixel widths in browser local storage; resizing never writes financial data or history. Sidebar collapse/expand saves only expanded/collapsed under whab.sidebar in browser local storage. It never changes budget data, history or bank synchronization; blocked browser storage keeps the toggle usable for this page. Settings navigation alone does not mutate budgets. Appearance changes only the existing browser-local light/dark preference. Plugin changes retain explicit review, host confirmation and separate restart-save behavior; closing or navigating never retries an uncertain mutation.",
+      "side_effects": "The interface delegates explicit reads/mutations to public services; it does not define financial rules. Account, Payee, Category and Memo resize controls save only column keys and pixel widths in browser local storage; resizing never writes financial data or history. Sidebar collapse/expand saves only expanded/collapsed under whab.sidebar in browser local storage. It never changes budget data, history or bank synchronization; blocked browser storage keeps the toggle usable for this page. Settings navigation alone does not mutate budgets. Appearance changes only the existing browser-local light/dark preference. Plugin changes retain explicit review, host confirmation and separate restart-save behavior; closing or navigating never retries an uncertain mutation. Signed balance presentation does not modify stored balances, transaction cash-flow signs, exact editor cents, review flags, pair links or bank state. Fixed privacy masks and display rounding remain unchanged.",
       "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
       "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
       "errors": [
@@ -50,7 +50,7 @@
         "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
       ],
       "retry": "Read again as needed; reads never authorize a later write using an old revision.",
-      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+      "availability": "Web 1.65+ requires WHAB 2.84+ for the shared source-aware account balance projection. SDK callback only; consult the owning README for the typed in-process contract."
     },
     {
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
