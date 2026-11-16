@@ -1564,3 +1564,10 @@ state. Storage adapters may pass `trusted_base=True` only for a detached base
 snapshot they have already fully validated. New identities, deletions, malformed
 chains, snapshot entries and mismatched before-values are rejected; unsupported
 operations require the owning storage's complete snapshot path.
+
+`detach_external_accounts=True` is an explicit opt-in, currently used by SQLite,
+for saved images that mark provider accounts stale. The saved base must exactly
+match its verified audit state after that projection; names, balances, manual
+account flags and every other field remain strict. Replay validates the original
+financial state and audit chain before marking provider accounts stale in the
+returned snapshot. The original audit records and hashes are preserved.

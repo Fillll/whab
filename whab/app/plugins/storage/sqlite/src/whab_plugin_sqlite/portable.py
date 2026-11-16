@@ -55,6 +55,14 @@ def _build_image(raw, previous, journal, hints):
     """Append audited changes to a sanitized snapshot, compacting when bounded."""
     from .portable_journal import append
     entries = journal.get('entries', []) if journal else []
+    if previous is None and journal and any(
+        not row['stale'] and row['source'] not in {'manual', 'demo'}
+        for row in journal['baseline']['accounts']
+    ):
+        # A legacy provider ledger without audit history has no verified
+        # pre-detachment baseline in its saved image. Establish one once before
+        # appending later edits; a frame alone cannot reconstruct stale flags.
+        return None
     # A verified sanitized base without audit entries is the initial baseline.
     # Replay creates that same baseline from its validated financial snapshot;
     # the first financial edit needs only its entry, not a second full image.
@@ -270,7 +278,8 @@ def read_files(files, *, with_receipts=False):
         base, entries = read_journal(raw)
         snapshot, images = read_files({_FILENAME: base}, with_receipts=True)
         if entries:
-            snapshot = replay_portable_entries(snapshot, entries, trusted_base=True)
+            snapshot = replay_portable_entries(snapshot, entries, trusted_base=True,
+                                               detach_external_accounts=True)
         active = {row['id'] for row in snapshot['transactions'] if not row['deleted']}
         if any(identifier not in active for identifier, _ in images):
             raise StoreError('Receipt images must belong to an active transaction.')

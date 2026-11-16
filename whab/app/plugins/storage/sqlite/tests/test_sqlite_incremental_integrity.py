@@ -150,3 +150,31 @@ def test_first_audit_reuses_only_verified_equivalent_tree_and_keeps_reopen_proof
         assert store.execute_operation(command).replayed
     finally:
         store.close()
+
+
+def test_control_scope_replacement_discards_unbound_financial_hash_cache(tmp_path):
+    from whab_plugin_sqlite.portable import read_files
+
+    from whab.domain.history import financial, state_digest
+
+    store = Store(tmp_path / 'fictional-control-cache.sqlite', month='2026-10')
+    try:
+        account = store.add_account('personal', {'name': 'Fictional checking', 'type': 'depository', 'balance': 0})
+        ids = [store.add_transaction('personal', {'accountId': account, 'date': '2026-10-01',
+               'merchant': 'Fictional shop', 'amount': 100, 'note': 'Original'}) for _ in range(2)]
+        store.execute_operation(request(store, 'fictional-warm', 'edit_transaction',
+                                        {'transactionId': ids[0], 'note': 'Warm state'}))
+        # Native control scopes replace/import data without making an ordinary
+        # financial-history entry. A current database stamp alone must not bind
+        # a leftover history tree after that scope discarded its history heads.
+        with store._authority_write(financial=False):
+            store.db.execute('UPDATE transactions SET note=? WHERE id=?', ('Control replacement', ids[0]))
+        store.execute_operation(request(store, 'fictional-after-control', 'edit_transaction',
+                                        {'transactionId': ids[1], 'note': 'Selected edit'}))
+        final = store.export_budget()
+        assert final['history']['entries'][-1]['afterDigest'] == state_digest(financial(final), 2)
+        assert any(entry['operation'] == 'import_workspace' for entry in final['history']['entries'])
+        assert read_files(store.export_budget_files()) == final
+        assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states()), version=2)
+    finally:
+        store.close()

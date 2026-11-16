@@ -1,5 +1,6 @@
 """Complete portable journals reject corruption and retain committed state on reopen."""
 
+import json
 import sqlite3
 from copy import deepcopy
 from hashlib import sha256
@@ -10,6 +11,7 @@ from whab_plugin_sqlite import portable_journal as journal
 
 from tests.receipt_images import png
 from whab.domain.history import append as append_history
+from whab.domain.history import financial, replay_portable_entries
 from whab.plugins import StoreError
 from whab.plugins.storage_transfer import StorageOperation, canonical_storage_json
 
@@ -83,6 +85,69 @@ def test_first_audited_edit_appends_to_validated_legacy_ledger_without_rebuildin
     assert portable.read_files({'budget.sqlite': saved}) == store.export_budget('personal')
 
 
+@pytest.mark.parametrize('history_mode', ['current', 'legacy', 'absent'])
+@pytest.mark.parametrize('operation', ['edit_transaction', 'update_account'])
+def test_provider_edits_replay_exact_audit_and_keep_only_detached_public_accounts(
+    imported_account, imported_transaction, history_mode, operation,
+):
+    store = Store(':memory:', month='2026-11')
+    try:
+        store.save_item('item', 'fictional-private-token', 'Fictional bank')
+        store.apply_sync('item', {'added': [imported_transaction()], 'modified': [], 'removed': []},
+                         'fictional-private-cursor', [imported_account()])
+        if history_mode == 'absent':
+            store.db.execute("DELETE FROM budget_history WHERE workspace='personal'")
+        elif history_mode == 'legacy':
+            before = financial(store.export_budget('personal'))
+            legacy = append_history(None, before, before, {'operation': 'apply_sync'})
+            store.db.execute("UPDATE budget_history SET record=? WHERE workspace='personal'", (json.dumps(legacy),))
+        previous = store.export_budget_files()['budget.sqlite']
+        for index, value in enumerate(('first', 'second')):
+            payload = ({'transactionId': 'tx', 'categoryId': 'groceries' if index == 0 else 'dining'}
+                       if operation == 'edit_transaction' else
+                       {'accountId': 'bank', 'type': 'credit' if index == 0 else 'depository', 'onBudget': True})
+            evidence = store.commit_evidence()
+            store.execute_operation(StorageOperation(
+                value, evidence.authority_epoch, evidence.generation, 'personal', operation,
+                canonical_storage_json(payload),
+            ))
+            raw = store.export_budget_files()['budget.sqlite']
+            if history_mode == 'absent' and index == 0:
+                assert not raw.startswith(previous)
+                assert journal.read(raw)[1] == []
+            else:
+                assert raw.startswith(previous)
+                assert journal.read(raw)[1]
+            reopened = portable.read_files({'budget.sqlite': raw})
+            native = store.export_budget('personal')
+            assert reopened['history'] == native['history']
+            assert reopened['transactions'] == native['transactions']
+            assert reopened['accounts'] == [{**row, 'stale': True} for row in native['accounts']]
+            assert native['accounts'][0]['stale'] is False
+            assert not {'itemId', 'mask'} & reopened['accounts'][0].keys()
+            assert b'fictional-private-token' not in raw and b'fictional-private-cursor' not in raw
+            previous = raw
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize('alteration', ['name', 'balance', 'manual-stale'])
+def test_detached_replay_rejects_every_other_base_difference(saved, alteration):
+    store, _, ids = saved
+    base = portable.read_files(store.export_budget_files())
+    request(store, ids[0], 'Audited edit', 'projection-rejection')
+    entry = store.export_budget('personal')['history']['entries'][-1]
+    altered = deepcopy(base)
+    if alteration == 'manual-stale':
+        altered['accounts'][0]['stale'] = True
+    elif alteration == 'balance':
+        altered['accounts'][0]['balance'] += 1
+    else:
+        altered['accounts'][0]['name'] = 'Unexpected name'
+    with pytest.raises(StoreError, match='detached audit state'):
+        replay_portable_entries(altered, [entry], detach_external_accounts=True)
+
+
 def test_reordered_or_repeated_valid_frames_cannot_replay_against_another_history(saved):
     store, _, ids = saved
     original = store.export_budget_files()['budget.sqlite']
@@ -113,6 +178,20 @@ def test_compaction_and_unknown_changes_keep_all_history(saved, monkeypatch):
     rebuilt = store.export_budget_files()['budget.sqlite']
     assert journal.read(rebuilt)[1] == []
     assert portable.read_files({'budget.sqlite': rebuilt}) == store.export_budget('personal')
+
+
+def test_stale_portable_history_hint_rebuilds_complete_committed_image(saved):
+    store, _, ids = saved
+    store.export_budget_files()
+    stamp, raw, _ = store._portable_images['personal']
+    # Disposable cache metadata cannot establish a predecessor absent from the
+    # current verified history. A normal edit must still commit and save fully.
+    store._portable_images['personal'] = (stamp, raw, 'f' * 64)
+    request(store, ids[0], 'Saved after stale hint', 'stale-history-hint')
+    rebuilt = store.export_budget_files()['budget.sqlite']
+    assert journal.read(rebuilt)[1] == []
+    assert portable.read_files({'budget.sqlite': rebuilt}) == store.export_budget('personal')
+    assert store.operation_receipt('stale-history-hint') is not None
 
 
 def test_external_sql_and_failed_commit_never_reuse_an_uncommitted_journal(saved, monkeypatch):

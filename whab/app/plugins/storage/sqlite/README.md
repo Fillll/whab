@@ -269,6 +269,13 @@ frames, unknown fields and unsupported changes are rejected without executing
 stored SQL. Earlier image-only readers refuse the new header; use SQLite 1.29+
 to open these saved files.
 
+Provider accounts in a saved image remain detached and stale. Replay checks the
+image against the independently verified audit state, allowing only that exact
+stale-flag projection; account names, balances, manual-account flags and every
+other financial field must match. The original audit records remain unchanged.
+A legacy provider ledger without audit history needs one complete snapshot on
+its first audited edit to establish that baseline; later supported edits append.
+
 The journal compacts to a fresh sanitized snapshot after 512 frames, 4 MiB of
 changes, a change that cannot be represented by supported replacements, or when
 needed to retain the 50 MiB payload bound. Compaction, the first integrity build,

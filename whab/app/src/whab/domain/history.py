@@ -419,12 +419,14 @@ def apply_request(state, action, target, fingerprint, metadata=None):
     return {'action': action, 'target': target, 'changeCount': len(result['changes'])}
 
 
-def replay_portable_entries(snapshot, entries, *, trusted_base=False):
+def replay_portable_entries(snapshot, entries, *, trusted_base=False, detach_external_accounts=False):
     """Validate a portable snapshot plus exact replacement-only audit entries.
 
     Portable storage may append these records to a sanitized base. This pure
     reader checks the complete chain and final financial state independently;
-    it never runs stored SQL or accepts new/deleted record identities.
+    it never runs stored SQL or accepts new/deleted record identities. SQLite
+    images detach provider accounts without rewriting their historical audit;
+    that mode permits only the exact provider-stale projection at the boundary.
     """
     snapshot = snapshot if trusted_base else validate_portable_budget(snapshot)
     if type(entries) is not list:
@@ -434,6 +436,15 @@ def replay_portable_entries(snapshot, entries, *, trusted_base=False):
     baseline = financial({key: list(value) if type(value) is list else value
                           for key, value in snapshot.items() if key != 'history'}, trusted=True)
     journal = snapshot.get('history') or {'formatVersion': 1, 'baseline': baseline, 'entries': []}
+    if detach_external_accounts and snapshot.get('history'):
+        audited = snapshot_at(journal, journal['entries'][-1]['id'] if journal['entries'] else 'baseline')
+        projected = {**audited, 'accounts': [
+            {**row, 'stale': row['stale'] or row['source'] not in {'manual', 'demo'}}
+            for row in audited['accounts']
+        ]}
+        if baseline != projected:
+            raise StoreError('Portable financial state does not match its detached audit state.')
+        baseline = audited
     rows = flatten(baseline)
     for entry in entries:
         if type(entry) is not dict or type(entry.get('changes')) is not list or 'snapshot' in entry:
@@ -450,4 +461,10 @@ def replay_portable_entries(snapshot, entries, *, trusted_base=False):
     for section in ('accounts', 'transactions'):
         result[section] = [deepcopy(rows[(section, row['id'])]) for row in snapshot[section]]
     result = validate_portable_budget(result)
-    return {**result, 'history': validate_history(journal, final_snapshot=result)}
+    journal = validate_history(journal, final_snapshot=result)
+    if detach_external_accounts:
+        result['accounts'] = [
+            {**row, 'stale': row['stale'] or row['source'] not in {'manual', 'demo'}}
+            for row in result['accounts']
+        ]
+    return {**result, 'history': journal}

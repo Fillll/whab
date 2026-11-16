@@ -243,9 +243,9 @@ class Authority:
                                                               hasher=self._native_merkle, selections=selections)
             else:
                 from .evidence import SnapshotEncoder
-                if not reusable or getattr(self, '_snapshot_encoder', None) is None:
-                    self._snapshot_encoder = SnapshotEncoder()
-                self._snapshot_encoder.begin(transaction_ids=selected[1] if reusable else None)
+                # Legacy reads rebuild; financial commits adopt version 2 before hashing.
+                self._snapshot_encoder = SnapshotEncoder()
+                self._snapshot_encoder.begin()
                 self._evidence_digest = native_records_digest(records, chunks=self._snapshot_encoder.chunks)
                 self._snapshot_encoder.finish()
             self._evidence_version = version
@@ -306,6 +306,10 @@ class Authority:
                     self._history_merkle = {}
                     self._history_digest_heads = {}
                 cached = getattr(self, '_history_heads', {}) if getattr(self, '_history_stamp', None) == stamp else {}
+                # A control scope can discard heads while retaining the same
+                # native generation. Unbound financial trees must not survive it.
+                self._history_merkle = {name: tree for name, tree in self._history_merkle.items() if name in cached}
+                self._history_digest_heads = {name: head for name, head in self._history_digest_heads.items() if name in cached}
                 names = (workspace,) if type(workspace) is str and workspace in {'personal', 'demo'} else ('personal', 'demo')
                 history_before = {name: cached[name] if name in cached else snapshot(self, name) for name in names if self.db.execute("SELECT 1 FROM meta WHERE workspace=?", (name,)).fetchone()} if financial else {}
                 history_after = dict(cached) if financial else {}
