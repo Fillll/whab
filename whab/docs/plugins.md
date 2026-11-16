@@ -200,6 +200,27 @@ Amounts are **integer minor units of `snapshot.currency`**, never floats. The le
 
 `AccountSnapshot.on_budget` is a boolean after construction. Its compatible default is true for cash/credit accounts and false for other account types. Report hooks receive all accounts and transactions; spending and income reports should filter transaction account IDs to accounts with `on_budget=True`. Off-budget records remain available for asset and liability reports and complete exports. `ACCOUNT_TYPES`, `ACCOUNT_SUBTYPES`, `ON_BUDGET_ACCOUNT_TYPES`, `LIABILITY_ACCOUNT_TYPES`, `normalize_account`, `is_on_budget` and `is_liability` are public classification helpers in `whab.plugins`.
 
+WHAB 2.84 adds the pure `account_balance_position(account)` helper for public
+account dictionaries. It returns `{"value": integer_minor_units_or_null,
+"status": "current" | "stale" | "estimated" | "unavailable"}` without changing
+the account. Positive values mean money owned; negative values mean money owed.
+Canonical `credit`, `loan` (including mortgages) and `other_liability` balances
+store positive amounts owed, so the projection negates them exactly once.
+A negative canonical card balance becomes a positive overpayment; a negative
+asset balance remains an overdraft. No absolute value, account-name inference,
+rounding or currency conversion is applied.
+
+YNAB export balances are already signed estimates: `source="ynab"` preserves
+their sign and reports `estimated`, even when legacy availability flags are
+missing or false. Classification does not verify them. A supported bank mapping
+replaces this provenance with the normalized provider snapshot. Other unknown,
+missing or invalid balances report `unavailable` with a null value; usable stale
+snapshots retain their signed value and report `stale`. Account summaries include
+only `current` projections, separated by currency. Their existing public
+`liabilities` field remains a positive amount owed; a signed-position interface
+displays that aggregate negatively. This projection does not change stored
+balances, transaction cash-flow signs, funding rules, history or reconciliation.
+
 ```python
 def insights(snapshot: BudgetSnapshot) -> tuple[Insight, ...]:
     count = sum(not row.pending for row in snapshot.transactions)

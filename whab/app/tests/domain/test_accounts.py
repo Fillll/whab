@@ -4,7 +4,14 @@ from copy import deepcopy
 
 import pytest
 
-from whab.domain.accounts import account_summary, is_liability, normalize_account
+from whab.domain.accounts import (
+    ACCOUNT_TYPES,
+    LIABILITY_ACCOUNT_TYPES,
+    account_balance_position,
+    account_summary,
+    is_liability,
+    normalize_account,
+)
 from whab.domain.budget import calculate_workspace, ensure_assignment_allowed, select_currency
 from whab.domain.commands import add_account, add_transaction, update_account
 from whab.domain.errors import StoreError
@@ -123,3 +130,87 @@ def test_account_totals_keep_currencies_separate_and_skip_unknown_or_stale(state
     assert select_currency(view, "JPY")["accountSummary"]["netWorth"] == 0
     with pytest.raises(StoreError, match="totals exceed"):
         account_summary([{"type": "property", "balance": MAX_SAFE_INTEGER}, {"type": "property", "balance": 1}])
+
+
+@pytest.mark.parametrize('kind', ACCOUNT_TYPES)
+@pytest.mark.parametrize('balance', [-500123, 0, 500123])
+@pytest.mark.parametrize('source', ['manual', 'plaid', 'custom-feed', None])
+def test_account_position_owns_positive_owes_negative_without_changing_account(kind, balance, source):
+    account = {'type': kind, 'balance': balance, 'currency': 'KWD', 'closed': True}
+    if source is not None:
+        account['source'] = source
+    before = deepcopy(account)
+    expected = -balance if kind in LIABILITY_ACCOUNT_TYPES else balance
+    assert account_balance_position(account) == {'value': expected, 'status': 'current'}
+    assert account == before
+
+
+@pytest.mark.parametrize('kind', ['credit', 'loan', 'other_liability', 'depository', 'other'])
+@pytest.mark.parametrize('balance', [-12345, 0, 12345])
+@pytest.mark.parametrize('flags', [{}, {'balanceUnknown': False, 'stale': False}, {'balanceUnknown': True, 'stale': True}])
+def test_ynab_import_provenance_always_preserves_signed_estimate_and_excludes_totals(kind, balance, flags):
+    account = {'type': kind, 'balance': balance, 'source': 'ynab', **flags}
+    before = deepcopy(account)
+    assert account_balance_position(account) == {'value': balance, 'status': 'estimated'}
+    assert account_summary([account]) == dict.fromkeys(('assets', 'liabilities', 'netWorth', 'onBudget', 'offBudget'), 0)
+    assert account == before
+
+
+@pytest.mark.parametrize('value', [None, True, False, 123.0, '123', [], {}, MAX_SAFE_INTEGER + 1, -MAX_SAFE_INTEGER - 1])
+@pytest.mark.parametrize('source', ['manual', 'ynab'])
+def test_invalid_balance_has_no_fabricated_position_or_summary(value, source):
+    account = {'type': 'loan', 'balance': value, 'source': source}
+    before = deepcopy(account)
+    assert account_balance_position(account) == {'value': None, 'status': 'unavailable'}
+    assert account_summary([account])['netWorth'] == 0
+    assert account == before
+
+
+def test_missing_unknown_and_stale_balances_retain_their_evidence_status():
+    assert account_balance_position({'type': 'credit'}) == {'value': None, 'status': 'unavailable'}
+    for amount in (-12345, 0, 12345):
+        account = {'type': 'credit', 'balance': amount, 'stale': True}
+        assert account_balance_position(account) == {'value': -amount, 'status': 'stale'}
+        assert account_summary([account])['netWorth'] == 0
+        account['balanceUnknown'] = True
+        assert account_balance_position(account) == {'value': None, 'status': 'unavailable'}
+
+
+@pytest.mark.parametrize('kind', ['depository', 'credit'])
+@pytest.mark.parametrize('value', [-MAX_SAFE_INTEGER, MAX_SAFE_INTEGER])
+def test_position_preserves_safe_integer_boundary_and_aggregate_still_checks_overflow(kind, value):
+    account = {'type': kind, 'balance': value}
+    expected = -value if kind == 'credit' else value
+    assert account_balance_position(account) == {'value': expected, 'status': 'current'}
+    assert account_summary([account])['netWorth'] == expected
+    with pytest.raises(StoreError, match='totals exceed'):
+        account_summary([account, {'type': kind, 'balance': 1 if value > 0 else -1}])
+
+
+def test_public_position_helper_and_positive_owed_summary_contract():
+    from whab.plugins import account_balance_position as public_position
+    assert public_position is account_balance_position
+    accounts = [
+        {'type': 'depository', 'balance': 10000},
+        {'type': 'depository', 'balance': -2000},
+        {'type': 'loan', 'subtype': 'mortgage', 'balance': 5000},
+        {'type': 'credit', 'balance': -3000},
+        {'type': 'loan', 'balance': -990000, 'source': 'ynab'},
+    ]
+    assert account_summary(accounts) == {'assets': 13000, 'liabilities': 7000, 'netWorth': 6000, 'onBudget': 11000, 'offBudget': -5000}
+
+
+def test_bank_link_replaces_ynab_estimate_with_canonical_snapshot_without_transaction_changes(state):
+    from whab.domain.bank_setup import configure_sync
+    state.update(items={'item': {'provider': 'plaid', 'token': 'fictional-token'}}, receipts={})
+    add_account(state, 'imported', {'name': 'Imported card', 'type': 'credit', 'balance': -90000})
+    state['accounts']['imported'].update(source='ynab', balanceUnknown=True, stale=True)
+    assert account_balance_position(state['accounts']['imported']) == {'value': -90000, 'status': 'estimated'}
+    transactions = deepcopy(state['transactions'])
+    bank = {'id': 'provider-card', 'name': 'Provider card', 'institution': 'Fictional Bank', 'type': 'credit',
+            'balance': 80000, 'currency': 'USD', 'source': 'plaid', 'itemId': 'item'}
+    configure_sync(state, 'item', [bank], {'provider-card': {'accountId': 'imported', 'since': None}})
+    linked = state['accounts']['imported']
+    assert linked['source'] == 'plaid' and linked['balance'] == 80000
+    assert account_balance_position(linked) == {'value': -80000, 'status': 'current'}
+    assert state['transactions'] == transactions

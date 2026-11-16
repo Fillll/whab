@@ -55,7 +55,7 @@
                 "integer",
                 "null"
               ],
-              "description": "Current integer-minor-unit balance; null when unknown. Assets carry signed value; liabilities carry a positive amount owed. Classifying an imported account does not verify its balance estimate or fetch a fresh bank balance."
+              "description": "Raw stored integer minor units; null when unknown. Canonical assets carry signed value and canonical liabilities carry positive amounts owed (negative for an overpayment). YNAB exports instead carry already-signed unverified estimates regardless of legacy freshness flags. Use the read-only account_balance_position SDK helper for consistent owned-positive/owed-negative presentation; classification does not verify balances or synchronize a bank."
             },
             "currency": {
               "type": "string",
@@ -316,7 +316,7 @@
     {
       "name": "workspace",
       "kind": "query",
-      "summary": "Read calculated monthly envelopes, summary, accounts and transactions. Income categories fund eligible posted external inflows and have no expense envelopes. summary.classifiedIncome and unclassifiedIncome split the existing total; explicit review requires classification or a confirmed transfer pair.",
+      "summary": "Read calculated monthly envelopes, summary, accounts and transactions. Income categories fund eligible posted external inflows and have no expense envelopes. summary.classifiedIncome and unclassifiedIncome split the existing total; explicit review requires classification or a confirmed transfer pair. Account summaries include only current signed account positions; stale, unavailable and YNAB estimates are excluded, including legacy false/missing flags. Public liabilities remains a positive amount owed.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -6874,6 +6874,182 @@
         }
       ],
       "side_effects": "Read-only; no revision change, save, history or provider call."
+    },
+    {
+      "name": "account_balance_position",
+      "kind": "sdk",
+      "summary": "Project a public account record into a signed financial position and evidence status. Money owned is positive; debt is negative. This pure Python helper is not a ledger query or command.",
+      "input": {
+        "type": "object",
+        "description": "Public account dictionary passed to whab.plugins.account_balance_position(account).",
+        "properties": {
+          "account": {
+            "type": "object",
+            "description": "One normalized public account record; other compatible fields are ignored and preserved.",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Existing domain account type; credit, loan and other_liability are canonical liabilities."
+              },
+              "balance": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Raw stored minor units. Missing, unknown, invalid or out-of-range values are unavailable."
+              },
+              "source": {
+                "type": "string",
+                "description": "YNAB provenance denotes an already-signed estimate even if legacy availability flags are absent/false; other normalized sources use canonical account conventions."
+              },
+              "stale": {
+                "type": "boolean",
+                "description": "True retains known signed value as last known, excluded from current totals."
+              },
+              "balanceUnknown": {
+                "type": "boolean",
+                "description": "True makes non-YNAB amounts unavailable. YNAB numeric estimates remain explicitly estimated."
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "account"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Fresh read-only projection; no formatting, rounding or currency conversion.",
+        "properties": {
+          "value": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Signed financial position in the account currency minor units; null for unavailable."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "current",
+              "stale",
+              "estimated",
+              "unavailable"
+            ],
+            "description": "Only current values participate in account summary totals."
+          }
+        },
+        "required": [
+          "value",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "account": {
+              "type": "loan",
+              "balance": 500000,
+              "source": "manual"
+            }
+          },
+          "output": {
+            "value": -500000,
+            "status": "current"
+          }
+        },
+        {
+          "input": {
+            "account": {
+              "type": "loan",
+              "balance": -500000,
+              "source": "ynab",
+              "balanceUnknown": false
+            }
+          },
+          "output": {
+            "value": -500000,
+            "status": "estimated"
+          }
+        },
+        {
+          "input": {
+            "account": {
+              "type": "credit",
+              "balance": -12345,
+              "source": "plaid"
+            }
+          },
+          "output": {
+            "value": 12345,
+            "status": "current"
+          }
+        },
+        {
+          "input": {
+            "account": {
+              "type": "depository",
+              "balance": -12345,
+              "source": "manual"
+            }
+          },
+          "output": {
+            "value": -12345,
+            "status": "current"
+          }
+        },
+        {
+          "input": {
+            "account": {
+              "type": "loan",
+              "balance": 0
+            }
+          },
+          "output": {
+            "value": 0,
+            "status": "current"
+          }
+        },
+        {
+          "input": {
+            "account": {
+              "type": "loan",
+              "balance": null
+            }
+          },
+          "output": {
+            "value": null,
+            "status": "unavailable"
+          }
+        },
+        {
+          "input": {
+            "account": {
+              "type": "loan",
+              "balance": 500000,
+              "stale": true
+            }
+          },
+          "output": {
+            "value": -500000,
+            "status": "stale"
+          }
+        }
+      ],
+      "side_effects": "None. Does not change account fields, transaction signs, amounts, pair links, review flags, history, funding, bank synchronization or reconciliation. Never applies absolute values or infers conventions from account names.",
+      "permissions": "Pure public SDK helper over an already-authorized record; grants no additional ledger access. Not exposed as a remotely callable operation.",
+      "scope": "One account dictionary and its currency; no budget/workspace lookup, aggregation or cross-currency conversion.",
+      "errors": [
+        "Use a normalized public account dictionary with its required type. Missing or invalid numeric balances return null/unavailable; unverified YNAB estimates are never promoted by missing or false flags."
+      ],
+      "retry": "Read-only and deterministic for the supplied record; safe to repeat. Does not authorize a later write or verify freshness.",
+      "availability": "WHAB 2.84+ public Python SDK. Read its documentation offline with whab-cli describe --plugin core --json; it is not a whab api query/command."
     }
   ]
 }

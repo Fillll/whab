@@ -26,7 +26,7 @@ def test_sidebar_balances_include_import_estimates_without_inventing_unknown_sna
         ("unknown", "depository", 0, "bank", True, True),
         ("import-cash", "other", 78901, "ynab", True, True),
         ("import-debt", "credit", -23456, "ynab", True, True),
-        ("verified-import", "credit", 40000, "ynab", False, False),
+        ("legacy-import", "credit", 40000, "ynab", False, False),
     )
     def seed(state):
         for identifier, kind, balance, source, stale, unknown in accounts:
@@ -46,16 +46,16 @@ def test_sidebar_balances_include_import_estimates_without_inventing_unknown_sna
             ("zero", "$0", "Current balance"),
             ("old", "$900", "Last known balance"),
             ("unknown", "—", "Balance unavailable"),
-            ("import-cash", "$789", "Estimated from imported transactions"),
-            ("import-debt", "-$235", "Estimated from imported transactions"),
-            ("verified-import", "-$400", "Current balance"),
+            ("import-cash", "$789", "Estimated from imported transactions · unverified"),
+            ("import-debt", "-$235", "Estimated from imported transactions · unverified"),
+            ("legacy-import", "$400", "Estimated from imported transactions · unverified"),
         ):
             assert re.sub(r'<[^>]*>', '', re.search(r'<small[^>]*>(.*?)</small>', rows[identifier])[1]) == amount
             assert "≈" not in rows[identifier]
             assert f'title="{label}"' in rows[identifier]
             assert f'aria-label="{label}' in rows[identifier]
     data = store.workspace("personal", "2026-10")
-    assert data["accountSummary"]["netWorth"] == 26667
+    assert data["accountSummary"]["netWorth"] == 66667
 
 
 @pytest.mark.parametrize('currency,balance,formatted', (

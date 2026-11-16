@@ -15,11 +15,11 @@
   {% for code, totals in account_totals.items() %}
   <dl class="account-summary" data-private-currency="{{ code }}" aria-label="Account totals in {{ code }}">
     <div><dt>Assets · {{ code }}</dt><dd><span data-private-amount>{{ currency_money(totals.assets, code) }}</span></dd></div>
-    <div><dt>Liabilities · {{ code }}</dt><dd><span data-private-amount>{{ currency_money(totals.liabilities, code) }}</span></dd></div>
+    <div><dt>Liabilities · {{ code }}</dt><dd><span data-private-amount>{{ currency_money(-totals.liabilities, code) }}</span></dd></div>
     <div><dt>Net worth · {{ code }}</dt><dd><span data-private-amount>{{ currency_money(totals.netWorth, code) }}</span></dd></div>
   </dl>
   {% endfor %}
-  <p class="account-summary-note">Current known balances, separated by currency. Stale and unavailable snapshots are excluded from totals.</p>
+  <p class="account-summary-note">Current known balances, separated by currency. Imported estimates, stale and unavailable snapshots are excluded from totals.</p>
   </div>
   {% for group in account_groups %}
   <section class="account-group" data-account-group="{{ 'true' if group.on_budget else 'false' }}" aria-label="{{ group.label }} accounts">
@@ -27,6 +27,7 @@
   <p class="account-group-description">{{ group.description }}</p>
   <div class="account-list">
     {% for account in group.accounts %}
+      {% set position = account_positions[account.id] %}
       <form class="account-row account-inline" data-private-currency="{{ account.currency }}" data-inline-account="{{ account.id }}">
         <button class="bank-mark account-logo-toggle" type="button" data-account-more aria-expanded="false" aria-controls="account-extra-{{ account.id }}" aria-label="Change logo for {{ account.name }}" title="Change account logo"><span aria-hidden="true">{{ account.institution[:1] }}</span>{% if logos.get(account.id) %}<img class="bank-logo-image" data-bank-logo data-logo-src="{{ logos[account.id] }}" alt="" width="39" height="39" decoding="async" hidden>{% endif %}</button>
         <div class="account-description">
@@ -56,7 +57,7 @@
           <p class="field-error" role="alert" hidden></p>
         </div>
         <div class="account-row-aside"><span class="source-label">{{ 'Sample' if workspace=='demo' else 'Manual' if account.source=='manual' else 'Test account' if status.environment=='sandbox' and account.source in bank_source_ids else account.source|capitalize }}</span>
-        <div class="account-balance" data-account-balance><strong><span data-private-amount data-private-currency="{{ account.currency }}">{% if account.balanceUnknown %}Unavailable{% else %}{{ account_money(account) }}{% endif %}</span></strong><small>{{ 'Owed' if is_liability(account) else 'Balance' }}</small></div></div>
+        <div class="account-balance" data-account-balance><strong><span data-private-amount data-private-currency="{{ account.currency }}">{% if position.value is none %}Unavailable{% else %}{{ currency_money(position.value, account.currency) }}{% endif %}</span></strong><small>{{ account_balance_labels[position.status] }}</small></div></div>
       </form>
     {% endfor %}<p class="empty-inline" data-account-group-empty{% if group.accounts %} hidden{% endif %}>No {{ group.label|lower }} accounts yet.</p>
   </div>

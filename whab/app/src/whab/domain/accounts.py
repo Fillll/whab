@@ -141,13 +141,33 @@ def normalize_account(account: dict) -> dict:
     return result
 
 
+def account_balance_position(account: dict) -> dict:
+    """Return owned-positive/owed-negative display money and its evidence status.
+
+    YNAB export totals are already signed and remain estimates, including legacy
+    records lacking freshness flags. Other liabilities use canonical positive
+    amounts owed, so a negative stored card balance becomes a positive credit.
+    This projection never verifies, normalizes or changes the saved account.
+    """
+    balance = account.get('balance')
+    if type(balance) is not int or abs(balance) > MAX_SAFE_INTEGER:
+        return {'value': None, 'status': 'unavailable'}
+    if account.get('source') == 'ynab':
+        return {'value': balance, 'status': 'estimated'}
+    if account.get('balanceUnknown'):
+        return {'value': None, 'status': 'unavailable'}
+    return {'value': -balance if is_liability(account) else balance,
+            'status': 'stale' if account.get('stale') else 'current'}
+
+
 def account_summary(accounts) -> dict:
     """Current known snapshots, in one currency, with debts subtracted once."""
     result = dict.fromkeys(("assets", "liabilities", "netWorth", "onBudget", "offBudget"), 0)
     for account in accounts:
-        if account.get("stale") or account.get("balanceUnknown"):
+        position = account_balance_position(account)
+        if position['status'] != 'current':
             continue
-        value = account["balance"] * (-1 if is_liability(account) else 1)
+        value = position['value']
         result["assets"] += max(0, value)
         result["liabilities"] += max(0, -value)
         result["netWorth"] += value

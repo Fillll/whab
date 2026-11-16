@@ -44,7 +44,10 @@ def test_unknown_account_balances_are_privacy_targets_without_inventing_values(c
     before = store.export_budget("personal")
     text = client.get("/budgets/home/accounts").text
     row = re.search(rf'<form[^>]+data-inline-account="{account}"[^>]*>(.*?)</form>', text, re.S)[1]
-    assert '<span data-private-amount data-private-currency="USD">Unavailable</span>' in row
+    expected = "$123" if source == "ynab" else "Unavailable"
+    assert f'<span data-private-amount data-private-currency="USD">{expected}</span>' in row
+    if source == "ynab":
+        assert 'Estimated from imported transactions · unverified' in row
     sidebar = re.search(rf'<a class="sidebar-account"[^>]*data-account-id="{account}"[^>]*>(.*?)</a>', text, re.S)[1]
     assert 'data-private-amount-attributes="aria-label title"' in sidebar
     assert '<span data-private-amount>' in sidebar

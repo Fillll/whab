@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.84.0 — 2026-11-15
+
+PR: [#216](https://github.com/Fillll/whab/pull/216)
+
+- Add a read-only public account balance projection that reports signed financial positions and current, stale, estimated or unavailable provenance. Canonical debts are negative; overpayments are positive; imported signed estimates retain their sign.
+- Reuse the projection in account summaries so legacy YNAB estimates with missing or false availability flags never become verified totals. Preserve stored balances, transaction signs and funding rules.
+
 ## 2.83.0 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)
