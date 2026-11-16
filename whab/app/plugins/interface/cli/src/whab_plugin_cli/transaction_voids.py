@@ -68,6 +68,8 @@ original intent: ordered IDs, action, --revision, --fingerprint, --request-id,
 after restart without duplicate changes/history/saves. Never retry automatically
 or replace an uncertain intent with a fresh revision/request ID. Conflicting
 request-ID reuse is refused. Unsupported backends fail before mutation.
+An HTTP error after submission does not prove that nothing was saved; keep the
+original intent and inspect saved state even when the server reports 400 or 409.
 Requires CLI 2.24 / WHAB 2.82 and native SQLite 1.30 or JSON 1.22. Help is offline.
 '''
 
@@ -177,9 +179,9 @@ def execute_void(connection, identifier, prefix, args, exchange, error):
         if not _receipt(saved['data'], ids, args.filter, fingerprint) or preview is not None and saved['data'] != preview['data']:
             raise error('Saved transaction void/unvoid receipt does not match the exact validated intent.')
     except (ValueError, OSError, RuntimeError, KeyError, TypeError, httpx.HTTPError) as failure:
-        refused = getattr(failure, 'status_code', None) in {400, 409}
-        message = ('Atomic transaction ' + args.filter + ' refused; nothing new was saved. ' + str(failure) + '. '
-                   if refused else 'Atomic transaction ' + args.filter + ' result was not confirmed; it may have been saved. ')
+        message = 'Atomic transaction ' + args.filter + ' result was not confirmed; it may have been saved. '
+        if getattr(failure, 'status_code', None) in {400, 409}:
+            message += 'Server reported: ' + str(failure) + '. '
         raise error(message + 'No automatic retry. Inspect saved receipt/history. Retain budgetId ' + identifier
                     + ' and the COMPLETE original intent: ' + json.dumps(intent) + '.') from failure
     return {**saved, 'budget': args.target, 'dryRun': False, **parameters,

@@ -176,7 +176,9 @@ After uncertainty retain the **complete original intent**: ordered IDs, action,
 revision, fingerprint, request ID, agent and batch. An exact retry uses all those
 same values and returns the original durable receipt, including after restart,
 without duplicated changes, history or saves. Never automatically replay with a
-fresh revision/request ID. `--agent` records audit attribution without changing
+fresh revision/request ID. An HTTP error after submission, including 400 or 409,
+does not prove that nothing was saved; inspect state using the original intent.
+`--agent` records audit attribution without changing
 existing category attribution. Unsupported backends fail before mutation.
 
 Requires CLI 2.24 / WHAB 2.82 and native SQLite 1.30 or JSON 1.22. Root, budget,

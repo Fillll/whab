@@ -117,7 +117,9 @@ def test_uncertain_or_refused_write_never_retries(endpoint, fault):
     assert len(state['calls']) == 2
     message = str(failure.value)
     assert 'private connection information' not in message
-    assert ('nothing new was saved' if fault in (400, 409) else 'may have been saved') in message
+    assert 'may have been saved' in message and 'nothing new was saved' not in message
+    if fault in (400, 409):
+        assert 'Server reported: Fictional refusal' in message
     assert state['calls'][-1]['request_id'] in message and 'Codex' in message and 'fictional' in message
 
 
@@ -225,3 +227,44 @@ def test_unknown_balance_cannot_claim_a_manual_adjustment(endpoint):
     endpoint[0]['data']['balanceChanges'][0].update(before=None, after=None)
     with pytest.raises(console.CommandError, match='Invalid.*preview'):
         run(endpoint)
+
+
+@pytest.mark.parametrize('status', [400, 409])
+def test_error_after_native_void_commit_never_claims_no_save(status):
+    from whab_plugin_sqlite import Store
+
+    from whab.plugins import LedgerService
+
+    store = Store(':memory:')
+    try:
+        service = LedgerService(store, budget_id='fictional')
+        account = service.add_account('personal', {'name': 'Fictional', 'type': 'depository', 'balance': 100000})
+        identifier = service.add_transaction('personal', {'accountId': account, 'date': '2026-11-01',
+            'merchant': 'Fictional', 'amount': 1234, 'categoryId': None, 'note': 'Preserve'})
+        submitted = []
+        def exchange(connection, method, path, **kwargs):
+            body = kwargs['json']
+            if path.endswith('/queries'):
+                result = service.query(body['operation'], 'personal', parameters=body['parameters'])
+                return {'budgetId': 'fictional', **result}
+            submitted.append(deepcopy(body))
+            service.command(body['operation'], 'personal', body['payload'], request_id=body['request_id'],
+                            expected_revision=body['expected_revision'])
+            # The native commit succeeded; a later transport/checkpoint error
+            # has an HTTP status, but no public proof of an absent mutation.
+            failure = console.CommandError(f'WHAB returned HTTP {status}: checkpoint result unknown')
+            failure.status_code = status
+            raise failure
+        with pytest.raises(console.CommandError, match='may have been saved') as failure:
+            voids.execute_void(None, 'fictional', '/fictional', arguments(transaction_ids=[identifier]), exchange, console.CommandError)
+        assert len(submitted) == 1 and 'nothing new was saved' not in str(failure.value)
+        assert 'checkpoint result unknown' in str(failure.value)
+        assert submitted[0]['request_id'] in str(failure.value)
+        saved = next(row for row in store.export_budget('personal')['transactions'] if row['id'] == identifier)
+        assert saved['voided'] is True and saved['deleted'] is True
+        intent = submitted[0]
+        replay = service.command(intent['operation'], 'personal', intent['payload'], request_id=intent['request_id'],
+                                 expected_revision=intent['expected_revision'])
+        assert replay['data']['changes'][0]['after'] == {**saved, 'accountName': 'Fictional', 'currency': 'USD'}
+    finally:
+        store.close()
