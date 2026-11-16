@@ -32,7 +32,7 @@ def add_change_parsers(commands):
         category = parser.add_mutually_exclusive_group()
         category.add_argument('--category', help='Existing category ID, unique exact name, or Group / Category')
         if not create:
-            category.add_argument('--clear-category', action='store_true', help='Explicitly remove the category and leave the transaction unreviewed')
+            category.add_argument('--clear-category', action='store_true', help='Explicitly remove category; unreview if no valid Transfer pair remains')
         parser.add_argument('--note', '--memo', dest='note', help='Replace memo verbatim; an empty string clears it; omitted edit memo is preserved')
         bulk_options(parser)
 

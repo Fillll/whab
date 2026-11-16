@@ -2667,7 +2667,7 @@
           }
         }
       ],
-      "side_effects": "One core-validated edit_transaction; manual assignments clear old attribution, explicit agent labels persist with the category. Review changes only with needsReview. No sync/model activity.",
+      "side_effects": "One core-validated edit_transaction; manual assignments clear old attribution, explicit agent labels persist with the category. Classification never auto-reviews. Existing review is retained only when prior and saved classifications remain eligible; removing the last eligible classification unreviews. A valid pair retains review eligibility when only its optional Transfer label is cleared. Explicit needsReview also clears review. No sync/model activity.",
       "errors": [
         "Unknown/ambiguous budgets or categories fail before writing. Core rejects invalid transaction/category/currency and stale revisions. Failed/uncertain writes are not replayed; response budget identity is checked."
       ],

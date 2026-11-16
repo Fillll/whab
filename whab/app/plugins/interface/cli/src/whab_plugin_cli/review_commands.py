@@ -13,8 +13,9 @@ GUIDE = """A posted transaction needs an Expense, Income or Opening Balance cate
 or exactly two valid reciprocal Transfer legs before review. A Transfer category
 alone or a bank transfer hint does not qualify. Use match-transfer or atomic
 match-transfers --reviewed for explicitly confirmed pairs. Classification does not automatically review it;
-clearing classification also sets reviewed=false. A combined classification and
-review is allowed in trnx edit-many when the final state is valid. Existing zero
+removing the last valid classification sets reviewed=false. A valid pair keeps
+review eligibility when its optional Transfer category label is cleared. A combined
+classification and review is allowed in trnx edit-many when the final state is valid. Existing zero
 opening entries become reviewable after explicit Opening Balance classification;
 pending entries remain ineligible. Classification never creates an opening entry.
 

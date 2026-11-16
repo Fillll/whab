@@ -4056,7 +4056,7 @@
       "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
       "name": "match_transfer",
       "kind": "command",
-      "summary": "Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review. Two existing posted zero-value entries can be explicitly paired without creating entries or assigning financial direction.",
+      "summary": "Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, source and original metadata. Matching preserves category attribution; unmatching clears any orphan Transfer label and that label's attribution. Both remain unreviewed for ordinary review. Two existing posted zero-value entries can be explicitly paired without creating entries or assigning financial direction.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",

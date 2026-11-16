@@ -1363,9 +1363,12 @@ a pair; inspect `transfer-audit` before explicit guarded repair.
 A posted, nondeleted transaction needs a valid Expense, Income or Opening Balance
 child, or a valid complete Transfer pair, before explicit review. A bank hint or
 unpaired Transfer category is insufficient.
-Assigning classification does not manufacture review. Clearing it makes unreviewed
-in the same native operation. An explicit conflicting clear+review rejects the
-whole operation. Mixed batches validate their final proposed state atomically.
+Assigning classification does not manufacture review. Removing the last valid
+classification makes a transaction unreviewed in the same native operation. An
+explicit clear+review rejects the whole operation if no eligible classification
+remains. A complete valid pair remains classified when its optional Transfer
+category label is cleared, so it can keep its review status. Mixed batches validate
+their final proposed state atomically.
 Pending records cannot be reviewed. Undo/redo cannot restore a newly invalid review.
 
 Old saved reviewed/unclassified flags and historical audit hashes remain readable

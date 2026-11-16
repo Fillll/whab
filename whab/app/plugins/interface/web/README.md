@@ -504,6 +504,8 @@ changes and retained across reopen and exports. Earlier changes are not backfill
 
 **Suggest transfers** remains a read-only proposal panel. Explicit pair confirmation
 uses the core's reciprocal two-leg rules and leaves both transactions unreviewed.
+Automatic proposals exclude zero-value entries. The CLI can explicitly pair two
+already-existing posted zero entries without creating records or inferring direction.
 Valid pairs can involve historical closed accounts or different current budget
 scopes. Review availability uses the authority's complete pair verification even
 when the counterpart is outside the visible page/date filter. Imported hints and
@@ -536,19 +538,28 @@ command. Existing targets or any assignment rows block income conversion.
 
 ## Classification before review
 
-WHAB 2.79 supports Expense, Income, Transfer and Opening Balance child types (`kind` in public
+WHAB 2.81 supports Expense, Income, Transfer and Opening Balance child types (`kind` in public
 records, `--type` in CLI). Missing kind remains Expense. Income, Transfer and Opening Balance have
 no expense target or assignment rows. Transfer is explicit account movement,
-excluded from ordinary income/spending without changing account balances. It may
-be classified before pairing; matching still requires equal opposite posted
-amounts, different active accounts, same currency/budget scope and dates within
-seven days. Matching remains separate and never reviews automatically.
+excluded from ordinary income/spending without changing account balances. Transfer
+classification and review require exactly two valid reciprocal posted legs in
+different same-currency accounts, with equal opposite amounts and dates within
+seven days. Two existing zero entries can be explicitly paired; automatic proposals
+exclude them. Closed historical accounts and different current budget scopes are
+allowed without reopening or reclassification. Web pair confirmation leaves both
+legs unreviewed; the CLI supports explicit review in the same bulk matching commit.
 
-A posted, nondeleted transaction needs a valid child of any type, or a previously
-confirmed transfer pair, before explicit review. A bank hint alone is insufficient.
-Assigning classification does not manufacture review. Clearing it makes unreviewed
-in the same native operation. An explicit conflicting clear+review rejects the
-whole operation. Mixed batches validate their final proposed state atomically.
+A posted, nondeleted transaction needs a valid Expense, Income or Opening Balance
+child, or a complete valid Transfer pair, before explicit review. A bank hint or
+unpaired Transfer category is insufficient. Unmatched and new-row category pickers
+omit Transfer; valid pairs offer the optional Transfer labels and a matched empty
+option. Old invalid saved classifications remain visible for inspection.
+Assigning classification does not manufacture review. Removing the last eligible
+classification clears review in the same native operation; explicit clear+review
+then rejects the whole operation. Clearing an optional Transfer label on a valid
+pair retains its classification and review eligibility. Choosing Expense, Income
+or Opening Balance for a paired row requires unmatching first. Mixed batches
+validate their final proposed state atomically.
 Pending records cannot be reviewed. Undo/redo cannot restore a newly invalid review.
 
 Old saved reviewed/unclassified flags and historical audit hashes remain readable

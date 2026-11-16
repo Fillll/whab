@@ -1505,9 +1505,12 @@ both legs with --reviewed.
 A posted, nondeleted transaction needs Expense, Income or Opening Balance
 classification, or a valid complete transfer pair, before explicit review. A bank
 hint or orphan Transfer category is insufficient.
-Assigning classification does not manufacture review. Clearing it makes unreviewed
-in the same native operation. An explicit conflicting clear+review rejects the
-whole operation. Mixed batches validate their final proposed state atomically.
+Assigning classification does not manufacture review. Clearing the last valid
+classification makes the record unreviewed in the same native operation; an
+explicit conflicting clear+review rejects the whole operation. A still-valid
+matched pair remains explicitly Transfer when only its optional category label is
+cleared, so its review eligibility remains. Mixed batches validate their final
+proposed state atomically.
 Pending records cannot be reviewed. Undo/redo cannot restore a newly invalid review.
 
 Old saved reviewed/unclassified flags and historical audit hashes remain readable

@@ -299,7 +299,7 @@
       "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
       "name": "transfers.confirm",
       "kind": "local",
-      "summary": "Transactions review panel: Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
+      "summary": "Transactions review panel: Explicitly confirm or unmatch two existing transactions in one atomic native operation. Preserve identities, financial fields, notes, source and original metadata. Matching preserves category attribution; unmatching clears any orphan Transfer label and its attribution. Both remain unreviewed for ordinary review. Complete valid pairs may assign or clear an optional Transfer label without unmatching; financial edits or choosing Expense, Income or Opening Balance require unmatching first. Historical closed/cross-scope accounts are supported. Explicit matching may pair two existing posted zero entries; automatic proposals exclude zeros.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -408,7 +408,7 @@
           }
         }
       ],
-      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, clears orphan Transfer classification, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
+      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, clears orphan Transfer classification and its attribution, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
     },
     {
       "name": "transactions.selected-category",

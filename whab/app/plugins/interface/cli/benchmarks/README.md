@@ -1,5 +1,50 @@
 # Atomic transfer benchmark
 
+The final compatible-source run used 100,000 fictional transactions, 100 accounts
+and **100 fresh CLI processes**: 25 each at 1, 10, 50 and 100 pairs. It includes
+portable version 2 and explicit existing zero-pair support; measured pairs were
+nonzero. Python was 3.15.1 on macOS 26.5.2 arm64. Each invocation included normal
+preview, guards, native commit, synchronous durable checkpoint and verified JSON
+receipt. [Complete raw primary samples](results-2026-11-15-primary.json).
+The separate 100-command comparison is still running and is not claimed complete
+or included in measured workflow savings below; it does not gate deployment.
+
+| Pairs / transaction legs | Batch p50 | Batch p95 | Per-leg p50 | Commits / checkpoints per batch |
+| --- | ---: | ---: | ---: | ---: |
+| 1 / 2 | 629.12 ms | 1,424.92 ms | 314.56 ms | 1 / 1 |
+| 10 / 20 | 476.27 ms | 756.67 ms | 23.81 ms | 1 / 1 |
+| 50 / 100 | 664.82 ms | 1,107.51 ms | 6.65 ms | 1 / 1 |
+| 100 / 200 | 992.28 ms | 3,861.97 ms | 4.96 ms | 1 / 1 |
+
+**Every size missed the 250 ms warm p95 target.** These shared-computer
+measurements overlapped the separate-command baseline. Raw samples retain load
+averages; this evidence does not isolate scheduling cost. Provider latency is
+excluded: there were no provider calls. Cold activation (36.90–48.88 s) and first
+mutation (13.95–23.80 s) are recorded separately and excluded from the warm table.
+
+All seven bounded segments restored the actual final saved `.whab` artifact into
+an empty store and verified 100,000 records, affected fields and coherent history.
+The largest portable payload was 48,451,584 bytes, below the unchanged
+52,428,800-byte storage limit. No history was pruned and no limits were increased.
+The portable compatibility fence preserves pairless version 1 files; paired data
+or reversible paired history requires version 2. Compatibility validation confirms
+WHAB 2.80 refuses these newer files before changing destination data, instead of
+applying its older transfer-funding rules.
+
+The primary source digest was identical before and after measurement:
+`46b0a649aca2035ad108369fe46eecd4476e7df6f689d15f81301537fe5d962b`.
+It covers core, SQLite, JSON and CLI production Python plus the benchmark script.
+
+After that complete run, four CLI help strings were corrected to distinguish
+clearing an optional Transfer label from removing the last eligible classification:
+`transaction_changes.py`, `transaction_commands.py`, `review_commands.py` and
+`category_classification.py`. Matching, storage and audit execution did not change.
+The post-help source digest is
+`7bc744c5694759f5bdf9d4aef296c966fd3cd3625364e004490ad5b2822c3773`.
+The still-running separate comparison will retain its own before/after identities.
+
+## Reproduction and measurement
+
 Run from `whab/app` in the installed development environment:
 
 ```sh
@@ -8,84 +53,49 @@ Run from `whab/app` in the installed development environment:
   --output /tmp/whab-transfer-benchmark.json
 ```
 
-This measures 25 fresh `whab` processes at each of 1, 10, 50 and 100 pairs:
-100 primary bulk invocations total. Each invocation performs its normal preview,
-revision/request guards, native commit, synchronous portable checkpoint and JSON
-receipt. One equivalent complete workflow of separate `match-transfer` commands
-is measured per size; use `--separate-runs` for additional baseline samples.
-Each separate workflow follows the bulk samples in its first fixture segment,
-uses the same number of fresh unmatched pairs, and retains the bounded history
-created by those samples. A one-sample baseline is an observed workflow duration,
-not a robust latency distribution. `--separate-runs 0` reruns only the primary samples.
+This runs 100 primary bulk processes and one equivalent complete workflow of
+separate `match-transfer` commands per size. Use `--separate-runs` for additional
+baseline samples, or `--separate-runs 0` for only the primary measurements. Each
+separate workflow follows the bulk samples in its first fixture segment and uses
+the same number of fresh unmatched pairs, retaining that bounded history. One
+baseline sample is an observed workflow duration, not a robust latency distribution.
 
-Fixtures contain 100,000 fictional transactions and 100 accounts. Every measured
-intent uses previously unmatched pairs; no benchmark repeatedly replays a receipt.
 Segments bound measured bulk work to 1,000 pairs, plus the separately reported
-cold mutation and baseline workflows, then start from a fresh equivalent fixture. No production home, provider or bank data
-is opened. No storage limits are raised and no audit history is pruned.
+cold mutation and baseline workflow, then start with an equivalent fresh fixture.
+Every measured intent uses previously unmatched pairs; this is not repeated receipt
+replay. No production home, provider or bank data is opened.
 
-JSON records total-batch p50/p95, per-pair/per-leg time, measured workflow savings,
-every raw sample, load averages, native commit/checkpoint counts, cold activation
-and first-mutation time separately. Provider latency is excluded. Instrumentation
-writes one small local metrics file after each successful checkpoint.
-`native_commits` is the delta in the public authority commit-evidence generation;
-`checkpoints` counts successful durable checkpoint calls. This is not a trace of
-internal SQLite bookkeeping statements. The complete
-native source digest before/after makes concurrent implementation changes visible;
-do not call a mixed-source run an exact-head measurement.
+`native_commits` measures the public authority commit-evidence generation delta;
+`checkpoints` counts successful durable checkpoint calls. Instrumentation writes
+one small metrics file after each checkpoint; it is not an internal SQLite statement
+trace. Assertions require exactly one of each per bulk invocation and one per
+separate pair. Timeouts, refused operations, count mismatches or restore failures
+stop the run instead of producing a successful result.
 
-The run asserts one native commit and one checkpoint per bulk invocation, versus
-one of each per separate pair. It restores the actual final saved `.whab` artifact
-into an empty store and verifies transaction count, every affected record and
-history count. Timeouts, refused operations, count mismatches and restore failures
-stop the run instead of producing misleading success measurements.
+## Earlier complete separate-command comparisons
 
-The warm p95 target is 250 ms. The result marks misses explicitly; this is not a
-promise for cold work, arbitrary hardware or maximum record payloads. Full
-separate-command baselines can take substantially longer than bulk sampling.
+[Raw earlier baselines](results-2026-11-15-before-fence-baselines.json) preserve
+one complete measured workflow at each size below. Those separate commands used
+the prior portable format and nonzero semantics; raw source changes are recorded.
+These are historical comparisons, not final compatible-source primary runs.
 
-## Historical measurements before the portable compatibility fence
+| Separate pair commands | Complete workflow | Time saved vs final bulk p50 | Commits / checkpoints |
+| --- | ---: | ---: | ---: |
+| 1 | 25,767.65 ms | 25,138.53 ms (97.56%) | 1 / 1 |
+| 10 | 273,143.32 ms | 272,667.05 ms (99.83%) | 10 / 10 |
+| 50 | 1,480,705.90 ms | 1,480,041.08 ms (99.96%) | 50 / 50 |
 
-[Raw earlier samples](results-2026-11-15-before-portable-fence.json) contain 25 fresh CLI
-processes per size, 100 total. These precede the required portable compatibility
-fence and are historical diagnostic evidence, not final delivery measurements.
-They ran on Python 3.15.1/macOS arm64 with 100,000 fictional
-transactions and 100 accounts. Times include normal preview, command startup,
-guards, save and verified JSON receipt. These shared-computer measurements
-overlapped separate-command baseline work and, briefly, a separate diagnostic.
-The recorded load averages provide context; they do not isolate scheduling cost.
+All saved artifacts passed restoration verification. This run was intentionally
+stopped after its complete 50-pair case, before any 100-pair measurements, so the
+next case could use the compatible reader throughout. No partial workflow is
+substituted for a complete measured result. Comparing these prior-format baselines
+to the final primary run does not isolate the effect of the compatibility fence.
 
-| Pairs / transaction legs | Batch p50 | Batch p95 | Per-leg p50 | Commit/checkpoint counts per batch |
-| --- | ---: | ---: | ---: | ---: |
-| 1 / 2 | 474.53 ms | 684.32 ms | 237.27 ms | 1 / 1 |
-| 10 / 20 | 518.44 ms | 1,292.70 ms | 25.92 ms | 1 / 1 |
-| 50 / 100 | 710.33 ms | 3,386.47 ms | 7.10 ms | 1 / 1 |
-| 100 / 200 | 770.94 ms | 3,013.96 ms | 3.85 ms | 1 / 1 |
+## Periodic audit reserve cost
 
-**Every size missed the 250 ms warm p95 target.** All seven bounded segments
-restored the actual saved artifact into an empty store and verified the 100,000
-records, changed fields and coherent history. The largest portable payload was
-48,451,584 bytes, below the unchanged 52,428,800-byte storage limit. Cold activation
-and first-mutation measurements are separate in the raw evidence; there were no
-provider calls.
-
-The raw before/after source digests differ. During this run the CLI help wording
-was corrected and guarded history reversal validation was tightened; native
-matching and durable checkpoint execution were unchanged. These results are
-identified by both digests, not described as an immutable exact-head run. Replacing
-only `src/whab/domain/history.py` and the CLI `transfer_commands.py` with their
-pre-edit contents exactly reproduces the starting digest. The history edit was
-written at `2026-11-16T00:09:05.505Z`; final result/digest capture completed at
-`2026-11-16T00:09:16.968Z`. This establishes a source change during the captured
-interval, without assuming that a particular warm process loaded the new guard.
-
-- Before: `e30cd71fa720624c50f0945fd6a66be71025d6236a5b93d523f091cc729b7648`
-- After: `aa2f55f6b7b73a6f81c5422fcf8c2ce92b018bf861a788d46515b5c3f3c8efee`
-
-## Audit reserve diagnostic
-
-The separate [native diagnostic samples](results-2026-11-15-history-profile.json)
-record 20 warm operations of 50 pairs after one cold operation. Reproduce with:
+The [native diagnostic samples](results-2026-11-15-history-profile.json) record
+20 warm operations of 50 pairs after one cold operation, before the portable fence.
+The same mechanism can be inspected against the checked-out implementation:
 
 ```sh
 .venv/bin/python plugins/interface/cli/benchmarks/profile_transfer_history.py \
@@ -93,22 +103,19 @@ record 20 warm operations of 50 pairs after one cold operation. Reproduce with:
   --output /tmp/whab-transfer-history-profile.json
 ```
 
-This temporary-process instrumentation wraps history writes and sanitized image
-preparation, and writes a cProfile file whenever the audit reserve grows. It
-measures native operations/image export with profiling overhead, excluding the
-CLI/HTTP and the host's final durable-container checkpoint. It does not replace
-the fresh-process benchmark.
+This separate process instruments history writes and sanitized-image preparation,
+with cProfile output when the audit reserve grows. It measures native operations
+and image export, with profiling overhead; it excludes CLI/HTTP and the host's
+final durable-container checkpoint and does not replace the fresh-process results.
 
-At warm batch 16, the old audit JSON ended at byte 31,418,589 with capacity
-31,425,402. Appending the next batch required rewriting the JSON baseline and
-extending capacity to 32,536,738. Native history writing took 355.26 ms; the
-sanitized image's corresponding history write took 233.56 ms, within 618.77 ms
-of image preparation. That instrumented operation took 1,483.89 ms; nearby
-operations took 269–393 ms. The portable image grew from 47,276,032 to
-48,377,856 bytes, below the size limit.
+At warm batch 16, audit JSON ended at byte 31,418,589 with capacity 31,425,402.
+The next batch rewrote the JSON baseline and enlarged capacity to 32,536,738.
+Native history writing took 355.26 ms; the sanitized copy's history write took
+233.56 ms within 618.77 ms of image preparation. The instrumented operation took
+1,483.89 ms, versus 269–393 ms nearby. The portable image grew from 47,276,032 to
+48,377,856 bytes, below its size limit.
 
-This demonstrates periodic full audit-JSON reserve refill cost. It does not prove
-that the entire 7,671.99 ms fresh-process outlier came from this event, nor that
-every warm batch serializes all 100,000 transaction rows. Shared-computer load,
-transport and durable-container work remain distinct from this diagnostic. No
-production optimization, storage-limit increase or history pruning was made.
+This proves periodic audit-JSON reserve refill cost. It does not attribute every
+observed p95/outlier to that event, or mean every warm batch exports all 100,000
+transaction rows. Shared load, transport and durable-container work remain distinct.
+No production optimization, storage-limit increase or history pruning was made.

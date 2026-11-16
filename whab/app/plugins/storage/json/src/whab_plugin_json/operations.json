@@ -2470,7 +2470,7 @@
       "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
       "name": "TransferMatching.apply_transfer_match",
       "kind": "sdk",
-      "summary": "Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
+      "summary": "Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, source and original metadata. Matching preserves category attribution; unmatching clears any orphan Transfer label and that label's attribution. Both remain unreviewed for ordinary review.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -3591,9 +3591,7 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
-        "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
-        "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
+        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting."
       ],
       "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
       "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
@@ -3785,8 +3783,7 @@
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
         "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
-        "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
-        "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
+        "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host. Keep the original request identity after an uncertain response."
       ],
       "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
       "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
@@ -3984,9 +3981,7 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
-        "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
-        "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
+        "Select 1–200 distinct existing transaction IDs from this workspace. Missing, duplicated, valid or unrelated records refuse the whole repair; include every existing linked invalid counterpart explicitly. Repair never invents a leg or reviews a hint."
       ],
       "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
       "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
@@ -4114,9 +4109,8 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
-        "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
-        "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
+        "Select 1–200 distinct existing transaction IDs from this workspace. Missing, duplicated, valid or unrelated records refuse the whole repair; include every existing linked invalid counterpart explicitly. Repair never invents a leg or reviews a hint.",
+        "A stale revision/fingerprint, conflicting request reuse, external-write or uncertain-save state refuses mutation through the public guarded host. Keep the original request identity after an uncertain response."
       ],
       "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
       "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
@@ -4251,9 +4245,7 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
-        "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
-        "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
+        "Only since, until, offset and limit are accepted. Dates must be valid inclusive bounds with since no later than until; offset must be a nonnegative integer and limit 1–100. An unavailable workspace or unreadable storage refuses the read; invalid transfer records are reported as issues instead of being rejected or repaired."
       ],
       "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
       "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
@@ -4348,9 +4340,7 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
-        "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
-        "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
+        "This is a capability probe, not record validation. A missing or false capability makes the public host refuse unsupported transfer operations before mutation; no transaction is inspected, created or repaired by the probe."
       ],
       "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
       "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
@@ -4380,9 +4370,7 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
-        "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
-        "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
+        "This is a capability probe, not record validation. A missing or false capability makes the public host refuse unsupported transfer operations before mutation; no transaction is inspected, created or repaired by the probe."
       ],
       "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
       "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",

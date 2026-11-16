@@ -52,7 +52,9 @@ Examples (fictional):
   whab "My budget" category classify "Finance / Opening Balance" --type opening_balance --dry-run
   whab "My budget" trnx categorize OPENING_TX --category "Finance / Opening Balance" --agent Codex
 Categorize supports 1–100 explicit IDs and --dry-run; mixed edits use trnx edit-many.
-Assignment never auto-reviews; clearing classification makes unreviewed.
+Assignment never auto-reviews; removing the last valid classification makes
+unreviewed. A valid pair keeps review eligibility when its optional Transfer
+category label is cleared.
 Set review explicitly with trnx review; inspect legacy flags with trnx review-audit.
 """
 
