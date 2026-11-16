@@ -18,7 +18,8 @@ from whab.plugins.storage import open_storage
 
 
 @pytest.mark.parametrize('kind', ['sqlite', 'json'])
-def test_real_transfer_workflow_uses_fictional_home_and_exact_restart_retry(tmp_path, kind):
+@pytest.mark.parametrize('zero', [False, True], ids=['nonzero', 'zero'])
+def test_real_transfer_workflow_uses_fictional_home_and_exact_restart_retry(tmp_path, kind, zero):
     home = tmp_path / 'runtime'
     env = {**os.environ, 'HOME': str(tmp_path), 'WHAB_HOME': str(home), 'WHAB_UI': '', 'WHAB_PLUGINS': '', 'WHAB_STORAGE': kind, 'ALLOW_LIVE_PLAID': 'false'}
     env.pop('WHAB_BUDGET', None)
@@ -29,7 +30,7 @@ def test_real_transfer_workflow_uses_fictional_home_and_exact_restart_retry(tmp_
         ids = []
         for name, amount in [('旅行 🍏', 12345), ('Сбережения', -12345)]:
             account = store.add_account('personal', {'name': name, 'type': 'depository', 'balance': 100000})
-            ids.append(store.add_transaction('personal', {'accountId': account, 'date': '2026-11-01', 'merchant': 'Fictional', 'amount': amount, 'categoryId': None, 'note': '[YNAB]\nExact note  '}))
+            ids.append(store.add_transaction('personal', {'accountId': account, 'date': '2026-11-01', 'merchant': 'Fictional', 'amount': 0 if zero else amount, 'categoryId': None, 'note': '[YNAB]\nExact note  '}))
     finally:
         store.close()
     executable = Path(sys.executable).parent / 'whab'
@@ -42,7 +43,7 @@ def test_real_transfer_workflow_uses_fictional_home_and_exact_restart_retry(tmp_
         assert result.returncode == 0 and 'Exact successful retries' in result.stdout and 'reviewed=true' in result.stdout
     with patch.dict(os.environ, env, clear=True), local_connection(home, 'sandbox'):
         pairs = run('My budget', 'trnx', 'transfers', '--account', '旅行 🍏', '--since', '2026-11-01')
-        assert pairs['data']['total'] == 1
+        assert pairs['data']['total'] == (0 if zero else 1)
         preview = run('default', 'trnx', 'match-transfer', *ids, '--dry-run')
         saved = run('My budget', 'trnx', 'match-transfer', *ids, '--revision', preview['revision'], '--fingerprint', preview['data']['fingerprint'], '--agent', 'Codex', '--batch', 'fictional', '--home', str(home))
         assert saved['data'] == preview['data']
@@ -73,20 +74,30 @@ def test_real_atomic_transfer_file_stdin_and_saved_receipt(tmp_path, kind):
     env.pop('WHAB_BUDGET', None)
     with patch.dict(os.environ, env, clear=True):
         initialize_home(home)
-    store = open_storage(load_plugins((kind,)).storage_plugin(kind), StorageContext(home, 'sandbox', {}))
+    from whab_plugin_sqlite import Store
+    store = Store(':memory:')
     pairs, originals = [], {}
     try:
         accounts = [store.add_account('personal', {'name': name, 'type': 'depository', 'balance': 100000})
                     for name in ['旅行 🍏', 'Сбережения']]
         for index in range(3):
             ids = [store.add_transaction('personal', {'accountId': account, 'date': '2026-11-01',
-                'merchant': '  Fictional transfer  ', 'amount': (index + 1) * 12345 * sign,
+                'merchant': '  Fictional transfer  ', 'amount': (0 if index == 1 else (index + 1) * 12345) * sign,
                 'categoryId': None, 'note': '[YNAB]\nExact note  '})
                 for account, sign in zip(accounts, [1, -1], strict=True)]
             pairs.append({'outId': ids[0], 'inId': ids[1]})
-        originals = {row['id']: row for row in store.export_budget('personal')['transactions']}
+        snapshot = store.export_budget('personal')
+        for row in snapshot['transactions']:
+            row['merchant'] = '  Fictional transfer  '
+        snapshot['history'] = {'formatVersion': 1, 'baseline': financial(snapshot), 'entries': []}
+        originals = {row['id']: row for row in snapshot['transactions']}
     finally:
         store.close()
+    backend = open_storage(load_plugins((kind,)).storage_plugin(kind), StorageContext(home, 'sandbox', {}))
+    try:
+        backend.restore_budget('personal', snapshot)
+    finally:
+        backend.close()
     executable = Path(sys.executable).parent / 'whab'
     def run(*parts, stdin=None, ok=True):
         result = subprocess.run([str(executable), '--home', str(home), '--environment', 'sandbox', *parts],
@@ -96,6 +107,7 @@ def test_real_atomic_transfer_file_stdin_and_saved_receipt(tmp_path, kind):
     path = tmp_path / 'pairs.json'
     path.write_text(json.dumps(pairs[:2]), encoding='utf-8')
     with patch.dict(os.environ, env, clear=True), local_connection(home, 'sandbox'):
+        assert run('default', 'trnx', 'transfers')['data']['total'] == 2  # No automatic zero proposal.
         preview = run('My budget', 'trnx', 'match-transfers', '--file', str(path), '--reviewed', '--dry-run')
         assert preview['data']['count'] == 4
         before_history = run('default', 'history', 'list')['data']['entries']
@@ -105,6 +117,8 @@ def test_real_atomic_transfer_file_stdin_and_saved_receipt(tmp_path, kind):
         saved = run('default', 'trnx', 'match-transfers', '--file', str(path), '--reviewed', '--agent', 'Codex',
                     '--batch', 'fictional-pairs', '--revision', preview['revision'], '--fingerprint', preview['data']['fingerprint'])
         assert saved['data'] == preview['data']
+        zero_changes = [row for row in saved['data']['changes'] if row['after']['amount'] == 0]
+        assert len(zero_changes) == 2 and all(row['after']['reviewed'] for row in zero_changes)
         retry = ('default', 'trnx', 'match-transfers', '--file', str(path), '--reviewed', '--agent', 'Codex',
                  '--batch', 'fictional-pairs', '--revision', saved['expectedRevision'], '--fingerprint', saved['fingerprint'],
                  '--request-id', saved['requestId'])

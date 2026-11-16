@@ -41,11 +41,14 @@ def test_hundred_pairs_one_commit_save_exact_restart_receipt_and_restored_budget
     pairs = [{'outId': f'out-{index}', 'inId': f'in-{index}'} for index in range(100)]
     saves = []
     try:
-        store.restore_budget('personal', portable_snapshot(fixture_state()))
+        state = fixture_state()
+        for identifier in ('out-0', 'in-0'):
+            state['transactions'][identifier].update(amount=0, source='ynab', inferredTransfer=True)
+        store.restore_budget('personal', portable_snapshot(state))
         service = LedgerService(store, budget_id='fictional', on_commit=lambda: saves.append(store.export_budget_files()))
         untouched = deepcopy(store.export_budget('personal'))
         policy = service.query('transfer_policy', 'personal')['data']
-        assert policy['maxPairs'] == 100 and policy['twoLegsRequired']
+        assert policy['maxPairs'] == 100 and policy['twoLegsRequired'] and policy['zeroAmountPairing']
         preview = service.query('preview_transfer_matches', 'personal', parameters={'pairs': pairs, 'reviewed': True})
         assert store.export_budget('personal') == untouched and saves == []
         payload = {'pairs': pairs, 'reviewed': True, 'fingerprint': preview['data']['fingerprint']}
@@ -65,6 +68,10 @@ def test_hundred_pairs_one_commit_save_exact_restart_receipt_and_restored_budget
         assert all(row['reviewed'] and row['transferPeerId'] for row in saved['transactions'])
         assert saved['accounts'] == untouched['accounts']
         assert saved['assignments'] == untouched['assignments']
+        originals = {row['id']: row for row in untouched['transactions']}
+        for row in saved['transactions']:
+            for field in ('amount', 'date', 'accountId', 'categoryId', 'source', 'inferredTransfer', 'categoryAgent'):
+                assert row[field] == originals[row['id']][field]
         assert len(first['data']['changes']) == 200
         assert all(row['merchant'] == '  Fictional 商店  ' and row['note'] == '[YNAB]  \nPreserved' for row in saved['transactions'])
         history = store.budget_history('personal')['entries'][0]
@@ -106,7 +113,10 @@ def test_https_and_remote_authority_bulk_pairing_and_conflicts(kind, tmp_path):
     else:
         from whab_plugin_json import Store
     native = Store(tmp_path / ('fictional.sqlite' if kind == 'sqlite' else 'fictional.json'))
-    native.restore_budget('personal', portable_snapshot(fixture_state(4)))
+    state = fixture_state(4)
+    for identifier in ('out-0', 'in-0', 'out-2', 'in-2'):
+        state['transactions'][identifier].update(amount=0, source='ynab')
+    native.restore_budget('personal', portable_snapshot(state))
     authority = LedgerService(native, budget_id='fictional')
     app = FastAPI()
     app.include_router(create_router(authority))

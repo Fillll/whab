@@ -48,7 +48,7 @@ def _identifier(value):
 
 
 def validate_pairs(pairs, reviewed=False):
-    """One bounded, directed, disjoint intent; never split or infer counterparts."""
+    """One bounded, explicit, disjoint intent; never split or infer counterparts."""
     if type(pairs) is not list or not 1 <= len(pairs) <= 100:
         raise StoreError('A transfer batch must contain 1–100 explicit pairs; it is never split.')
     if type(reviewed) is not bool:
@@ -90,8 +90,8 @@ def plan_many(state, pairs, *, reviewed=False, fingerprint=None, apply=False):
         left, right = (state['transactions'].get(pair[key]) for key in ('outId', 'inId'))
         if left is None or right is None:
             raise StoreError(f'Pair {index}: a transaction is missing from this workspace.')
-        if left['amount'] <= 0 or right['amount'] >= 0:
-            raise StoreError(f'Pair {index}: outId must be a nonzero outflow and inId a nonzero inflow. Zero-value hints cannot be paired.')
+        if (left['amount'] != 0 or right['amount'] != 0) and (left['amount'] <= 0 or right['amount'] >= 0):
+            raise StoreError(f'Pair {index}: outId must be an outflow and inId an inflow, or both IDs must identify existing posted zero-value entries. Zero pairs have no inferred direction.')
         candidate = {**state, 'transactions': dict(state['transactions'])}
         try:
             plan(candidate, [pair['outId'], pair['inId']], apply=True)
@@ -124,7 +124,7 @@ def _audit_issue(state, row, incoming=None):
     if valid_pair(row, state['transactions'], state['accounts'], state['categories'], incoming=incoming):
         return None
     if row['amount'] == 0:
-        code, message = 'zero_amount', 'Zero-value imported hints have no directed legs and cannot form a transfer pair.'
+        code, message = 'zero_amount', 'A zero-value hint needs an explicitly confirmed pair of existing posted zero entries in different same-currency accounts; no direction or counterpart is inferred.'
     elif 'transferPeerId' in row:
         code, message = 'invalid_pair', 'The stored link is not an exclusive reciprocal pair of equal opposite posted amounts.'
     else:
@@ -155,7 +155,7 @@ def audit(state, parameters=None):
                            'repairable': bool(row.get('reviewed') or 'transferPeerId' in row or state['categories'].get(row.get('categoryId'), {}).get('kind') == 'transfer')})
     end = offset + limit
     return {'issues': issues[offset:end], 'total': len(issues), 'next': end if end < len(issues) else None,
-            'zeroValuePolicy': 'A zero-value hint cannot form a directed pair and must remain unreviewed.'}
+            'zeroValuePolicy': 'Existing posted zero entries may be explicitly paired across different same-currency accounts and then reviewed. Unpaired zero hints remain unreviewed; no entries or direction are invented.'}
 
 
 def validate_repair_ids(transaction_ids):
@@ -206,7 +206,7 @@ def _compatible(left, right, accounts, categories=None):
     a, b = accounts[left['accountId']], accounts[right['accountId']]
     return (left['id'] != right['id'] and a['id'] != b['id']
             and a.get('currency', 'USD') == b.get('currency', 'USD')
-            and left['amount'] != 0 and left['amount'] == -right['amount']
+            and left['amount'] == -right['amount']
             and not any(row.get('deleted') or row.get('pending') or row.get('categoryId') is not None and (categories or {}).get(row['categoryId'], {}).get('kind') != 'transfer' for row in (left, right)))
 
 
@@ -261,7 +261,7 @@ def plan(state, transaction_ids, *, action='match', fingerprint=None, apply=Fals
         if any(row.get('transferPeerId') for row in rows):
             raise StoreError('A transaction is already matched. Inspect or unmatch its existing pair first.')
         if not _compatible(left, right, accounts, state.get('categories')):
-            raise StoreError('A transfer needs posted transactions that are unclassified or explicitly Transfer, with opposite equal amounts in different accounts of the same currency.')
+            raise StoreError('A transfer needs existing posted transactions that are unclassified or explicitly Transfer, with opposite equal amounts (including two explicit zeros) in different accounts of the same currency.')
         if abs((date.fromisoformat(left['date']) - date.fromisoformat(right['date'])).days) > MAX_DAYS:
             raise StoreError('Transfer dates must be within seven calendar days.')
     elif left.get('transferPeerId') != right['id'] or right.get('transferPeerId') != left['id']:

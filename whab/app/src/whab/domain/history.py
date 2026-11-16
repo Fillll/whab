@@ -329,7 +329,8 @@ def apply_to_state(state, wanted):
         if candidate['categories'].get(row.get('categoryId'), {}).get('kind') == 'transfer':
             if (not valid_pair(row, candidate['transactions'], candidate['accounts'], candidate['categories'], incoming=candidate_context['incoming'])
                     and (previous.get('categoryId') != row.get('categoryId')
-                         or state['categories'].get(previous.get('categoryId'), {}).get('kind') != 'transfer')):
+                         or state['categories'].get(previous.get('categoryId'), {}).get('kind') != 'transfer'
+                         or valid_pair(previous, state['transactions'], state['accounts'], state['categories'], incoming=current_context['incoming']))):
                 raise StoreError(f'{identifier}: This reversal would restore a Transfer category without exactly two valid legs.')
         if row.get('reviewed') and (not previous.get('reviewed') or
                 review_status(previous, state['categories'], **current_context)['eligible'] and not review_status(row, candidate['categories'], **candidate_context)['eligible']):

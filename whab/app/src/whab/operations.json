@@ -3934,15 +3934,14 @@
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending or expense/income-classified legs, differing currencies, zero/unequal opposite amounts, dates over seven days or existing links reject confirmation before mutation. Historical closed/cross-scope accounts are supported.",
-        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
-        "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
+        "Missing/deleted/duplicate IDs, pending or expense/income-classified legs, differing currencies, unequal opposite amounts (including a zero/nonzero mismatch), dates over seven days or existing links reject confirmation before mutation. Historical closed/cross-scope accounts are supported.",
+        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
       "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
       "name": "preview_transfer_match",
       "kind": "query",
-      "summary": "Inspect the exact proposed pair changes and fingerprint before explicit confirmation. Confirming links both IDs, marks transfer exclusion and leaves both unreviewed. Unmatching removes links and restores provider transfer hints, leaving both unreviewed.",
+      "summary": "Inspect the exact proposed pair changes and fingerprint before explicit confirmation. Confirming links both IDs, marks transfer exclusion and leaves both unreviewed. Unmatching removes links and restores provider transfer hints, leaving both unreviewed. Two existing posted zero-value entries can be explicitly paired without creating entries or assigning financial direction.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -4050,15 +4049,14 @@
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending or expense/income-classified legs, differing currencies, zero/unequal opposite amounts, dates over seven days or existing links reject confirmation before mutation. Historical closed/cross-scope accounts are supported.",
-        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
-        "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
+        "Missing/deleted/duplicate IDs, pending or expense/income-classified legs, differing currencies, unequal opposite amounts (including a zero/nonzero mismatch), dates over seven days or existing links reject confirmation before mutation. Historical closed/cross-scope accounts are supported.",
+        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
       "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
       "name": "match_transfer",
       "kind": "command",
-      "summary": "Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
+      "summary": "Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review. Two existing posted zero-value entries can be explicitly paired without creating entries or assigning financial direction.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -5086,13 +5084,13 @@
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
       "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
       "errors": [
-        "Invalid, missing, deleted, repeated or shared IDs, zero/unequal amounts, pending legs, same account/currency mismatch, existing links and dates over seven days reject the complete batch before mutation.",
+        "Invalid, missing, deleted, repeated or shared IDs, unequal amounts (including a zero/nonzero mismatch), pending legs, same account/currency mismatch, existing links and dates over seven days reject the complete batch before mutation.",
         "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail clearly before any mutation.",
         "An uncertain write must retain its original intent; do not regenerate request ID, revision, fingerprint or payload."
       ],
       "name": "preview_transfer_matches",
       "kind": "query",
-      "summary": "Confirm 1–100 explicit disjoint transfer pairs together; optionally review every complete pair. Closed historical accounts and differing current budget scopes are supported without changing accounts. Every pair validates before any mutation.",
+      "summary": "Confirm 1–100 explicit disjoint transfer pairs together; optionally review every complete pair. Closed historical accounts and differing current budget scopes are supported without changing accounts. Every pair validates before any mutation. Mixed batches may include two existing posted zero-value entries: outId/inId identify those two legs without inventing direction, entries or amounts. Suggestions never infer zero-value pairs.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -5279,13 +5277,13 @@
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
       "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
       "errors": [
-        "Invalid, missing, deleted, repeated or shared IDs, zero/unequal amounts, pending legs, same account/currency mismatch, existing links and dates over seven days reject the complete batch before mutation.",
+        "Invalid, missing, deleted, repeated or shared IDs, unequal amounts (including a zero/nonzero mismatch), pending legs, same account/currency mismatch, existing links and dates over seven days reject the complete batch before mutation.",
         "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail clearly before any mutation.",
         "An uncertain write must retain its original intent; do not regenerate request ID, revision, fingerprint or payload."
       ],
       "name": "match_transfers",
       "kind": "command",
-      "summary": "Confirm 1–100 explicit disjoint transfer pairs together; optionally review every complete pair. Closed historical accounts and differing current budget scopes are supported without changing accounts. Every pair validates before any mutation.",
+      "summary": "Confirm 1–100 explicit disjoint transfer pairs together; optionally review every complete pair. Closed historical accounts and differing current budget scopes are supported without changing accounts. Every pair validates before any mutation. Mixed batches may include two existing posted zero-value entries: outId/inId identify those two legs without inventing direction, entries or amounts. Suggestions never infer zero-value pairs.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -5479,13 +5477,13 @@
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
       "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
       "errors": [
-        "Invalid, missing, deleted, repeated or shared IDs, zero/unequal amounts, pending legs, same account/currency mismatch, existing links and dates over seven days reject the complete batch before mutation.",
-        "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail clearly before any mutation.",
-        "An uncertain write must retain its original intent; do not regenerate request ID, revision, fingerprint or payload."
+        "Select 1–200 distinct existing IDs with invalid transfer state; include every existing malformed counterpart. Missing, duplicate, unrelated or incomplete selections reject the entire repair before mutation.",
+        "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail before mutation.",
+        "An uncertain save retains the complete original intent; never automatically retry with a fresh request. Guarded undo refuses to restore invalid Transfer classification or review."
       ],
       "name": "preview_transfer_repair",
       "kind": "query",
-      "summary": "Inspect or explicitly repair selected invalid transfer records: unreview, clear orphan Transfer classification and malformed links, retain imported hints and exact financial fields. Never invent a missing leg; zero-value hints cannot pair. Include all existing malformed counterparts explicitly.",
+      "summary": "Inspect or explicitly repair selected invalid transfer records: unreview, clear orphan Transfer classification and malformed links, retain imported hints and exact financial fields. Never invent a missing leg; two existing posted zero-value records may instead be explicitly paired through match_transfers. Include all existing malformed counterparts explicitly.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -5609,13 +5607,13 @@
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
       "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
       "errors": [
-        "Invalid, missing, deleted, repeated or shared IDs, zero/unequal amounts, pending legs, same account/currency mismatch, existing links and dates over seven days reject the complete batch before mutation.",
-        "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail clearly before any mutation.",
-        "An uncertain write must retain its original intent; do not regenerate request ID, revision, fingerprint or payload."
+        "Select 1–200 distinct existing IDs with invalid transfer state; include every existing malformed counterpart. Missing, duplicate, unrelated or incomplete selections reject the entire repair before mutation.",
+        "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail before mutation.",
+        "An uncertain save retains the complete original intent; never automatically retry with a fresh request. Guarded undo refuses to restore invalid Transfer classification or review."
       ],
       "name": "repair_transfers",
       "kind": "command",
-      "summary": "Inspect or explicitly repair selected invalid transfer records: unreview, clear orphan Transfer classification and malformed links, retain imported hints and exact financial fields. Never invent a missing leg; zero-value hints cannot pair. Include all existing malformed counterparts explicitly.",
+      "summary": "Inspect or explicitly repair selected invalid transfer records: unreview, clear orphan Transfer classification and malformed links, retain imported hints and exact financial fields. Never invent a missing leg; two existing posted zero-value records may instead be explicitly paired through match_transfers. Include all existing malformed counterparts explicitly.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -5746,13 +5744,12 @@
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
       "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
       "errors": [
-        "Invalid, missing, deleted, repeated or shared IDs, zero/unequal amounts, pending legs, same account/currency mismatch, existing links and dates over seven days reject the complete batch before mutation.",
-        "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail clearly before any mutation.",
-        "An uncertain write must retain its original intent; do not regenerate request ID, revision, fingerprint or payload."
+        "Use inclusive valid ISO dates in ascending order, a nonnegative offset and limit 1–100. Unknown fields or invalid values are refused.",
+        "Unsupported authorities fail clearly. Keep the same revision across every page; a changed revision requires restarting the read, not combining inconsistent pages."
       ],
       "name": "transfer_audit",
       "kind": "query",
-      "summary": "Read complete paginated transfer-integrity issues, including unpaired imported hints, invalid links/Transfer categories, legacy reviewed records and zero-value hints. Reads never clean up legacy data.",
+      "summary": "Read complete paginated transfer-integrity issues, including unpaired imported hints, invalid links/Transfer categories, legacy reviewed records and unpaired zero-value hints. Reads never clean up legacy data.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -5856,7 +5853,7 @@
             "issues": [],
             "total": 0,
             "next": null,
-            "zeroValuePolicy": "Zero-value imported hints have no direction and cannot form a transfer pair; keep unreviewed until explicitly reclassified."
+            "zeroValuePolicy": "Unpaired zero-value hints stay unreviewed; explicitly select two existing valid counterparts to pair them without inventing direction, or deliberately reclassify."
           }
         }
       ],
@@ -5868,13 +5865,11 @@
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
       "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
       "errors": [
-        "Invalid, missing, deleted, repeated or shared IDs, zero/unequal amounts, pending legs, same account/currency mismatch, existing links and dates over seven days reject the complete batch before mutation.",
-        "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail clearly before any mutation.",
-        "An uncertain write must retain its original intent; do not regenerate request ID, revision, fingerprint or payload."
+        "Unsupported authoritative storage or an unavailable remote policy fails clearly without mutation."
       ],
       "name": "transfer_policy",
       "kind": "query",
-      "summary": "Read authoritative strict two-leg transfer, native atomic bulk and historical-account support. Unsupported storage/remote authorities fail before mutation.",
+      "summary": "Read authoritative strict two-leg transfer, native atomic bulk and historical-account support. Unsupported storage/remote authorities fail before mutation. zeroAmountPairing=true means explicit matching of two existing posted zero records, never inferred suggestions or zero creation.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -5895,7 +5890,7 @@
             "maxPairs": 100,
             "maxRepairTransactions": 200,
             "twoLegsRequired": true,
-            "zeroAmountPairing": false,
+            "zeroAmountPairing": true,
             "historicalClosedAccounts": true,
             "crossScopeFunding": true
           }

@@ -18,9 +18,9 @@ TRANSFER_HELP = '''Transfer proposals are suggestions, never automatic matches o
   whab "My budget" trnx match-transfer OUT_ID IN_ID --agent Codex
   whab "My budget" trnx unmatch-transfer OUT_ID IN_ID --dry-run
 
-Eligibility: two existing posted, nondeleted transactions with no category or a
-Transfer category, in different accounts, equal nonzero opposite amounts, same
-currency, within seven calendar days. Historical closed accounts and differing
+Explicit matching: two existing posted, nondeleted transactions with no category
+or a Transfer category, in different accounts, equal opposite amounts (including
+two explicitly confirmed zero-value entries), same currency, within seven days. Historical closed accounts and differing
 current on/off-budget scopes are supported without reopening/reclassifying them.
 A date/account filter selects an
 anchor; the other leg may lie outside that selection by up to seven days. Names
@@ -31,7 +31,8 @@ budget movement uses explicit dated transferFunding, not income or spending.
 Same-month cash pairs net to zero; cross-month legs affect their posting months.
 Stale/unavailable cash cannot create funding. Credit debt uses its
 actual change without inventing cash for overpayment. No bank sync or standing
-future rule is created. Zero-value imported hints cannot establish directed legs.
+future rule is created. Proposals exclude zero-value entries; explicit matching
+can pair two existing zeros without inventing a counterpart, direction or value.
 
 List is read-only. JSON includes complete stable IDs, both public transactions,
 account names, evidence, ambiguity, exact total and next offset. Default limit
@@ -50,14 +51,16 @@ remain unreviewed for ordinary transaction review. Notes, amounts, merchants
 (including whitespace), dates, accounts and identities stay unchanged. Match
 preserves category attribution and sets reciprocal transferPeerId/isTransfer=true.
 Unmatch removes links, clears any now-orphan Transfer category and its attribution,
-and restores isTransfer from the existing provider hint. Unmatch
-before changing paired amounts/dates/accounts/categories. Current budget scope or
-closed status does not destroy a valid historical pair.
+and restores isTransfer from the existing provider hint. Unmatch before changing
+paired amounts/dates/accounts or choosing Expense, Income or Opening Balance.
+A valid pair may assign or clear a Transfer category without unmatching. Current
+budget scope or closed status does not destroy a valid historical pair.
 Provider corrections/removals that invalidate a pair remove both links and leave
 both unreviewed; provider hints remain distinct from a confirmed match.
 
 Verify with trnx list (JSON includes transferPeerId) and history list/show. Undo
-and redo use the existing fingerprint/revision-guarded history commands. Stale
+and redo use fingerprint/revision-guarded history commands and refuse to restore
+invalid legacy Transfer labels or invalid reviewed state. Stale
 state is refused. After an uncertain result, inspect the saved pair/history and
 retain BOTH original IDs, action, --revision, --fingerprint and --request-id.
 Exact successful retries return the original durable result after restart. Never

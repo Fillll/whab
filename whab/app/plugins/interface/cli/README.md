@@ -1129,9 +1129,9 @@ Transfer proposals are suggestions, never automatic matches or reviews.
   whab "My budget" trnx match-transfer OUT_ID IN_ID --agent Codex
   whab "My budget" trnx unmatch-transfer OUT_ID IN_ID --dry-run
 
-Eligibility: two existing posted, nondeleted transactions with no category or a
-Transfer category, in different accounts, equal nonzero opposite amounts, same
-currency, within seven calendar days. Historical closed accounts and differing
+Explicit matching: two existing posted, nondeleted transactions with no category
+or a Transfer category, in different accounts, equal opposite amounts (including
+two explicitly confirmed zero-value entries), same currency, within seven days. Historical closed accounts and differing
 current on/off-budget scopes are supported without reopening/reclassifying them.
 A date/account filter selects an
 anchor; the other leg may lie outside that selection by up to seven days. Names
@@ -1142,7 +1142,8 @@ budget movement uses explicit dated transferFunding, not income or spending.
 Same-month cash pairs net to zero; cross-month legs affect their posting months.
 Stale/unavailable cash cannot create funding. Credit debt uses its
 actual change without inventing cash for overpayment. No bank sync or standing
-future rule is created. Zero-value imported hints cannot establish directed legs.
+future rule is created. Proposals exclude zero-value entries; explicit matching
+can pair two existing zeros without inventing a counterpart, direction or value.
 
 List is read-only. JSON includes complete stable IDs, both public transactions,
 account names, evidence, ambiguity, exact total and next offset. Default limit
@@ -1161,14 +1162,16 @@ remain unreviewed for ordinary transaction review. Notes, amounts, merchants
 (including whitespace), dates, accounts and identities stay unchanged. Match
 preserves category attribution and sets reciprocal transferPeerId/isTransfer=true.
 Unmatch removes links, clears any now-orphan Transfer category and its attribution,
-and restores isTransfer from the existing provider hint. Unmatch
-before changing paired amounts/dates/accounts/categories. Current budget scope or
-closed status does not destroy a valid historical pair.
+and restores isTransfer from the existing provider hint. Unmatch before changing
+paired amounts/dates/accounts or choosing Expense, Income or Opening Balance.
+A valid pair may assign or clear a Transfer category without unmatching. Current
+budget scope or closed status does not destroy a valid historical pair.
 Provider corrections/removals that invalidate a pair remove both links and leave
 both unreviewed; provider hints remain distinct from a confirmed match.
 
 Verify with trnx list (JSON includes transferPeerId) and history list/show. Undo
-and redo use the existing fingerprint/revision-guarded history commands. Stale
+and redo use fingerprint/revision-guarded history commands and refuse to restore
+invalid legacy Transfer labels or invalid reviewed state. Stale
 state is refused. After an uncertain result, inspect the saved pair/history and
 retain BOTH original IDs, action, --revision, --fingerprint and --request-id.
 Exact successful retries return the original durable result after restart. Never
@@ -1185,22 +1188,29 @@ Atomic transfer matching (1–100 explicit pairs):
 Complete pairs.json example (UTF-8 JSON array, maximum 2 MiB):
 [
   {"outId": "out-1", "inId": "in-1"},
-  {"outId": "out-2", "inId": "in-2"}
+  {"outId": "zero-a", "inId": "zero-b"}
 ]
-Use stable IDs from trnx list/transfers. outId is the positive minor-unit outflow;
-inId is its negative inflow. Each ID may appear exactly once in the whole file.
+Here zero-a/zero-b are two already-existing posted zero entries confirmed by the
+user; names do not establish their amounts. Inspect the exact preview.
+Use stable IDs from trnx list/transfers. For nonzero pairs, outId is the positive
+minor-unit outflow and inId its negative inflow. For two explicitly confirmed
+zero-value entries, these are simply the first/second IDs; no direction is inferred.
+Each ID may appear exactly once in the whole file.
 No fuzzy matching or inferred counterpart. Every pair must pass core validation;
 one invalid, missing, repeated, already paired or otherwise disallowed leg rejects
 ALL pairs. Oversized batches are refused, never split. Empty batches are refused.
-Pairing requires equal nonzero opposite amounts in different same-currency
-accounts, posted/nondeleted legs within seven days, and compatible classification.
+Pairing requires equal opposite amounts (or two explicitly confirmed zero-value
+entries) in different same-currency accounts, posted/nondeleted legs within seven
+days, and compatible classification. Zero and nonzero pairs may share one batch.
 Closed historical accounts and different current on/off-budget scopes may pair
 without reopening/reclassifying. Dated transferFunding accounts for signed
 eligible budget movement; transfers never become income/spending. Same-month
 cash pairs net to zero; cross-month legs affect their posting months. Unknown/
 stale cash creates no funding; credit debt changes cannot invent overpayment cash.
-Zero-value imported transfer hints cannot establish directed legs; leave unreviewed
-and inspect the transfer audit. Bank hints and merchant names are not proof.
+Automatic proposals exclude zero-value entries. Explicit matching may pair two
+existing zeros, without inventing a counterpart, direction or value. An unpaired
+zero hint stays unreviewed until paired or independently classified. Bank hints
+and merchant names are not proof; inspect the transfer audit.
 
 This is ONE native atomic commit, revision advancement, durable checkpoint and
 coherent reversible before/after audit entry for the complete batch, not repeated
@@ -1215,22 +1225,25 @@ Inspect every pair, then bind the chosen preview with --revision REV and
 --fingerprint HASH. Omitting them previews current state internally. Execution
 stays noninteractive. A stale revision or changed fingerprint rejects all changes.
 JSON is complete; --format table shows every saved before/after record. Verify
-trnx list and history list/show. History undo/redo remain separately guarded.
+trnx list and history list/show. Guarded undo/redo refuses invalid legacy Transfer
+labels or invalid reviewed state; undo to safely unclassified, unpaired records remains allowed.
 
 After an uncertain response, inspect saved pairs/history and retain the ENTIRE
 reported intent: exact ordered file, --reviewed choice, original --revision,
 --fingerprint, --request-id, --agent and --batch. Repeat that exact command only;
 successful retries return the original durable receipt after restart, without a
 second mutation/history/save. Never retry with fresh intent. Conflicting reuse
-is refused. Unsupported authoritative backends fail before mutation. Help works
+is refused. Unsupported authoritative backends fail before mutation. Paired-transfer
+portable budgets require WHAB 2.81 or newer; older readers refuse them. Help works
 offline. Use match-transfer for one pair with its existing result shape, or
 match-transfers for a batch and optional review in the same commit.
 
 
 A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,
 a merchant name or an isolated Transfer category does not prove a pair. A zero
-amount imported hint has no directed outflow/inflow; it cannot be paired and
-must remain unreviewed until explicitly reclassified on independent evidence.
+amount imported hint has no inferred direction and is excluded from proposals.
+Two explicitly confirmed existing posted zero entries can be paired. An unpaired
+zero hint stays unreviewed until paired or classified on independent evidence.
 
 Audit first (read-only):
   whab "My budget" trnx transfer-audit --format table
@@ -1250,9 +1263,11 @@ dates, merchants (including whitespace), notes, account balances and history.
 It neither manufactures a missing leg nor guesses a category or counterpart.
 Explicit non-Transfer categories are retained; imported hint evidence cannot
 override their financial treatment after repair.
-After repair, incomplete/zero-value hints stay unreviewed. Inspect trnx list and
+After repair, unpaired hints (including zero values) stay unreviewed. Inspect trnx list and
 history list/show; use match-transfers only for confirmed complete pairs.
 An already unreviewed hint can appear as unchanged in the exact repair receipt.
+Audit history is permanent; guarded undo/redo refuses to restore invalid legacy
+Transfer labels or invalid reviewed state, including an invalid pre-repair state.
 
 1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,
 revision advancement, durable save and reversible audit entry. One invalid,
@@ -1331,12 +1346,15 @@ create another change/history/save. Success verifies the saved category hierarch
 
 ## Classification before review
 
-WHAB 2.79 supports Expense, Income, Transfer and Opening Balance child types (`kind` in public
+WHAB 2.81 supports Expense, Income, Transfer and Opening Balance child types (`kind` in public
 records, `--type` in CLI). Missing kind remains Expense. Income, Transfer and Opening Balance have
 no expense target or assignment rows. Transfer is explicit account movement,
 excluded from ordinary income/spending without changing account balances. Exactly two valid reciprocal legs are required for Transfer classification or review.
-Matching requires equal nonzero opposite posted amounts, different same-currency
-accounts and dates within seven days. Closed historical accounts and mixed current
+Matching requires equal opposite posted amounts, different same-currency
+accounts and dates within seven days. Two explicitly confirmed existing posted
+zero entries may also be paired; outId/inId are first/second labels for that pair,
+without inventing financial direction. Zero pairs and nonzero pairs may share one
+atomic batch. Automatic proposals exclude zeros. Closed historical accounts and mixed current
 budget scopes are supported without reopening/reclassifying. Single-pair matching
 leaves unreviewed; bulk matching can explicitly review in the same commit with
 `match-transfers --reviewed`. Imported hints, including zero amounts, do not prove

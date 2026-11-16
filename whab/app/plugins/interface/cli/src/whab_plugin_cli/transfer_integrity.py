@@ -14,8 +14,9 @@ from .transaction_search import calendar_date
 
 TRANSFER_AUDIT_HELP = '''A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,
 a merchant name or an isolated Transfer category does not prove a pair. A zero
-amount imported hint has no directed outflow/inflow; it cannot be paired and
-must remain unreviewed until explicitly reclassified on independent evidence.
+amount imported hint has no inferred direction and is excluded from proposals.
+Two explicitly confirmed existing posted zero entries can be paired. An unpaired
+zero hint stays unreviewed until paired or classified on independent evidence.
 
 Audit first (read-only):
   whab "My budget" trnx transfer-audit --format table
@@ -35,9 +36,11 @@ dates, merchants (including whitespace), notes, account balances and history.
 It neither manufactures a missing leg nor guesses a category or counterpart.
 Explicit non-Transfer categories are retained; imported hint evidence cannot
 override their financial treatment after repair.
-After repair, incomplete/zero-value hints stay unreviewed. Inspect trnx list and
+After repair, unpaired hints (including zero values) stay unreviewed. Inspect trnx list and
 history list/show; use match-transfers only for confirmed complete pairs.
 An already unreviewed hint can appear as unchanged in the exact repair receipt.
+Audit history is permanent; guarded undo/redo refuses to restore invalid legacy
+Transfer labels or invalid reviewed state, including an invalid pre-repair state.
 
 1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,
 revision advancement, durable save and reversible audit entry. One invalid,

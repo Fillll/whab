@@ -183,11 +183,7 @@ class Store(Authority):
             kinds.update(row.get('kind') for entry in journal.get('entries', ())
                          for change in entry['changes'] if change['path'][0] == 'categories'
                          for row in (change['before'], change['after']) if row is not None)
-            retained_pairs = retained_pairs or any(row.get('transferPeerId') for row in state['transactions'].values())
-            retained_pairs = retained_pairs or any(row.get('transferPeerId') for row in journal.get('baseline', {}).get('transactions', ()))
-            retained_pairs = retained_pairs or any(row is not None and row.get('transferPeerId') for entry in journal.get('entries', ())
-                for change in entry['changes'] if change['path'][0] == 'transactions'
-                for row in (change['before'], change['after']))
+            retained_pairs = retained_pairs or codec.retains_pairs(state)
         if 'opening_balance' in kinds:
             candidate = {**candidate, 'formatVersion': max(candidate['formatVersion'], 4)}
         if retained_pairs:

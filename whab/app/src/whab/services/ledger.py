@@ -206,7 +206,7 @@ class LedgerService:
                 self._require_bulk_transfer_matching()
                 return {'revision': self._revision, 'data': {
                     'version': 1, 'maxPairs': 100, 'maxRepairTransactions': 200,
-                    'twoLegsRequired': True, 'zeroAmountPairing': False,
+                    'twoLegsRequired': True, 'zeroAmountPairing': True,
                     'historicalClosedAccounts': True, 'crossScopeFunding': True,
                 }}
             if operation in {'preview_transfer_matches', 'transfer_audit', 'preview_transfer_repair'}:

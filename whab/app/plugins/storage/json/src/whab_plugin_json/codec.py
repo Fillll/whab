@@ -289,8 +289,18 @@ def encode(document):
     return raw, decode(raw)
 
 
+def retains_pairs(state):
+    """Require current financial semantics for pairs retained in data or history."""
+    journal = state.get('history') or {}
+    return (any(row.get('transferPeerId') for row in state['transactions'].values())
+            or any(row.get('transferPeerId') for row in journal.get('baseline', {}).get('transactions', ()))
+            or any(row is not None and row.get('transferPeerId') for entry in journal.get('entries', ())
+                   for change in entry['changes'] if change['path'][0] == 'transactions'
+                   for row in (change['before'], change['after'])))
+
+
 def export_files(state):
-    value = {"formatVersion": 1, **_pack_ledger(state, portable=True)}
+    value = {"formatVersion": 2 if retains_pairs(state) else 1, **_pack_ledger(state, portable=True)}
     return {"budget.json": serialize(value, MAX_PORTABLE_BYTES)}
 
 
@@ -317,6 +327,6 @@ def read_files(files):
         raise StoreError("JSON budgets require exactly one budget.json payload.")
     value = parse(files["budget.json"], MAX_PORTABLE_BYTES)
     _exact(value, {"formatVersion", "ledger", "items", "associations", "receipts", "importReceipt"})
-    if type(value["formatVersion"]) is not int or value["formatVersion"] != 1 or value["items"] or value["associations"]:
+    if type(value["formatVersion"]) is not int or value["formatVersion"] not in {1, 2} or value["items"] or value["associations"]:
         raise StoreError("JSON portable budgets cannot contain protected provider records.")
     return _read_ledger({key: row for key, row in value.items() if key != "formatVersion"}, "personal", portable=True)

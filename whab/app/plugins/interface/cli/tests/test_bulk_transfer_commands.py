@@ -95,6 +95,23 @@ def test_complete_preview_and_atomic_optional_review_intent(endpoint):
     assert len([body for body in state['calls'] if body['operation'] == 'match_transfers']) == 1
 
 
+def test_explicit_mixed_zero_pairs_preserve_fields_and_exact_retry(endpoint):
+    _, state, _ = endpoint
+    for row in state['data']['changes'][2:]:
+        row['before']['amount'] = row['after']['amount'] = 0
+    preview = run(endpoint, dry_run=True, reviewed=True)
+    intent = {'reviewed': True, 'revision': 'observed', 'fingerprint': 'f' * 64, 'request_id': 'zero-confirmed'}
+    saved = run(endpoint, **intent)
+    replay = run(endpoint, **intent)
+    assert saved['data'] == replay['data'] == preview['data']
+    assert state['calls'][1] == state['calls'][2]
+    assert [row['after']['amount'] for row in saved['data']['changes']] == [100, -100, 0, 0]
+    for row in saved['data']['changes']:
+        for field in ('id', 'date', 'amount', 'accountId', 'merchant', 'note', 'categoryId'):
+            assert row['before'][field] == row['after'][field]
+        assert row['after']['reviewed'] and row['after']['transferPeerId']
+
+
 def test_exact_recovery_skips_new_preview_and_preserves_original_intent(endpoint):
     _, state, _ = endpoint
     saved = run(endpoint, revision='observed', fingerprint='f' * 64, request_id='original')

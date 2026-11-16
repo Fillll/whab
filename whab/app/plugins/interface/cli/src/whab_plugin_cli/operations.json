@@ -5183,7 +5183,7 @@
       "availability": "WHAB 2.81+ with transfer integrity; supported SQLite/JSON authorities. Unsupported backends fail before mutation.",
       "name": "trnx.match-transfer",
       "kind": "local",
-      "summary": "Name-addressed CLI: Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
+      "summary": "Name-addressed CLI: Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve identities, financial fields, notes, source and original metadata; unmatching clears any orphan Transfer category and its attribution. Both remain unreviewed for ordinary review. Valid pairs may assign or clear a Transfer category without unmatching; changing financial fields or choosing Expense, Income or Opening Balance requires unmatching first. Guarded undo/redo refuses invalid legacy Transfer labels or invalid reviewed state.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -5306,7 +5306,7 @@
       "availability": "WHAB 2.81+ with transfer integrity; supported SQLite/JSON authorities. Unsupported backends fail before mutation.",
       "name": "trnx.unmatch-transfer",
       "kind": "local",
-      "summary": "Name-addressed CLI: Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
+      "summary": "Name-addressed CLI: Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve identities, financial fields, notes, source and original metadata; unmatching clears any orphan Transfer category and its attribution. Both remain unreviewed for ordinary review. Valid pairs may assign or clear a Transfer category without unmatching; changing financial fields or choosing Expense, Income or Opening Balance requires unmatching first. Guarded undo/redo refuses invalid legacy Transfer labels or invalid reviewed state.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -5880,7 +5880,7 @@
       "retry": "Retain ordered input, review choice, original revision, fingerprint, request ID and history metadata. Exact successful retries return the durable original receipt after restart without repeated changes/history/saves. Never retry uncertainty with a new intent.",
       "availability": "CLI 2.23+, WHAB 2.81+ and native BulkTransferMatching capability. Help and packaged docs work offline.",
       "name": "trnx.match-transfers.preview",
-      "summary": "Atomic transfer matching (1–100 explicit pairs):\n  whab \"My budget\" trnx match-transfers --file pairs.json --dry-run\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --dry-run --agent Codex\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --agent Codex\n  printf '%s\\n' '[{\"outId\":\"out-1\",\"inId\":\"in-1\"}]' | whab \"My budget\" trnx match-transfers --file - --dry-run\n\nComplete pairs.json example (UTF-8 JSON array, maximum 2 MiB):\n[\n  {\"outId\": \"out-1\", \"inId\": \"in-1\"},\n  {\"outId\": \"out-2\", \"inId\": \"in-2\"}\n]\nUse stable IDs from trnx list/transfers. outId is the positive minor-unit outflow;\ninId is its negative inflow. Each ID may appear exactly once in the whole file.\nNo fuzzy matching or inferred counterpart. Every pair must pass core validation;\none invalid, missing, repeated, already paired or otherwise disallowed leg rejects\nALL pairs. Oversized batches are refused, never split. Empty batches are refused.\nPairing requires equal nonzero opposite amounts in different same-currency\naccounts, posted/nondeleted legs within seven days, and compatible classification.\nClosed historical accounts and different current on/off-budget scopes may pair\nwithout reopening/reclassifying. Dated transferFunding accounts for signed\neligible budget movement; transfers never become income/spending. Same-month\ncash pairs net to zero; cross-month legs affect their posting months. Unknown/\nstale cash creates no funding; credit debt changes cannot invent overpayment cash.\nZero-value imported transfer hints cannot establish directed legs; leave unreviewed\nand inspect the transfer audit. Bank hints and merchant names are not proof.\n\nThis is ONE native atomic commit, revision advancement, durable checkpoint and\ncoherent reversible before/after audit entry for the complete batch, not repeated\nsingle-pair edits. --batch groups history only. --agent labels the audit actor,\nwithout changing existing category-agent attribution. Omitted --reviewed leaves\nboth legs unreviewed; --reviewed explicitly reviews every validated complete pair\ninside that same commit. No financial fields, notes or merchant whitespace are\nchanged; no bank sync or persistent future matching rule is created.\n\n--dry-run is read-only and reports exact before/after, revision and fingerprint.\nInspect every pair, then bind the chosen preview with --revision REV and\n--fingerprint HASH. Omitting them previews current state internally. Execution\nstays noninteractive. A stale revision or changed fingerprint rejects all changes.\nJSON is complete; --format table shows every saved before/after record. Verify\ntrnx list and history list/show. History undo/redo remain separately guarded.\n\nAfter an uncertain response, inspect saved pairs/history and retain the ENTIRE\nreported intent: exact ordered file, --reviewed choice, original --revision,\n--fingerprint, --request-id, --agent and --batch. Repeat that exact command only;\nsuccessful retries return the original durable receipt after restart, without a\nsecond mutation/history/save. Never retry with fresh intent. Conflicting reuse\nis refused. Unsupported authoritative backends fail before mutation. Help works\noffline. Use match-transfer for one pair with its existing result shape, or\nmatch-transfers for a batch and optional review in the same commit.\n",
+      "summary": "Atomic transfer matching (1–100 explicit pairs):\n  whab \"My budget\" trnx match-transfers --file pairs.json --dry-run\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --dry-run --agent Codex\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --agent Codex\n  printf '%s\\n' '[{\"outId\":\"out-1\",\"inId\":\"in-1\"}]' | whab \"My budget\" trnx match-transfers --file - --dry-run\n\nComplete pairs.json example (UTF-8 JSON array, maximum 2 MiB):\n[\n  {\"outId\": \"out-1\", \"inId\": \"in-1\"},\n  {\"outId\": \"zero-a\", \"inId\": \"zero-b\"}\n]\nHere zero-a/zero-b are two already-existing posted zero entries confirmed by the\nuser; names do not establish their amounts. Inspect the exact preview.\nUse stable IDs from trnx list/transfers. For nonzero pairs, outId is the positive\nminor-unit outflow and inId its negative inflow. For two explicitly confirmed\nzero-value entries, these are simply the first/second IDs; no direction is inferred.\nEach ID may appear exactly once in the whole file.\nNo fuzzy matching or inferred counterpart. Every pair must pass core validation;\none invalid, missing, repeated, already paired or otherwise disallowed leg rejects\nALL pairs. Oversized batches are refused, never split. Empty batches are refused.\nPairing requires equal opposite amounts (or two explicitly confirmed zero-value\nentries) in different same-currency accounts, posted/nondeleted legs within seven\ndays, and compatible classification. Zero and nonzero pairs may share one batch.\nClosed historical accounts and different current on/off-budget scopes may pair\nwithout reopening/reclassifying. Dated transferFunding accounts for signed\neligible budget movement; transfers never become income/spending. Same-month\ncash pairs net to zero; cross-month legs affect their posting months. Unknown/\nstale cash creates no funding; credit debt changes cannot invent overpayment cash.\nAutomatic proposals exclude zero-value entries. Explicit matching may pair two\nexisting zeros, without inventing a counterpart, direction or value. An unpaired\nzero hint stays unreviewed until paired or independently classified. Bank hints\nand merchant names are not proof; inspect the transfer audit.\n\nThis is ONE native atomic commit, revision advancement, durable checkpoint and\ncoherent reversible before/after audit entry for the complete batch, not repeated\nsingle-pair edits. --batch groups history only. --agent labels the audit actor,\nwithout changing existing category-agent attribution. Omitted --reviewed leaves\nboth legs unreviewed; --reviewed explicitly reviews every validated complete pair\ninside that same commit. No financial fields, notes or merchant whitespace are\nchanged; no bank sync or persistent future matching rule is created.\n\n--dry-run is read-only and reports exact before/after, revision and fingerprint.\nInspect every pair, then bind the chosen preview with --revision REV and\n--fingerprint HASH. Omitting them previews current state internally. Execution\nstays noninteractive. A stale revision or changed fingerprint rejects all changes.\nJSON is complete; --format table shows every saved before/after record. Verify\ntrnx list and history list/show. Guarded undo/redo refuses invalid legacy Transfer\nlabels or invalid reviewed state; undo to safely unclassified, unpaired records remains allowed.\n\nAfter an uncertain response, inspect saved pairs/history and retain the ENTIRE\nreported intent: exact ordered file, --reviewed choice, original --revision,\n--fingerprint, --request-id, --agent and --batch. Repeat that exact command only;\nsuccessful retries return the original durable receipt after restart, without a\nsecond mutation/history/save. Never retry with fresh intent. Conflicting reuse\nis refused. Unsupported authoritative backends fail before mutation. Paired-transfer\nportable budgets require WHAB 2.81 or newer; older readers refuse them. Help works\noffline. Use match-transfer for one pair with its existing result shape, or\nmatch-transfers for a batch and optional review in the same commit.\n",
       "input": {
         "type": "object",
         "description": "Resolved --file/- JSON pairs and --reviewed choice; execution adds fingerprint from the native preview.",
@@ -5967,28 +5967,202 @@
               {
                 "outId": "fictional-out",
                 "inId": "fictional-in"
+              },
+              {
+                "outId": "zero-a",
+                "inId": "zero-b"
               }
             ],
             "reviewed": true
           },
           "output": {
+            "action": "match",
+            "pairCount": 2,
+            "count": 4,
+            "changed": 4,
+            "reviewed": true,
             "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
-            "count": 2,
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in",
+                "crossesBudgetScope": false,
+                "archivedAccounts": []
+              },
+              {
+                "outId": "zero-a",
+                "inId": "zero-b",
+                "crossesBudgetScope": false,
+                "archivedAccounts": []
+              }
+            ],
             "changes": [
               {
                 "id": "fictional-out",
-                "before": {},
+                "before": {
+                  "id": "fictional-out",
+                  "accountId": "fictional-outId",
+                  "accountName": "Fictional outId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 1200,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false
+                },
                 "after": {
-                  "transferPeerId": "fictional-in",
-                  "reviewed": true
+                  "id": "fictional-out",
+                  "accountId": "fictional-outId",
+                  "accountName": "Fictional outId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 1200,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": true,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": true,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false,
+                  "transferPeerId": "fictional-in"
                 }
               },
               {
                 "id": "fictional-in",
-                "before": {},
+                "before": {
+                  "id": "fictional-in",
+                  "accountId": "fictional-inId",
+                  "accountName": "Fictional inId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": -1200,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false
+                },
                 "after": {
-                  "transferPeerId": "fictional-out",
-                  "reviewed": true
+                  "id": "fictional-in",
+                  "accountId": "fictional-inId",
+                  "accountName": "Fictional inId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": -1200,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": true,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": true,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false,
+                  "transferPeerId": "fictional-out"
+                }
+              },
+              {
+                "id": "zero-a",
+                "before": {
+                  "id": "zero-a",
+                  "accountId": "fictional-outId",
+                  "accountName": "Fictional outId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 0,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false
+                },
+                "after": {
+                  "id": "zero-a",
+                  "accountId": "fictional-outId",
+                  "accountName": "Fictional outId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 0,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": true,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": true,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false,
+                  "transferPeerId": "zero-b"
+                }
+              },
+              {
+                "id": "zero-b",
+                "before": {
+                  "id": "zero-b",
+                  "accountId": "fictional-inId",
+                  "accountName": "Fictional inId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 0,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false
+                },
+                "after": {
+                  "id": "zero-b",
+                  "accountId": "fictional-inId",
+                  "accountName": "Fictional inId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 0,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": true,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": true,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false,
+                  "transferPeerId": "zero-a"
                 }
               }
             ]
@@ -6008,7 +6182,7 @@
       "retry": "Retain ordered input, review choice, original revision, fingerprint, request ID and history metadata. Exact successful retries return the durable original receipt after restart without repeated changes/history/saves. Never retry uncertainty with a new intent.",
       "availability": "CLI 2.23+, WHAB 2.81+ and native BulkTransferMatching capability. Help and packaged docs work offline.",
       "name": "trnx.match-transfers",
-      "summary": "Atomic transfer matching (1–100 explicit pairs):\n  whab \"My budget\" trnx match-transfers --file pairs.json --dry-run\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --dry-run --agent Codex\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --agent Codex\n  printf '%s\\n' '[{\"outId\":\"out-1\",\"inId\":\"in-1\"}]' | whab \"My budget\" trnx match-transfers --file - --dry-run\n\nComplete pairs.json example (UTF-8 JSON array, maximum 2 MiB):\n[\n  {\"outId\": \"out-1\", \"inId\": \"in-1\"},\n  {\"outId\": \"out-2\", \"inId\": \"in-2\"}\n]\nUse stable IDs from trnx list/transfers. outId is the positive minor-unit outflow;\ninId is its negative inflow. Each ID may appear exactly once in the whole file.\nNo fuzzy matching or inferred counterpart. Every pair must pass core validation;\none invalid, missing, repeated, already paired or otherwise disallowed leg rejects\nALL pairs. Oversized batches are refused, never split. Empty batches are refused.\nPairing requires equal nonzero opposite amounts in different same-currency\naccounts, posted/nondeleted legs within seven days, and compatible classification.\nClosed historical accounts and different current on/off-budget scopes may pair\nwithout reopening/reclassifying. Dated transferFunding accounts for signed\neligible budget movement; transfers never become income/spending. Same-month\ncash pairs net to zero; cross-month legs affect their posting months. Unknown/\nstale cash creates no funding; credit debt changes cannot invent overpayment cash.\nZero-value imported transfer hints cannot establish directed legs; leave unreviewed\nand inspect the transfer audit. Bank hints and merchant names are not proof.\n\nThis is ONE native atomic commit, revision advancement, durable checkpoint and\ncoherent reversible before/after audit entry for the complete batch, not repeated\nsingle-pair edits. --batch groups history only. --agent labels the audit actor,\nwithout changing existing category-agent attribution. Omitted --reviewed leaves\nboth legs unreviewed; --reviewed explicitly reviews every validated complete pair\ninside that same commit. No financial fields, notes or merchant whitespace are\nchanged; no bank sync or persistent future matching rule is created.\n\n--dry-run is read-only and reports exact before/after, revision and fingerprint.\nInspect every pair, then bind the chosen preview with --revision REV and\n--fingerprint HASH. Omitting them previews current state internally. Execution\nstays noninteractive. A stale revision or changed fingerprint rejects all changes.\nJSON is complete; --format table shows every saved before/after record. Verify\ntrnx list and history list/show. History undo/redo remain separately guarded.\n\nAfter an uncertain response, inspect saved pairs/history and retain the ENTIRE\nreported intent: exact ordered file, --reviewed choice, original --revision,\n--fingerprint, --request-id, --agent and --batch. Repeat that exact command only;\nsuccessful retries return the original durable receipt after restart, without a\nsecond mutation/history/save. Never retry with fresh intent. Conflicting reuse\nis refused. Unsupported authoritative backends fail before mutation. Help works\noffline. Use match-transfer for one pair with its existing result shape, or\nmatch-transfers for a batch and optional review in the same commit.\n",
+      "summary": "Atomic transfer matching (1–100 explicit pairs):\n  whab \"My budget\" trnx match-transfers --file pairs.json --dry-run\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --dry-run --agent Codex\n  whab \"My budget\" trnx match-transfers --file pairs.json --reviewed --agent Codex\n  printf '%s\\n' '[{\"outId\":\"out-1\",\"inId\":\"in-1\"}]' | whab \"My budget\" trnx match-transfers --file - --dry-run\n\nComplete pairs.json example (UTF-8 JSON array, maximum 2 MiB):\n[\n  {\"outId\": \"out-1\", \"inId\": \"in-1\"},\n  {\"outId\": \"zero-a\", \"inId\": \"zero-b\"}\n]\nHere zero-a/zero-b are two already-existing posted zero entries confirmed by the\nuser; names do not establish their amounts. Inspect the exact preview.\nUse stable IDs from trnx list/transfers. For nonzero pairs, outId is the positive\nminor-unit outflow and inId its negative inflow. For two explicitly confirmed\nzero-value entries, these are simply the first/second IDs; no direction is inferred.\nEach ID may appear exactly once in the whole file.\nNo fuzzy matching or inferred counterpart. Every pair must pass core validation;\none invalid, missing, repeated, already paired or otherwise disallowed leg rejects\nALL pairs. Oversized batches are refused, never split. Empty batches are refused.\nPairing requires equal opposite amounts (or two explicitly confirmed zero-value\nentries) in different same-currency accounts, posted/nondeleted legs within seven\ndays, and compatible classification. Zero and nonzero pairs may share one batch.\nClosed historical accounts and different current on/off-budget scopes may pair\nwithout reopening/reclassifying. Dated transferFunding accounts for signed\neligible budget movement; transfers never become income/spending. Same-month\ncash pairs net to zero; cross-month legs affect their posting months. Unknown/\nstale cash creates no funding; credit debt changes cannot invent overpayment cash.\nAutomatic proposals exclude zero-value entries. Explicit matching may pair two\nexisting zeros, without inventing a counterpart, direction or value. An unpaired\nzero hint stays unreviewed until paired or independently classified. Bank hints\nand merchant names are not proof; inspect the transfer audit.\n\nThis is ONE native atomic commit, revision advancement, durable checkpoint and\ncoherent reversible before/after audit entry for the complete batch, not repeated\nsingle-pair edits. --batch groups history only. --agent labels the audit actor,\nwithout changing existing category-agent attribution. Omitted --reviewed leaves\nboth legs unreviewed; --reviewed explicitly reviews every validated complete pair\ninside that same commit. No financial fields, notes or merchant whitespace are\nchanged; no bank sync or persistent future matching rule is created.\n\n--dry-run is read-only and reports exact before/after, revision and fingerprint.\nInspect every pair, then bind the chosen preview with --revision REV and\n--fingerprint HASH. Omitting them previews current state internally. Execution\nstays noninteractive. A stale revision or changed fingerprint rejects all changes.\nJSON is complete; --format table shows every saved before/after record. Verify\ntrnx list and history list/show. Guarded undo/redo refuses invalid legacy Transfer\nlabels or invalid reviewed state; undo to safely unclassified, unpaired records remains allowed.\n\nAfter an uncertain response, inspect saved pairs/history and retain the ENTIRE\nreported intent: exact ordered file, --reviewed choice, original --revision,\n--fingerprint, --request-id, --agent and --batch. Repeat that exact command only;\nsuccessful retries return the original durable receipt after restart, without a\nsecond mutation/history/save. Never retry with fresh intent. Conflicting reuse\nis refused. Unsupported authoritative backends fail before mutation. Paired-transfer\nportable budgets require WHAB 2.81 or newer; older readers refuse them. Help works\noffline. Use match-transfer for one pair with its existing result shape, or\nmatch-transfers for a batch and optional review in the same commit.\n",
       "input": {
         "type": "object",
         "description": "Resolved --file/- JSON pairs and --reviewed choice; execution adds fingerprint from the native preview.",
@@ -6096,29 +6270,203 @@
               {
                 "outId": "fictional-out",
                 "inId": "fictional-in"
+              },
+              {
+                "outId": "zero-a",
+                "inId": "zero-b"
               }
             ],
             "reviewed": true,
             "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
           },
           "output": {
+            "action": "match",
+            "pairCount": 2,
+            "count": 4,
+            "changed": 4,
+            "reviewed": true,
             "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
-            "count": 2,
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in",
+                "crossesBudgetScope": false,
+                "archivedAccounts": []
+              },
+              {
+                "outId": "zero-a",
+                "inId": "zero-b",
+                "crossesBudgetScope": false,
+                "archivedAccounts": []
+              }
+            ],
             "changes": [
               {
                 "id": "fictional-out",
-                "before": {},
+                "before": {
+                  "id": "fictional-out",
+                  "accountId": "fictional-outId",
+                  "accountName": "Fictional outId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 1200,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false
+                },
                 "after": {
-                  "transferPeerId": "fictional-in",
-                  "reviewed": true
+                  "id": "fictional-out",
+                  "accountId": "fictional-outId",
+                  "accountName": "Fictional outId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 1200,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": true,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": true,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false,
+                  "transferPeerId": "fictional-in"
                 }
               },
               {
                 "id": "fictional-in",
-                "before": {},
+                "before": {
+                  "id": "fictional-in",
+                  "accountId": "fictional-inId",
+                  "accountName": "Fictional inId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": -1200,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false
+                },
                 "after": {
-                  "transferPeerId": "fictional-out",
-                  "reviewed": true
+                  "id": "fictional-in",
+                  "accountId": "fictional-inId",
+                  "accountName": "Fictional inId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": -1200,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": true,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": true,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false,
+                  "transferPeerId": "fictional-out"
+                }
+              },
+              {
+                "id": "zero-a",
+                "before": {
+                  "id": "zero-a",
+                  "accountId": "fictional-outId",
+                  "accountName": "Fictional outId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 0,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false
+                },
+                "after": {
+                  "id": "zero-a",
+                  "accountId": "fictional-outId",
+                  "accountName": "Fictional outId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 0,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": true,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": true,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false,
+                  "transferPeerId": "zero-b"
+                }
+              },
+              {
+                "id": "zero-b",
+                "before": {
+                  "id": "zero-b",
+                  "accountId": "fictional-inId",
+                  "accountName": "Fictional inId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 0,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": false,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": false,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false
+                },
+                "after": {
+                  "id": "zero-b",
+                  "accountId": "fictional-inId",
+                  "accountName": "Fictional inId",
+                  "date": "2026-11-01",
+                  "merchant": "  Fictional transfer  ",
+                  "merchantLogo": null,
+                  "amount": 0,
+                  "currency": "USD",
+                  "categoryId": null,
+                  "pending": false,
+                  "reviewed": true,
+                  "note": "[YNAB] exact  ",
+                  "source": "ynab",
+                  "isTransfer": true,
+                  "inferredTransfer": false,
+                  "categoryEdited": false,
+                  "deleted": false,
+                  "transferPeerId": "zero-a"
                 }
               }
             ]
@@ -6138,7 +6486,7 @@
       "retry": "Retain ordered input, review choice, original revision, fingerprint, request ID and history metadata. Exact successful retries return the durable original receipt after restart without repeated changes/history/saves. Never retry uncertainty with a new intent.",
       "availability": "CLI 2.23+, WHAB 2.81+ and native BulkTransferMatching capability. Help and packaged docs work offline.",
       "name": "trnx.transfer-audit",
-      "summary": "A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,\na merchant name or an isolated Transfer category does not prove a pair. A zero\namount imported hint has no directed outflow/inflow; it cannot be paired and\nmust remain unreviewed until explicitly reclassified on independent evidence.\n\nAudit first (read-only):\n  whab \"My budget\" trnx transfer-audit --format table\n  whab \"My budget\" trnx transfer-audit --since 2026-01-01 --until 2026-12-31\n  whab \"My budget\" trnx transfer-audit --offset NEXT --limit 100\nThe inclusive dates select audited transactions. Inspect total/next and keep the\nsame revision across pages; next=null means complete. Default limit 100; no silent\ntruncation. JSON exposes stable IDs, exact saved records and issue reasons.\n\nRepair only explicitly inspected legacy issues:\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --dry-run --agent Codex\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --revision REV --fingerprint HASH --agent Codex\nRepair clears invalid reviewed flags, orphan Transfer classification and invalid\nlinks, as shown by the exact core before/after preview. Include every affected\nmalformed counterpart explicitly. It preserves import hints, identities, amounts,\ndates, merchants (including whitespace), notes, account balances and history.\nIt neither manufactures a missing leg nor guesses a category or counterpart.\nExplicit non-Transfer categories are retained; imported hint evidence cannot\noverride their financial treatment after repair.\nAfter repair, incomplete/zero-value hints stay unreviewed. Inspect trnx list and\nhistory list/show; use match-transfers only for confirmed complete pairs.\nAn already unreviewed hint can appear as unchanged in the exact repair receipt.\n\n1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,\nrevision advancement, durable save and reversible audit entry. One invalid,\nmissing, duplicate or incomplete repair selection rejects the entire operation.\nNo automatic upgrade/read cleanup, bank sync or future matching rule. --batch\ngroups history only; --agent records the audit actor. Normal use is noninteractive.\n\n--dry-run returns exact changes, revision and fingerprint without mutation/save.\nBind a chosen preview with --revision and --fingerprint; otherwise the CLI previews\ncurrent state internally. Stale state or changed fingerprints fail safely. After\nan uncertain result, inspect saved records/history and keep the complete original\nIDs, revision, fingerprint, request ID and actor/batch metadata. Exact successful\nretries return the durable original receipt, including after restart, without\nduplicated changes/history/saves. Never retry with a new intent. Unsupported\nauthorities fail before mutation. JSON is complete; tables show every before/after.\nAll help works offline.\n",
+      "summary": "A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,\na merchant name or an isolated Transfer category does not prove a pair. A zero\namount imported hint has no inferred direction and is excluded from proposals.\nTwo explicitly confirmed existing posted zero entries can be paired. An unpaired\nzero hint stays unreviewed until paired or classified on independent evidence.\n\nAudit first (read-only):\n  whab \"My budget\" trnx transfer-audit --format table\n  whab \"My budget\" trnx transfer-audit --since 2026-01-01 --until 2026-12-31\n  whab \"My budget\" trnx transfer-audit --offset NEXT --limit 100\nThe inclusive dates select audited transactions. Inspect total/next and keep the\nsame revision across pages; next=null means complete. Default limit 100; no silent\ntruncation. JSON exposes stable IDs, exact saved records and issue reasons.\n\nRepair only explicitly inspected legacy issues:\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --dry-run --agent Codex\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --revision REV --fingerprint HASH --agent Codex\nRepair clears invalid reviewed flags, orphan Transfer classification and invalid\nlinks, as shown by the exact core before/after preview. Include every affected\nmalformed counterpart explicitly. It preserves import hints, identities, amounts,\ndates, merchants (including whitespace), notes, account balances and history.\nIt neither manufactures a missing leg nor guesses a category or counterpart.\nExplicit non-Transfer categories are retained; imported hint evidence cannot\noverride their financial treatment after repair.\nAfter repair, unpaired hints (including zero values) stay unreviewed. Inspect trnx list and\nhistory list/show; use match-transfers only for confirmed complete pairs.\nAn already unreviewed hint can appear as unchanged in the exact repair receipt.\nAudit history is permanent; guarded undo/redo refuses to restore invalid legacy\nTransfer labels or invalid reviewed state, including an invalid pre-repair state.\n\n1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,\nrevision advancement, durable save and reversible audit entry. One invalid,\nmissing, duplicate or incomplete repair selection rejects the entire operation.\nNo automatic upgrade/read cleanup, bank sync or future matching rule. --batch\ngroups history only; --agent records the audit actor. Normal use is noninteractive.\n\n--dry-run returns exact changes, revision and fingerprint without mutation/save.\nBind a chosen preview with --revision and --fingerprint; otherwise the CLI previews\ncurrent state internally. Stale state or changed fingerprints fail safely. After\nan uncertain result, inspect saved records/history and keep the complete original\nIDs, revision, fingerprint, request ID and actor/batch metadata. Exact successful\nretries return the durable original receipt, including after restart, without\nduplicated changes/history/saves. Never retry with a new intent. Unsupported\nauthorities fail before mutation. JSON is complete; tables show every before/after.\nAll help works offline.\n",
       "input": {
         "type": "object",
         "description": "Read-only transfer issue pagination and inclusive date bounds.",
@@ -6200,7 +6548,7 @@
       "retry": "Retain ordered input, review choice, original revision, fingerprint, request ID and history metadata. Exact successful retries return the durable original receipt after restart without repeated changes/history/saves. Never retry uncertainty with a new intent.",
       "availability": "CLI 2.23+, WHAB 2.81+ and native BulkTransferMatching capability. Help and packaged docs work offline.",
       "name": "trnx.repair-transfers.preview",
-      "summary": "A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,\na merchant name or an isolated Transfer category does not prove a pair. A zero\namount imported hint has no directed outflow/inflow; it cannot be paired and\nmust remain unreviewed until explicitly reclassified on independent evidence.\n\nAudit first (read-only):\n  whab \"My budget\" trnx transfer-audit --format table\n  whab \"My budget\" trnx transfer-audit --since 2026-01-01 --until 2026-12-31\n  whab \"My budget\" trnx transfer-audit --offset NEXT --limit 100\nThe inclusive dates select audited transactions. Inspect total/next and keep the\nsame revision across pages; next=null means complete. Default limit 100; no silent\ntruncation. JSON exposes stable IDs, exact saved records and issue reasons.\n\nRepair only explicitly inspected legacy issues:\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --dry-run --agent Codex\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --revision REV --fingerprint HASH --agent Codex\nRepair clears invalid reviewed flags, orphan Transfer classification and invalid\nlinks, as shown by the exact core before/after preview. Include every affected\nmalformed counterpart explicitly. It preserves import hints, identities, amounts,\ndates, merchants (including whitespace), notes, account balances and history.\nIt neither manufactures a missing leg nor guesses a category or counterpart.\nExplicit non-Transfer categories are retained; imported hint evidence cannot\noverride their financial treatment after repair.\nAfter repair, incomplete/zero-value hints stay unreviewed. Inspect trnx list and\nhistory list/show; use match-transfers only for confirmed complete pairs.\nAn already unreviewed hint can appear as unchanged in the exact repair receipt.\n\n1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,\nrevision advancement, durable save and reversible audit entry. One invalid,\nmissing, duplicate or incomplete repair selection rejects the entire operation.\nNo automatic upgrade/read cleanup, bank sync or future matching rule. --batch\ngroups history only; --agent records the audit actor. Normal use is noninteractive.\n\n--dry-run returns exact changes, revision and fingerprint without mutation/save.\nBind a chosen preview with --revision and --fingerprint; otherwise the CLI previews\ncurrent state internally. Stale state or changed fingerprints fail safely. After\nan uncertain result, inspect saved records/history and keep the complete original\nIDs, revision, fingerprint, request ID and actor/batch metadata. Exact successful\nretries return the durable original receipt, including after restart, without\nduplicated changes/history/saves. Never retry with a new intent. Unsupported\nauthorities fail before mutation. JSON is complete; tables show every before/after.\nAll help works offline.\n",
+      "summary": "A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,\na merchant name or an isolated Transfer category does not prove a pair. A zero\namount imported hint has no inferred direction and is excluded from proposals.\nTwo explicitly confirmed existing posted zero entries can be paired. An unpaired\nzero hint stays unreviewed until paired or classified on independent evidence.\n\nAudit first (read-only):\n  whab \"My budget\" trnx transfer-audit --format table\n  whab \"My budget\" trnx transfer-audit --since 2026-01-01 --until 2026-12-31\n  whab \"My budget\" trnx transfer-audit --offset NEXT --limit 100\nThe inclusive dates select audited transactions. Inspect total/next and keep the\nsame revision across pages; next=null means complete. Default limit 100; no silent\ntruncation. JSON exposes stable IDs, exact saved records and issue reasons.\n\nRepair only explicitly inspected legacy issues:\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --dry-run --agent Codex\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --revision REV --fingerprint HASH --agent Codex\nRepair clears invalid reviewed flags, orphan Transfer classification and invalid\nlinks, as shown by the exact core before/after preview. Include every affected\nmalformed counterpart explicitly. It preserves import hints, identities, amounts,\ndates, merchants (including whitespace), notes, account balances and history.\nIt neither manufactures a missing leg nor guesses a category or counterpart.\nExplicit non-Transfer categories are retained; imported hint evidence cannot\noverride their financial treatment after repair.\nAfter repair, unpaired hints (including zero values) stay unreviewed. Inspect trnx list and\nhistory list/show; use match-transfers only for confirmed complete pairs.\nAn already unreviewed hint can appear as unchanged in the exact repair receipt.\nAudit history is permanent; guarded undo/redo refuses to restore invalid legacy\nTransfer labels or invalid reviewed state, including an invalid pre-repair state.\n\n1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,\nrevision advancement, durable save and reversible audit entry. One invalid,\nmissing, duplicate or incomplete repair selection rejects the entire operation.\nNo automatic upgrade/read cleanup, bank sync or future matching rule. --batch\ngroups history only; --agent records the audit actor. Normal use is noninteractive.\n\n--dry-run returns exact changes, revision and fingerprint without mutation/save.\nBind a chosen preview with --revision and --fingerprint; otherwise the CLI previews\ncurrent state internally. Stale state or changed fingerprints fail safely. After\nan uncertain result, inspect saved records/history and keep the complete original\nIDs, revision, fingerprint, request ID and actor/batch metadata. Exact successful\nretries return the durable original receipt, including after restart, without\nduplicated changes/history/saves. Never retry with a new intent. Unsupported\nauthorities fail before mutation. JSON is complete; tables show every before/after.\nAll help works offline.\n",
       "input": {
         "type": "object",
         "description": "Explicit repair IDs and exact fingerprint from --dry-run or internal preview.",
@@ -6296,7 +6644,7 @@
       "retry": "Retain ordered input, review choice, original revision, fingerprint, request ID and history metadata. Exact successful retries return the durable original receipt after restart without repeated changes/history/saves. Never retry uncertainty with a new intent.",
       "availability": "CLI 2.23+, WHAB 2.81+ and native BulkTransferMatching capability. Help and packaged docs work offline.",
       "name": "trnx.repair-transfers",
-      "summary": "A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,\na merchant name or an isolated Transfer category does not prove a pair. A zero\namount imported hint has no directed outflow/inflow; it cannot be paired and\nmust remain unreviewed until explicitly reclassified on independent evidence.\n\nAudit first (read-only):\n  whab \"My budget\" trnx transfer-audit --format table\n  whab \"My budget\" trnx transfer-audit --since 2026-01-01 --until 2026-12-31\n  whab \"My budget\" trnx transfer-audit --offset NEXT --limit 100\nThe inclusive dates select audited transactions. Inspect total/next and keep the\nsame revision across pages; next=null means complete. Default limit 100; no silent\ntruncation. JSON exposes stable IDs, exact saved records and issue reasons.\n\nRepair only explicitly inspected legacy issues:\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --dry-run --agent Codex\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --revision REV --fingerprint HASH --agent Codex\nRepair clears invalid reviewed flags, orphan Transfer classification and invalid\nlinks, as shown by the exact core before/after preview. Include every affected\nmalformed counterpart explicitly. It preserves import hints, identities, amounts,\ndates, merchants (including whitespace), notes, account balances and history.\nIt neither manufactures a missing leg nor guesses a category or counterpart.\nExplicit non-Transfer categories are retained; imported hint evidence cannot\noverride their financial treatment after repair.\nAfter repair, incomplete/zero-value hints stay unreviewed. Inspect trnx list and\nhistory list/show; use match-transfers only for confirmed complete pairs.\nAn already unreviewed hint can appear as unchanged in the exact repair receipt.\n\n1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,\nrevision advancement, durable save and reversible audit entry. One invalid,\nmissing, duplicate or incomplete repair selection rejects the entire operation.\nNo automatic upgrade/read cleanup, bank sync or future matching rule. --batch\ngroups history only; --agent records the audit actor. Normal use is noninteractive.\n\n--dry-run returns exact changes, revision and fingerprint without mutation/save.\nBind a chosen preview with --revision and --fingerprint; otherwise the CLI previews\ncurrent state internally. Stale state or changed fingerprints fail safely. After\nan uncertain result, inspect saved records/history and keep the complete original\nIDs, revision, fingerprint, request ID and actor/batch metadata. Exact successful\nretries return the durable original receipt, including after restart, without\nduplicated changes/history/saves. Never retry with a new intent. Unsupported\nauthorities fail before mutation. JSON is complete; tables show every before/after.\nAll help works offline.\n",
+      "summary": "A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,\na merchant name or an isolated Transfer category does not prove a pair. A zero\namount imported hint has no inferred direction and is excluded from proposals.\nTwo explicitly confirmed existing posted zero entries can be paired. An unpaired\nzero hint stays unreviewed until paired or classified on independent evidence.\n\nAudit first (read-only):\n  whab \"My budget\" trnx transfer-audit --format table\n  whab \"My budget\" trnx transfer-audit --since 2026-01-01 --until 2026-12-31\n  whab \"My budget\" trnx transfer-audit --offset NEXT --limit 100\nThe inclusive dates select audited transactions. Inspect total/next and keep the\nsame revision across pages; next=null means complete. Default limit 100; no silent\ntruncation. JSON exposes stable IDs, exact saved records and issue reasons.\n\nRepair only explicitly inspected legacy issues:\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --dry-run --agent Codex\n  whab \"My budget\" trnx repair-transfers TX1 TX2 --revision REV --fingerprint HASH --agent Codex\nRepair clears invalid reviewed flags, orphan Transfer classification and invalid\nlinks, as shown by the exact core before/after preview. Include every affected\nmalformed counterpart explicitly. It preserves import hints, identities, amounts,\ndates, merchants (including whitespace), notes, account balances and history.\nIt neither manufactures a missing leg nor guesses a category or counterpart.\nExplicit non-Transfer categories are retained; imported hint evidence cannot\noverride their financial treatment after repair.\nAfter repair, unpaired hints (including zero values) stay unreviewed. Inspect trnx list and\nhistory list/show; use match-transfers only for confirmed complete pairs.\nAn already unreviewed hint can appear as unchanged in the exact repair receipt.\nAudit history is permanent; guarded undo/redo refuses to restore invalid legacy\nTransfer labels or invalid reviewed state, including an invalid pre-repair state.\n\n1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,\nrevision advancement, durable save and reversible audit entry. One invalid,\nmissing, duplicate or incomplete repair selection rejects the entire operation.\nNo automatic upgrade/read cleanup, bank sync or future matching rule. --batch\ngroups history only; --agent records the audit actor. Normal use is noninteractive.\n\n--dry-run returns exact changes, revision and fingerprint without mutation/save.\nBind a chosen preview with --revision and --fingerprint; otherwise the CLI previews\ncurrent state internally. Stale state or changed fingerprints fail safely. After\nan uncertain result, inspect saved records/history and keep the complete original\nIDs, revision, fingerprint, request ID and actor/batch metadata. Exact successful\nretries return the durable original receipt, including after restart, without\nduplicated changes/history/saves. Never retry with a new intent. Unsupported\nauthorities fail before mutation. JSON is complete; tables show every before/after.\nAll help works offline.\n",
       "input": {
         "type": "object",
         "description": "Explicit repair IDs and exact fingerprint from --dry-run or internal preview.",

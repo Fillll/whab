@@ -5,13 +5,14 @@ from copy import deepcopy
 import pytest
 
 from whab.domain import commands
-from whab.domain.budget import calculate_workspace
+from whab.domain.budget import calculate_workspace, ensure_assignment_allowed
 from whab.domain.categories import classify_category
 from whab.domain.errors import StoreError
 from whab.domain.ledger_state import initial_state
 from whab.domain.review import review_status
 from whab.domain.transfer_matching import (
     audit,
+    candidates,
     plan,
     plan_many,
     repair_plan,
@@ -126,7 +127,7 @@ def test_new_orphan_transfer_category_and_review_rejected_but_legacy_auditable()
     assert result['issues'][0]['code'] == 'missing_pair'
 
 
-def test_zero_value_hint_is_explicitly_unreviewed_and_repair_preserves_evidence():
+def test_unpaired_zero_value_hint_is_unreviewed_and_repair_preserves_evidence():
     state = state_for_pairs()
     row = state['transactions']['out-0']
     row.update(amount=0, categoryId='transfer', reviewed=True)
@@ -140,7 +141,7 @@ def test_zero_value_hint_is_explicitly_unreviewed_and_repair_preserves_evidence(
     after = state['transactions'][row['id']]
     assert after['amount'] == 0 and after['note'] == row['note'] and after['merchant'] == row['merchant']
     assert after['inferredTransfer'] and after['isTransfer'] and not after['reviewed'] and after['categoryId'] is None
-    with pytest.raises(StoreError, match='Zero-value'):
+    with pytest.raises(StoreError, match='both IDs must identify existing posted zero-value'):
         plan_many(state, pairs(1))
 
 
@@ -198,6 +199,26 @@ def test_cross_scope_credit_paydown_never_creates_cash_from_overpayment(credit_b
     assert summary['transferFunding'] == expected
     assert summary['income'] == summary['spent'] == 0
     assert summary['readyToAssign'] == -max(0, credit_balance)
+
+
+@pytest.mark.parametrize('credit_balance', [5000, -5000])
+def test_unknown_credit_pair_cannot_unlock_spendable_funding_or_assignments(credit_balance):
+    state = state_for_pairs()
+    state['accounts']['cash']['onBudget'] = False
+    state['accounts']['other'].update(type='credit', subtype='credit_card', balance=credit_balance,
+                                      balanceUnknown=True, stale=True)
+    original_accounts = deepcopy(state['accounts'])
+    preview = plan_many(state, pairs(1))
+    plan_many(state, pairs(1), fingerprint=preview['fingerprint'], apply=True)
+    assert state['accounts'] == original_accounts
+    for month in ['2026-10', '2026-11']:
+        summary = calculate_workspace(state, month)['summary']
+        assert summary['readyToAssign'] <= 0
+        assert summary['fundingCapacity'] <= 0
+        with pytest.raises(StoreError, match='unknown credit account balances'):
+            ensure_assignment_allowed(state, 'expense', month, 1, month)
+    assert calculate_workspace(state, '2026-10')['summary']['transferFunding'] > 0
+    assert state['budget'] == {}
 
 
 def test_same_scope_and_unverified_cash_do_not_create_transfer_funding():
@@ -339,3 +360,154 @@ def test_repair_preserves_explicit_nontransfer_classification_and_original_hint(
     assert repaired['inferredTransfer'] is True
     assert review_status(repaired, state['categories'], transactions=state['transactions'], accounts=state['accounts'])['eligible']
     assert not any(issue['id'] == row['id'] for issue in audit(state)['issues'])
+
+
+@pytest.mark.parametrize('legacy_category', [None, 'transfer'])
+def test_pair_undo_cannot_restore_orphan_transfer_label_but_unclassified_undo_is_safe(legacy_category):
+    from whab.domain.history import apply_to_state, financial
+    from whab.domain.ledger_state import portable_snapshot
+    state = state_for_pairs()
+    for category in state['categories'].values():
+        category['currency'] = 'USD'
+    for row in state['transactions'].values():
+        row['merchantLogo'] = None
+    state['transactions']['out-0']['categoryId'] = legacy_category
+    original = deepcopy(state)
+    wanted = financial(portable_snapshot(state))
+    plan_many(state, pairs(1), apply=True)
+    if legacy_category is not None:
+        matched = deepcopy(state)
+        with pytest.raises(StoreError, match='Transfer category without exactly two valid legs'):
+            apply_to_state(state, wanted)
+        assert state == matched
+    else:
+        apply_to_state(state, wanted)
+        assert state['transactions'] == original['transactions']
+        assert all(not row['reviewed'] and not row.get('transferPeerId') for row in state['transactions'].values())
+
+
+@pytest.mark.parametrize('bulk', [False, True])
+@pytest.mark.parametrize('reverse_ids', [False, True])
+def test_existing_zero_pairs_require_explicit_ids_preserve_evidence_and_can_be_reviewed(bulk, reverse_ids):
+    state = state_for_pairs()
+    state['accounts']['other'].update(onBudget=False, closed=True, stale=True, balanceUnknown=True)
+    for row in state['transactions'].values():
+        row.update(amount=0, original={'importedMerchant': row['merchant'], 'importedAmount': 0})
+    before = deepcopy(state)
+    identifiers = ['in-0', 'out-0'] if reverse_ids else ['out-0', 'in-0']
+    assert all(issue['code'] == 'zero_amount' for issue in audit(state)['issues'])
+    assert candidates(state['accounts'], list(state['transactions'].values()), {}, categories=state['categories'])['total'] == 0
+    if bulk:
+        explicit = [{'outId': identifiers[0], 'inId': identifiers[1]}]
+        preview = plan_many(state, explicit, reviewed=True)
+        assert state == before
+        result = plan_many(state, explicit, reviewed=True, fingerprint=preview['fingerprint'], apply=True)
+    else:
+        preview = plan(state, identifiers)
+        assert state == before
+        result = plan(state, identifiers, fingerprint=preview['fingerprint'], apply=True)
+        assert all(not row['reviewed'] for row in state['transactions'].values())
+    assert result == preview
+    assert state['accounts'] == before['accounts'] and state['budget'] == before['budget']
+    assert state['transactions'].keys() == before['transactions'].keys()
+    assert [change['id'] for change in result['changes']] == identifiers
+    for identifier, row in state['transactions'].items():
+        assert valid_pair(row, state['transactions'], state['accounts'], state['categories'])
+        assert {key: value for key, value in row.items() if key not in {'transferPeerId', 'reviewed'}} == {
+            key: value for key, value in before['transactions'][identifier].items() if key != 'reviewed'}
+        assert row['reviewed'] is bulk
+        assert review_status(row, state['categories'], transactions=state['transactions'], accounts=state['accounts'])['eligible']
+        commands.edit_transaction(state, identifier, category_id='transfer', reviewed=True)
+    assert not audit(state)['issues']
+    assert all(row['reviewed'] and row['amount'] == 0 for row in state['transactions'].values())
+    summary = calculate_workspace(state, '2026-10')['summary']
+    assert summary['transferFunding'] == summary['income'] == summary['spent'] == 0
+
+
+def test_mixed_zero_and_nonzero_batch_preserves_unaddressed_rows_and_exact_fingerprint():
+    state = state_for_pairs(3)
+    for identifier in ['out-1', 'in-1']:
+        state['transactions'][identifier]['amount'] = 0
+    state['transactions']['out-2'].update(categoryId='expense', isTransfer=False, reviewed=True)
+    before = deepcopy(state)
+    explicit = pairs(2)
+    preview = plan_many(state, explicit, reviewed=True)
+    state['transactions']['in-1']['note'] += ' Later imported evidence'
+    changed = deepcopy(state)
+    with pytest.raises(StoreError, match='changed'):
+        plan_many(state, explicit, reviewed=True, fingerprint=preview['fingerprint'], apply=True)
+    assert state == changed
+    state = deepcopy(before)
+    plan_many(state, explicit, reviewed=True, fingerprint=preview['fingerprint'], apply=True)
+    assert state['transactions'].keys() == before['transactions'].keys()
+    assert state['transactions']['out-2'] == before['transactions']['out-2']
+    assert state['transactions']['in-2'] == before['transactions']['in-2']
+    assert state['accounts'] == before['accounts']
+    assert all(state['transactions'][identifier]['reviewed'] for pair in explicit for identifier in pair.values())
+    assert all(state['transactions'][identifier]['amount'] == 0 for identifier in ['out-1', 'in-1'])
+    zero_receipt = [row for row in preview['changes'] if row['id'] in {'out-1', 'in-1'}]
+    assert len(zero_receipt) == 2 and all(row['before']['amount'] == row['after']['amount'] == 0 for row in zero_receipt)
+    confirmed = deepcopy(state)
+    with pytest.raises(StoreError, match='already matched'):
+        plan_many(state, explicit, reviewed=True, fingerprint=preview['fingerprint'], apply=True)
+    assert state == confirmed
+
+
+@pytest.mark.parametrize('invalid', ['one_nonzero', 'same_account', 'currency', 'pending', 'deleted', 'third_reference', 'duplicate'])
+def test_invalid_explicit_zero_pair_rolls_back_entire_mixed_batch(invalid):
+    state = state_for_pairs(3)
+    for identifier in ['out-1', 'in-1']:
+        state['transactions'][identifier]['amount'] = 0
+    explicit = pairs(2)
+    if invalid == 'one_nonzero':
+        state['transactions']['in-1']['amount'] = -1
+    elif invalid == 'same_account':
+        state['transactions']['in-1']['accountId'] = 'cash'
+    elif invalid == 'currency':
+        state['accounts']['foreign'] = {**state['accounts']['other'], 'id': 'foreign', 'currency': 'EUR'}
+        state['transactions']['in-1']['accountId'] = 'foreign'
+    elif invalid in {'pending', 'deleted'}:
+        state['transactions']['in-1'][invalid] = True
+    elif invalid == 'third_reference':
+        state['transactions']['out-2']['transferPeerId'] = 'in-1'
+    else:
+        explicit[1]['outId'] = 'out-0'
+    before = deepcopy(state)
+    with pytest.raises(StoreError):
+        plan_many(state, explicit, reviewed=True, apply=True)
+    assert state == before
+
+
+def test_zero_pairs_stay_out_of_automatic_proposals_in_a_mixed_history():
+    state = state_for_pairs(2)
+    for identifier in ['out-1', 'in-1']:
+        state['transactions'][identifier]['amount'] = 0
+    result = candidates(state['accounts'], list(state['transactions'].values()), {}, categories=state['categories'])
+    assert result['total'] == 1
+    assert result['candidates'][0]['transactionIds'] == ['out-0', 'in-0']
+
+
+def test_zero_pair_history_undo_redo_remain_guarded_and_change_no_money():
+    from whab.domain.history import apply_to_state, financial
+    from whab.domain.ledger_state import portable_snapshot
+    state = state_for_pairs()
+    for category in state['categories'].values():
+        category['currency'] = 'USD'
+    for row in state['transactions'].values():
+        row.update(amount=0, merchantLogo=None)
+    unpaired = financial(portable_snapshot(state))
+    original_accounts = deepcopy(unpaired['accounts'])
+    plan_many(state, pairs(1), reviewed=True, apply=True)
+    paired = financial(portable_snapshot(state))
+    apply_to_state(state, unpaired)
+    assert all(not row['reviewed'] and not row.get('transferPeerId') for row in state['transactions'].values())
+    apply_to_state(state, paired)
+    assert all(row['reviewed'] and row['amount'] == 0 for row in state['transactions'].values())
+    assert not audit(state)['issues'] and financial(portable_snapshot(state))['accounts'] == original_accounts
+    assert calculate_workspace(state, '2026-10')['summary']['transferFunding'] == 0
+    # The same new-orphan rule applies even though both amounts are zero.
+    orphan = deepcopy(paired)
+    orphan['transactions'][0].pop('transferPeerId')
+    with pytest.raises(StoreError):
+        apply_to_state(state, orphan)
+    assert financial(portable_snapshot(state)) == paired

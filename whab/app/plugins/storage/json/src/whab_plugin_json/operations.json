@@ -3591,7 +3591,7 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, zero-value, wrongly directed, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. No implicit counterpart selection or batch splitting.",
+        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
         "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
         "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
       ],
@@ -3629,7 +3629,7 @@
               "additionalProperties": false,
               "description": "Explicit pair identities and preserved account context."
             },
-            "description": "Explicit directed disjoint pairs. outId is a positive-minor-unit outflow and inId its equal negative inflow; every ID may occur only once."
+            "description": "Explicit disjoint pairs. For nonzero amounts, outId is a positive-minor-unit outflow and inId its equal negative inflow. Two existing zero-valued records may be explicitly paired without inferring direction; every ID occurs only once."
           },
           "reviewed": {
             "type": "boolean",
@@ -3784,7 +3784,7 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, zero-value, wrongly directed, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. No implicit counterpart selection or batch splitting.",
+        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
         "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
         "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
       ],
@@ -3822,7 +3822,7 @@
               "additionalProperties": false,
               "description": "Explicit pair identities and preserved account context."
             },
-            "description": "Explicit directed disjoint pairs. outId is a positive-minor-unit outflow and inId its equal negative inflow; every ID may occur only once."
+            "description": "Explicit disjoint pairs. For nonzero amounts, outId is a positive-minor-unit outflow and inId its equal negative inflow. Two existing zero-valued records may be explicitly paired without inferring direction; every ID occurs only once."
           },
           "reviewed": {
             "type": "boolean",
@@ -3977,14 +3977,14 @@
           }
         }
       ],
-      "side_effects": "One native transaction, one revision advancement, one coherent audit entry, one receipt and one synchronous durable checkpoint. Optional reviewed=true reviews both legs in that same commit. No bank synchronization."
+      "side_effects": "One native transaction, one revision advancement, one coherent audit entry, one receipt and one synchronous durable checkpoint. Optional reviewed=true reviews both legs in that same commit. Paired records or retained pair history require native format 5 and portable payload version 2; older readers refuse these financial semantics. No bank synchronization."
     },
     {
       "kind": "sdk",
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, zero-value, wrongly directed, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. No implicit counterpart selection or batch splitting.",
+        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
         "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
         "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
       ],
@@ -4114,7 +4114,7 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, zero-value, wrongly directed, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. No implicit counterpart selection or batch splitting.",
+        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
         "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
         "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
       ],
@@ -4244,21 +4244,21 @@
           }
         }
       ],
-      "side_effects": "One guarded atomic commit/save with complete audit and receipt. Does not create counterparts or delete transactions; undo is refused when it would recreate invalid reviewed/Transfer state."
+      "side_effects": "One guarded atomic commit/save with complete audit and receipt. Does not create counterparts or delete transactions; undo is refused when it would recreate invalid reviewed/Transfer state. Native format 5 and portable payload version 2 remain required while paired before/after history is retained."
     },
     {
       "kind": "sdk",
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, zero-value, wrongly directed, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. No implicit counterpart selection or batch splitting.",
+        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
         "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
         "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
       ],
       "retry": "Read-only previews/audits may be repeated. Exact successful writes reuse operation, payload, revision, request ID and history metadata and return the original durable receipt after restart without another commit/save. Never retry an uncertain write as a new intent.",
       "availability": "WHAB 2.81+, SQLite 1.29+ or JSON 1.21+. Strict pairing/review uses TransferIntegrity; the authority must advertise the complete capability.",
       "name": "TransferIntegrity.transfer_audit",
-      "summary": "Read a complete explicitly paginated transfer-integrity audit, including legacy reviewed orphans and zero-value imported hints. A zero amount has no directed opposite legs and stays unreviewed.",
+      "summary": "Read a complete explicitly paginated transfer-integrity audit, including legacy reviewed orphans and zero-value imported hints. An unpaired zero hint stays unreviewed; two existing zero records can be explicitly confirmed together without creating rows or inferring direction.",
       "input": {
         "type": "object",
         "properties": {
@@ -4337,7 +4337,7 @@
             "issues": [],
             "total": 0,
             "next": null,
-            "zeroValuePolicy": "A zero-value hint cannot form a directed pair and must remain unreviewed."
+            "zeroValuePolicy": "Existing posted zero entries may be explicitly paired across different same-currency accounts and then reviewed. Unpaired zero hints remain unreviewed; no entries or direction are invented."
           }
         }
       ],
@@ -4348,7 +4348,7 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, zero-value, wrongly directed, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. No implicit counterpart selection or batch splitting.",
+        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
         "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
         "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
       ],
@@ -4380,7 +4380,7 @@
       "permissions": "Optional public host-scoped SDK callback. Mutations use guarded native recorded_command operations with actor/batch attribution, permanent before/after history and durable receipts.",
       "scope": "One budget/environment/workspace. Pairs never cross currencies or budgets; current account scope and closed status are preserved.",
       "errors": [
-        "Invalid, missing, deleted, pending, zero-value, wrongly directed, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. No implicit counterpart selection or batch splitting.",
+        "Invalid, missing, deleted, pending, wrongly directed nonzero, unequal or duplicate legs, existing links or shared counterparts reject the whole batch before mutation. Zero-valued pairs require two already saved zero records explicitly selected together; no zero rows are created or suggested. No implicit counterpart selection or batch splitting.",
         "A stale revision/fingerprint, conflicting request reuse, unsupported backend, external-write or uncertain-save state refuses mutation through the public guarded host.",
         "Repair requires every linked invalid counterpart explicitly; it never invents a leg or reviews a hint."
       ],

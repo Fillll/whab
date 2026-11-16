@@ -10,7 +10,7 @@ from .store import Store
 
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
-_FORMAT_VERSION = 1
+_FORMAT_VERSION = 2
 _ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized", "tx_uncategorized_recent", "tx_transfer_peer")
 _ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000, "transaction_receipts": 10000, "budget_history": 1}
 
@@ -67,6 +67,12 @@ def _build_image(raw, previous, journal, hints):
     clean = sqlite3.connect(':memory:')
     try:
         clean.deserialize(raw)
+        if any(row is not None and row.get('transferPeerId') for entry in changes
+               for change in entry['changes'] if change['path'][0] == 'transactions'
+               for row in (change['before'], change['after'])):
+            # Fence the first pairing even when its save uses only bounded
+            # record deltas against a previously exported format-1 image.
+            clean.execute(f"PRAGMA user_version={_FORMAT_VERSION}")
         for entry in changes:
             for change in entry['changes']:
                 row = change['after']
@@ -214,7 +220,8 @@ def export_files(store, workspace):
             from .history_writes import save_history
             save_history(clean, 'personal', snapshot['history'], None, cache_valid=False)
         clean.db.execute("VACUUM")
-        clean.db.execute(f"PRAGMA user_version={_FORMAT_VERSION}")
+        from .transfer_pairs import retains_pairs
+        clean.db.execute(f"PRAGMA user_version={_FORMAT_VERSION if retains_pairs(snapshot) else 1}")
         raw = clean.db.serialize()
         if len(raw) > MAX_DATABASE_BYTES and snapshot.get('history'):
             clean.db.execute("UPDATE budget_history SET record=? WHERE workspace='personal'", (json.dumps(snapshot['history'], separators=(',', ':')),))
@@ -341,7 +348,7 @@ def read_files(files, *, with_receipts=False):
             raise StoreError("This SQLite budget has an unsupported database schema.")
         normalized_schema = [row for row in actual_schema if row[1] not in optional_indexes]
         if (
-            reader.db.execute("PRAGMA user_version").fetchone()[0] != _FORMAT_VERSION
+            reader.db.execute("PRAGMA user_version").fetchone()[0] not in {1, _FORMAT_VERSION}
             or _without_additive_columns(normalized_schema) not in compatible_schemas
         ):
             raise StoreError("This SQLite budget has an unsupported database schema.")

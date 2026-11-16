@@ -306,10 +306,12 @@ See [CLI examples, JSON fields and dry-run](../../interface/cli/README.md#atomic
 
 ## Reviewed transfer matching
 
-WHAB 2.74 introduces optional public `TransferMatching` SDK capability. The financial
-core owns equal nonzero opposite amounts, same currency and budget scope, distinct
-active accounts, posted/nondeleted/uncategorized eligibility and the seven-day date
-window. Deterministic proposals are read-only and preserve every ambiguous alternative;
+WHAB 2.74 introduced the optional public `TransferMatching` SDK capability.
+Current financial rules require equal opposite amounts, same currency, distinct
+accounts, posted/nondeleted eligibility and the seven-day date window. Existing
+Transfer categories are allowed; other classifications must be resolved first.
+Closed accounts and differing current budget scopes are supported. Explicit
+confirmation may pair two existing zero-valued records; suggestions omit zeros. Deterministic proposals are read-only and preserve every ambiguous alternative;
 merchant names and provider hints never prove a pair. Date/account filters select an
 anchor; its counterpart may lie outside those filters. Pagination returns total/next;
 over 1,000 candidates requires narrower filters. No initial-page background scan runs.
@@ -320,7 +322,7 @@ CLI `trnx transfers`, `match-transfer --dry-run`, `match-transfer` and `unmatch-
 use the same public operations. Neither matching nor unmatching reviews a transaction:
 both become unreviewed for the normal review workflow. No bank synchronization or
 persistent future rule is created. Refunds may look identical and require judgment.
-Cross-currency, fees/splits and cross-budget-scope transfers need manual handling.
+Cross-currency and unequal fees/splits require separate explicit handling.
 
 Confirmation uses an observed revision and fingerprint, one native operation, one
 reversible before/after audit entry, one durable receipt and one synchronous checkpoint.
@@ -525,7 +527,10 @@ The optional public `TransferIntegrity` capability adds read-only
 A batch contains 1–100 explicit `{"outId": "fictional-out",
 "inId": "fictional-in"}` pairs: every transaction ID is distinct,
 outflows are positive integer minor units, inflows negative, and paired amounts
-are equal and opposite. Both records must be posted, nondeleted, in different
+are equal and opposite. Two already saved zero-valued records can also be paired
+explicitly: the ID slots identify both records without inventing a direction or
+amount. No zero-valued record is created, and automatic suggestions omit zeros.
+Both records must be posted, nondeleted, in different
 accounts of the same currency and at most seven calendar days apart. Existing
 links, any incoming third leg, invalid categories or one invalid pair reject the
 whole batch before the first write. No counterpart is guessed and no oversized
@@ -548,8 +553,8 @@ reciprocal exactly-two-leg pair. Imported flags remain evidence only.
 
 `transfer_audit(workspace, parameters)` is read only, with inclusive `since`/`until`
 and explicit `offset`/`limit` pagination. It reports invalid, missing or shared
-links, orphan Transfer categories and zero-value imported hints. Zero-value hints
-have no directed opposite pair and must stay unreviewed. Nothing is repaired on
+links, orphan Transfer categories and unpaired zero-value imported hints. A zero
+hint stays unreviewed until an explicit valid existing zero-zero pair is confirmed. Nothing is repaired on
 read or open. `preview_transfer_repair(workspace, transaction_ids)` and guarded
 `repair_transfers(workspace, transaction_ids, fingerprint)` repair 1–200 explicit
 invalid rows by clearing invalid links/Transfer classification and leaving them
@@ -562,3 +567,20 @@ Native format 5 fences older readers once paired transfers are retained in curre
 state or audit history. The floor never decreases after undo/unmatching and is
 retained by saved-file and complete local restoration. Existing older native
 ledgers remain readable for explicit audit; opening them does not repair records.
+
+Saved `.whab` files also fence older financial interpretations: their sanitized
+SQLite payload uses `PRAGMA user_version=2` while pairs remain in current records
+or permanent history, including after undo/unmatching. The first bounded pairing
+updates this header in the prepared image without rebuilding unrelated history.
+Pair-free legacy payloads remain version 1; this plugin reads both versions.
+Older plugins reject version 2 before restoring records into the destination.
+Plugin `state_version=1` remains unchanged because settings, state and ledger
+record schemas are unchanged; the payload header declares the required financial
+interpretation, independently of namespace migrations and native authority format.
+
+Reproduce legacy acceptance and paired/history-only rejection using genuine
+WHAB 2.80.0 source from local Git history, with fictional saved containers only:
+
+```sh
+.venv/bin/python plugins/storage/sqlite/scripts/check_transfer_portable_compatibility.py
+```

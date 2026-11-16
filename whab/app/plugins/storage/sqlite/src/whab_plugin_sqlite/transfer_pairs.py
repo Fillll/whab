@@ -6,7 +6,9 @@ from whab.domain.transfer_matching import audit, plan_many, repair_plan, validat
 def retains_pairs(state):
     """Fence older native readers, including pairs retained only by audit history."""
     journal = state.get('history') or {}
-    return (any(row.get('transferPeerId') for row in state['transactions'].values())
+    transactions = state['transactions']
+    rows = transactions.values() if isinstance(transactions, dict) else transactions
+    return (any(row.get('transferPeerId') for row in rows)
             or any(row.get('transferPeerId') for row in journal.get('baseline', {}).get('transactions', ()))
             or any(row is not None and row.get('transferPeerId') for entry in journal.get('entries', ())
                    for change in entry['changes'] if change['path'][0] == 'transactions'

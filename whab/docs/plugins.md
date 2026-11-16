@@ -1320,8 +1320,12 @@ Worker RPC and supported HTTPS transports carry the same public operations.
 ## Reviewed transfer matching
 
 WHAB 2.81 adds `TransferIntegrity` alongside the existing `TransferMatching` SDK.
-The domain requires exactly two reciprocal nondeleted, posted legs, equal nonzero
+The domain requires exactly two reciprocal nondeleted, posted legs, equal
 opposite amounts, different accounts of one currency, and dates within seven days.
+Two existing posted zero-value records can be explicitly paired; their zero amounts,
+identities, dates, notes, import provenance and account balances remain unchanged.
+Suggestions continue to exclude zeros. Ordinary creation/correction guards remain
+nonzero: matching does not manufacture a leg, amount or direction.
 No third record may claim either leg. A Transfer category or imported bank hint
 alone is not a complete transfer and cannot qualify for review. New orphan Transfer
 classification is rejected; legacy records remain readable until explicit repair.
@@ -1349,7 +1353,9 @@ limits. The optional SDK methods are:
 The public host query `preview_transfer_matches` takes `pairs` and optional
 `reviewed`; command `match_transfers` additionally requires its exact fingerprint.
 Pairs are an ordered array of `{outId, inId}` stable IDs. OUT is a positive internal
-minor-unit amount, IN negative. All 1–100 pairs must be explicit and disjoint; any
+minor-unit amount, IN negative. For two existing zero-value records, these keys
+only identify the first and second leg; no financial direction is inferred.
+All 1–100 pairs must be explicit and disjoint; any
 invalid pair rejects the entire operation. `reviewed=true` is an explicit request to
 review both legs of every valid pair in that same commit, not automatic inference.
 The receipt has `pairCount`, `count`, `changed`, `reviewed`, `fingerprint`, exact
@@ -1366,12 +1372,19 @@ receipt without another history entry, mutation or save, including after restart
 An unknown outcome never authorizes a fresh intent. `--batch` groups history only.
 Native format 5 preserves the stricter transfer semantics, including retained
 history, and older readers must fail rather than reinterpret supported pairs.
+SQLite and JSON portable payloads use format 2 when current records or retained
+history contain pairs, including the first pairing saved through an incremental
+checkpoint. Current readers accept both formats; genuine older readers refuse
+format 2 before replacing destination data. The plugin namespace/state schema
+remains version 1 because no record migration is required.
 
 `transfer_audit` is read-only with inclusive since/until bounds and explicit
 offset/limit/total/next pagination. It reports unmatched imported hints, invalid
 reciprocal graphs, orphan Transfer classification and legacy invalid review states.
-Zero-value hints have no direction, cannot pair and stay unreviewed until a deliberate
-non-transfer reclassification. They are never omitted from the audit.
+Unpaired zero-value hints have no direction and stay unreviewed until their two
+existing counterparts are explicitly paired or deliberately reclassified. They are
+never omitted from the audit. A verified zero-value pair can be reviewed and is not
+reported as invalid merely because its amounts are zero.
 `preview_transfer_repair` and `repair_transfers` accept 1–200 explicit transaction IDs;
 the command also requires its fingerprint. Repair removes invalid links and orphan
 Transfer classification and clears invalid review while retaining imported hints,
@@ -1484,7 +1497,7 @@ records, `--type` in CLI). Missing kind remains Expense. Income and Transfer hav
 no expense target or assignment rows. Transfer is explicit account movement,
 excluded from ordinary income/spending without changing account balances. Since
 WHAB 2.81, Transfer classification requires a complete reciprocal pair: equal
-nonzero opposite posted amounts, different same-currency accounts and dates within
+opposite posted amounts (including two explicitly selected existing zero records), different same-currency accounts and dates within
 seven days. Closed historical accounts and differing current scopes are supported.
 Single matching leaves both unreviewed; atomic bulk matching can explicitly review
 both legs with --reviewed.

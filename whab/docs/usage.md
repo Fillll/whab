@@ -342,8 +342,11 @@ current browser session and offers an explicit retry of the same request.
 
 Use `whab "My budget" trnx transfers` to inspect suggestions. Merchant text and bank
 hints do not prove a transfer. A valid transfer has exactly two reciprocal posted
-legs, equal nonzero opposite amounts in different accounts of one currency, and
+legs, equal opposite amounts in different accounts of one currency, and
 transaction dates no more than seven days apart. Review requires a valid pair.
+Two existing posted zero-value records can also be explicitly selected as a pair;
+their IDs, zero amounts and imported information stay unchanged. Suggestions do
+not infer zero-value pairs. No new entries or financial direction are invented.
 Closed historical accounts and different current budget scopes are supported
 without changing the accounts. Income and expenses remain separate classifications.
 
@@ -370,9 +373,11 @@ preview, retain the returned revision and fingerprint with `--revision` and
 those values to retry an uncertain save. Read command `--help` for full receipt,
 retry, stdin and explicit repair examples. `--batch` remains history grouping.
 
-The read-only audit includes zero-value imported hints and returns explicit
-pagination. These hints cannot pair and stay unreviewed until deliberately
-reclassified. `trnx repair-transfers ID... --dry-run` shows the exact proposed
+The read-only audit includes unpaired zero-value imported hints and returns explicit
+pagination. An incomplete hint stays unreviewed until explicitly paired with its
+existing counterpart or deliberately reclassified. For a zero-value pair, put its
+two existing IDs in the same `outId`/`inId` JSON fields; these keys identify the
+two legs without assigning financial direction. `trnx repair-transfers ID... --dry-run` shows the exact proposed
 cleanup; execution clears invalid review/Transfer classification and malformed
 links only on the explicit selected records. It never invents a missing leg or
 silently includes a counterpart. No automatic production cleanup runs on upgrade.
@@ -408,7 +413,7 @@ records, `--type` in CLI). Missing kind remains Expense. Income and Transfer hav
 no expense target or assignment rows. Transfer is explicit account movement,
 excluded from ordinary income/spending without changing account balances. Since
 WHAB 2.81, Transfer classification requires a complete reciprocal pair: equal
-nonzero opposite posted amounts, different same-currency accounts and dates within
+opposite posted amounts (including two explicitly selected existing zero records), different same-currency accounts and dates within
 seven days. Closed historical accounts and differing current scopes are supported.
 Single matching leaves both unreviewed; atomic bulk matching can explicitly review
 both legs with --reviewed.

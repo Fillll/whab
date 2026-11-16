@@ -59,6 +59,44 @@ def recorded(store, name, parameters, request_id=None):
         }))
 
 
+def portable_version(files):
+    import json
+
+    if 'budget.json' in files:
+        return json.loads(files['budget.json'])['formatVersion']
+    with closing(sqlite3.connect(':memory:')) as image:
+        image.deserialize(files['budget.sqlite'])
+        return image.execute('PRAGMA user_version').fetchone()[0]
+
+
+def test_portable_transfer_fence_preserves_legacy_and_fences_first_bounded_save(transfer_store, tmp_path, monkeypatch):
+    store, path, Store = transfer_store
+    store.edit_transaction('personal', 'out-0', note='Fictional warm history')
+    legacy = store.export_budget_files()
+    assert portable_version(legacy) == 1
+    restored = Store(tmp_path / ('legacy-restored' + path.suffix), month='2026-11')
+    try:
+        restored.restore_budget_files('personal', legacy)
+        assert restored.export_budget('personal')['transactions'] == store.export_budget('personal')['transactions']
+        assert portable_version(restored.export_budget_files()) == 1
+    finally:
+        restored.close()
+    with monkeypatch.context() as bounded:
+        if Store is SQLiteStore:
+            bounded.setattr(store, 'export_budget', lambda *_: pytest.fail('First paired save must use the existing bounded image delta.'))
+        store.apply_transfer_matches('personal', [{'outId': 'out-0', 'inId': 'in-0'}])
+        current = store.export_budget_files()
+    assert portable_version(current) == 2
+    assert portable_version(legacy) == 1
+    restored = Store(tmp_path / ('paired-restored' + path.suffix), month='2026-11')
+    try:
+        restored.restore_budget_files('personal', current)
+        assert restored.export_budget('personal')['transactions'] == store.export_budget('personal')['transactions']
+        assert portable_version(restored.export_budget_files()) == 2
+    finally:
+        restored.close()
+
+
 def test_native_batch_replay_reopen_portable_and_reversible_history(transfer_store, tmp_path):
     store, path, Store = transfer_store
     assert store.supports_bulk_transfer_matching() and store.supports_transfer_integrity()
@@ -114,6 +152,59 @@ def test_native_batch_replay_reopen_portable_and_reversible_history(transfer_sto
             row['id']: row for row in saved['transactions']}
     finally:
         reopened.close()
+
+
+@pytest.mark.parametrize('Store', [SQLiteStore, JSONStore], ids=['sqlite', 'json'])
+def test_mixed_existing_zero_pairs_are_atomic_reviewed_replayable_and_portable(tmp_path, Store):
+    path = tmp_path / 'fictional-zero-pairs'
+    store = Store(path, month='2026-11')
+    try:
+        state = fictional_state(2)
+        for identifier in ('out-0', 'in-0'):
+            state['transactions'][identifier]['amount'] = 0
+        store.restore_budget('personal', portable_snapshot(state))
+        before, evidence = store.export_budget('personal'), store.commit_evidence()
+        with pytest.raises(StoreError):
+            store.apply_transfer_matches('personal', [{'outId': 'out-0', 'inId': 'in-1'}], reviewed=True)
+        assert store.export_budget('personal') == before and store.commit_evidence() == evidence
+        pairs = [{'outId': 'out-0', 'inId': 'in-0'}, {'outId': 'out-1', 'inId': 'in-1'}]
+        preview = store.preview_transfer_matches('personal', pairs, reviewed=True)
+        operation = recorded(store, 'apply_transfer_matches', {
+            'pairs': pairs, 'reviewed': True, 'fingerprint': preview['fingerprint'],
+        })
+        result = store.execute_operation(operation)
+        assert result.receipt.evidence.generation == evidence.generation + 1
+        assert store.execute_operation(operation).receipt == result.receipt
+        saved = store.export_budget('personal')
+        assert len(saved['transactions']) == len(before['transactions']) == 4
+        assert saved['accounts'] == before['accounts'] and saved['assignments'] == before['assignments']
+        for previous, row in zip(before['transactions'], saved['transactions']):
+            assert row['reviewed'] and row['transferPeerId']
+            assert {key: value for key, value in row.items() if key not in {'reviewed', 'transferPeerId'}} == {
+                key: value for key, value in previous.items() if key != 'reviewed'}
+        files = store.export_budget_files()
+        assert portable_version(files) == 2
+    finally:
+        store.close()
+    reopened = Store(path, month='2026-11')
+    restored = Store(tmp_path / 'fictional-zero-restored', month='2026-11')
+    try:
+        assert reopened.execute_operation(operation).receipt == result.receipt
+        assert reopened.commit_evidence() == result.receipt.evidence
+        restored.restore_budget_files('personal', files)
+        assert restored.export_budget('personal')['transactions'] == saved['transactions']
+        assert all(row['transferPairValid'] and row['reviewed'] for row in restored.transactions('personal'))
+        assert restored.transfer_audit('personal', {})['total'] == 0
+        entry = next(row for row in reopened.budget_history('personal')['entries'] if row['operation'] == 'match_transfers')
+        assert entry['changeCount'] == 4 and entry['actor'] == 'Codex'
+        for action in ('undo', 'redo'):
+            plan = reopened.history_preview('personal', action, entry['id'])
+            reopened.history_apply('personal', action, entry['id'], plan['fingerprint'])
+        assert {row['id']: row for row in reopened.export_budget('personal')['transactions']} == {
+            row['id']: row for row in saved['transactions']}
+    finally:
+        reopened.close()
+        restored.close()
 
 
 @pytest.mark.parametrize('pairs', [
@@ -224,6 +315,34 @@ def test_sqlite_paged_and_filtered_reads_prove_peer_outside_selection(tmp_path):
         store.close()
 
 
+def test_sqlite_search_byte_budget_includes_transfer_graph_proof(tmp_path):
+    import json
+
+    store = SQLiteStore(tmp_path / 'fictional.sqlite', month='2026-11')
+    try:
+        store.restore_budget('personal', portable_snapshot(fictional_state(1)))
+        store.apply_transfer_matches('personal', [{'outId': 'out-0', 'inId': 'in-0'}])
+        filters = {'limit': 1, 'maxBytes': 9999}
+        result = store.search_transactions('personal', filters)
+        row = result['data'][0]
+        assert row['transferPairValid'] is True
+        unproven = {key: value for key, value in row.items() if key != 'transferPairValid'}
+        # The existing response allowance plus the raw row fits exactly. Its
+        # subsequently verified graph metadata must still respect the same cap.
+        bounded = {**filters, 'maxBytes': 999}
+        budget = 512 + len(json.dumps(bounded, ensure_ascii=False).encode()) + len(
+            json.dumps(unproven, ensure_ascii=False, separators=(',', ':')).encode(),
+        ) + 1
+        assert len(str(budget)) == len(str(bounded['maxBytes']))
+        before, evidence = store.export_budget('personal'), store.commit_evidence()
+        with pytest.raises(StoreError, match='Restrict dates or merchant selection'):
+            store.search_transactions('personal', {**bounded, 'maxBytes': budget})
+        assert store.export_budget('personal') == before and store.commit_evidence() == evidence
+        assert store.search_transactions('personal', filters) == result
+    finally:
+        store.close()
+
+
 def test_sqlite_related_peer_context_uses_indexes_and_keeps_portable_schema_compatible(tmp_path):
     store = SQLiteStore(tmp_path / 'fictional.sqlite', month='2026-11')
     try:
@@ -313,16 +432,19 @@ def test_native_format_fence_survives_history_only_pairs_and_restoration(transfe
     pairs = [{'outId': 'out-0', 'inId': 'in-0'}]
     store.apply_transfer_matches('personal', pairs)
     assert version(store) == 5
+    assert portable_version(store.export_budget_files()) == 2
     entry = next(row for row in store.budget_history('personal')['entries'] if row['operation'] == 'match_transfers')
     plan = store.history_preview('personal', 'undo', entry['id'])
     store.history_apply('personal', 'undo', entry['id'], plan['fingerprint'])
     assert not any(row.get('transferPeerId') for row in store.transactions('personal'))
     assert version(store) == 5
+    assert portable_version(store.export_budget_files()) == 2
     restored = Store(tmp_path / ('history-restored' + path.suffix), month='2026-11')
     local = Store(tmp_path / ('history-local' + path.suffix), month='2026-11', initial_role='staged')
     try:
         restored.restore_budget_files('personal', store.export_budget_files())
         assert version(restored) == 5
+        assert portable_version(restored.export_budget_files()) == 2
         local.import_local('fictional-transfer-history', store.export_local())
         assert version(local) == 5
     finally:
