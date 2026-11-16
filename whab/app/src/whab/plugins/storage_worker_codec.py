@@ -39,6 +39,8 @@ _RECORDS = {record.__name__: record for record in (
 # (required positional names, optional names/defaults). No arbitrary attribute
 # lookup, kwargs, database handle or implementation-specific state is exposed.
 METHODS = {
+    "supports_transaction_voiding": ((), {}),
+    "preview_transaction_void": (("workspace", "transaction_ids", "action"), {}),
     "supports_atomic_transaction_changes": ((), {}),
     "preview_transaction_changes": (("workspace", "edits", "creates"), {"preserve_balances": False}),
     "supports_transfer_matching": ((), {}),

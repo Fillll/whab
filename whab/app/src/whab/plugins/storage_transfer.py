@@ -32,6 +32,7 @@ MAX_BULK_OPERATION_BYTES = 72 * 1024 * 1024
 MAX_OPERATION_RECEIPTS = 4096
 STORAGE_ROLES = frozenset({"primary", "staged", "copy", "fenced", "retired"})
 STORAGE_OPERATIONS = frozenset({
+    "apply_transaction_void",
     "change_transactions",
     "apply_transfer_match",
     "apply_transfer_matches", "repair_transfers",
@@ -44,6 +45,7 @@ STORAGE_OPERATIONS = frozenset({
 })
 _BULK_OPERATIONS = frozenset({"recorded_command", "restore_budget", "restore_budget_files", "prepare_budget_files", "import_workspace"})
 _OPERATION_FIELDS = {
+    "apply_transaction_void": ({"transactionIds", "action", "fingerprint"}, set()),
     "change_transactions": ({"edits", "creates"}, {"preserveBalances"}),
     "apply_transfer_match": ({"transactionIds", "action", "fingerprint"}, set()),
     "apply_transfer_matches": ({"pairs", "reviewed", "fingerprint"}, set()),
@@ -381,6 +383,8 @@ def dispatch_storage_operation(backend, operation):
         context(payload['context'])
         nested = StorageOperation(operation.operation_id, operation.authority_epoch, operation.expected_generation, workspace, inner, canonical_storage_json(payload['parameters'], limit=operation_limit(inner)))
         return dispatch_storage_operation(backend, nested)
+    if name == "apply_transaction_void":
+        return backend.apply_transaction_void(workspace, payload["transactionIds"], payload["action"], payload["fingerprint"])
     if name == "apply_transfer_match":
         return backend.apply_transfer_match(workspace, payload["transactionIds"], payload["action"], payload["fingerprint"])
     if name == "apply_transfer_matches":

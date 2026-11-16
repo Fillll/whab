@@ -199,8 +199,22 @@ class LedgerService:
         if month is not None:
             _month(month)
         with self._lock:
-            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_category_classification", "preview_bulk_edits", "transfer_candidates", "preview_transfer_match", "preview_transaction_changes", "preview_transfer_matches", "transfer_audit", "preview_transfer_repair"}:
+            if parameters is not None and operation not in {"feature", "history", "history_preview", "category_deletion_status", "preview_category_classification", "preview_bulk_edits", "transfer_candidates", "preview_transfer_match", "preview_transaction_changes", "preview_transfer_matches", "transfer_audit", "preview_transfer_repair", "preview_void_transactions", "preview_unvoid_transactions"}:
                 raise StoreError("Only feature queries accept parameters.")
+            if operation == 'transaction_void_policy':
+                self._require_transaction_voiding()
+                return {'revision': self._revision, 'data': {
+                    'version': 1, 'maxTransactions': 100, 'durableTombstones': True,
+                }}
+            if operation in {'preview_void_transactions', 'preview_unvoid_transactions'}:
+                self._require_transaction_voiding()
+                if type(parameters) is not dict or parameters.keys() != {'transactionIds'}:
+                    raise StoreError('Void preview requires explicit transactionIds only.')
+                from whab.domain.transaction_voids import validate_void_ids
+                identifiers = validate_void_ids(parameters['transactionIds'])
+                action = 'void' if operation == 'preview_void_transactions' else 'unvoid'
+                return {'revision': self._revision, 'data': _public(
+                    self._store.preview_transaction_void(workspace, identifiers, action))}
             if operation == 'transfer_policy':
                 self._require_transfer_integrity()
                 self._require_bulk_transfer_matching()
@@ -445,6 +459,12 @@ class LedgerService:
         if (type(payload) is not dict or not set(schema["required"]) <= payload.keys()
                 or payload.keys() - schema["properties"].keys()):
             raise StoreError("Invalid ledger command fields.")
+        if operation in {'void_transactions', 'unvoid_transactions'}:
+            from whab.domain.transaction_voids import validate_void_ids
+            fingerprint = payload['fingerprint']
+            if type(fingerprint) is not str or len(fingerprint) != 64 or any(c not in '0123456789abcdef' for c in fingerprint):
+                raise StoreError('Use the fingerprint from the exact void or unvoid preview.')
+            return {'transactionIds': validate_void_ids(payload['transactionIds']), 'fingerprint': fingerprint}
         if operation in {'match_transfers', 'repair_transfers'}:
             fingerprint = payload['fingerprint']
             if type(fingerprint) is not str or len(fingerprint) != 64 or any(c not in '0123456789abcdef' for c in fingerprint):
@@ -553,6 +573,13 @@ class LedgerService:
         self._workspace(workspace)
         return deepcopy(self._validate(operation, payload))
 
+    def _require_transaction_voiding(self):
+        supported = getattr(self._store, 'supports_transaction_voiding', None)
+        if not callable(supported) or supported() is not True or not all(callable(getattr(self._store, name, None)) for name in (
+            'preview_transaction_void', 'apply_transaction_void', 'history_scope', 'budget_history',
+        )):
+            raise StoreError('Update the storage backend/authority for reversible atomic voids with durable tombstones, history and exact retries. Nothing was changed.')
+
     def _require_transfer_matching(self):
         supported = getattr(self._store, 'supports_transfer_matching', None)
         if not callable(supported) or supported() is not True or not all(callable(getattr(self._store, name, None)) for name in (
@@ -649,6 +676,8 @@ class LedgerService:
         _identifier(request_id)
         _identifier(expected_revision)
         payload = self._validate(operation, payload)
+        if operation in {'void_transactions', 'unvoid_transactions'}:
+            self._require_transaction_voiding()
         if operation == 'match_transfer':
             self._require_transfer_matching()
             self._require_transfer_integrity()
@@ -742,6 +771,10 @@ class LedgerService:
                         if not callable(remote):
                             raise StoreError("Enable a categorization plugin on the budget host first.")
                         data = remote(workspace, payload)
+                elif operation in {'void_transactions', 'unvoid_transactions'}:
+                    action = 'void' if operation == 'void_transactions' else 'unvoid'
+                    data = _public(self._store.apply_transaction_void(
+                        workspace, payload['transactionIds'], action, payload['fingerprint']))
                 elif operation == 'match_transfer':
                     data = _public(self._store.apply_transfer_match(workspace, payload['transactionIds'], payload['action'], payload['fingerprint']))
                 elif operation == 'match_transfers':

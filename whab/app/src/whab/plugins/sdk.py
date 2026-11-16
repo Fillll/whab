@@ -284,6 +284,14 @@ class CategoryManagement(Protocol):
     def move_category(self, workspace: str, category_id: str, parent_id: str) -> None: ...
 
 
+class TransactionVoiding(Protocol):
+    """Optional native reversible user voids with exact preview and durable receipts."""
+
+    def supports_transaction_voiding(self) -> bool: ...
+    def preview_transaction_void(self, workspace: str, transaction_ids: list[str], action: str) -> dict: ...
+    def apply_transaction_void(self, workspace: str, transaction_ids: list[str], action: str, fingerprint: str) -> dict: ...
+
+
 class TransferMatching(Protocol):
     """Optional native, audited confirmation of two already existing transactions."""
 
