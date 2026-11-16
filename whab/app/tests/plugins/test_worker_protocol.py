@@ -643,10 +643,21 @@ def test_technical_category_snapshot_roundtrip_and_legacy_default(worker_snapsho
 def test_real_worker_reports_technical_categories_without_envelope_rows(store):
     from whab.web.plugin_snapshot import build_snapshot
     wallet = store.add_account('personal', {'name': 'Fictional wallet', 'type': 'depository', 'balance': 10000})
-    for kind, amount in [('opening_balance', -10000), ('income', -1000), ('transfer', 500)]:
+    for kind, amount in [('opening_balance', -10000), ('income', -1000)]:
         category = store.add_category('personal', {'name': kind, 'group': 'Technical', 'kind': kind})
         store.add_transaction('personal', {'accountId': wallet, 'merchant': 'Fictional ' + kind,
                                           'date': '2026-10-01', 'amount': amount, 'categoryId': category})
+    savings = store.add_account('personal', {'name': 'Fictional savings', 'type': 'depository', 'balance': 0})
+    transfer = store.add_category('personal', {'name': 'transfer', 'group': 'Technical', 'kind': 'transfer'})
+    out = store.add_transaction('personal', {'accountId': wallet, 'merchant': 'Fictional transfer out',
+                                             'date': '2026-10-01', 'amount': 500, 'categoryId': None})
+    incoming = store.add_transaction('personal', {'accountId': savings, 'merchant': 'Fictional transfer in',
+                                                  'date': '2026-10-01', 'amount': -500, 'categoryId': None})
+    pairs = [{'outId': out, 'inId': incoming}]
+    preview = store.preview_transfer_matches('personal', pairs)
+    store.apply_transfer_matches('personal', pairs, fingerprint=preview['fingerprint'])
+    for transaction_id in (out, incoming):
+        store.edit_transaction('personal', transaction_id, category_id=transfer)
     snapshot = build_snapshot('personal', store.workspace('personal', '2026-10'))
     assert {'opening_balance', 'income', 'transfer'} <= {row.kind for row in snapshot.categories}
     assert all((row.assigned_cents, row.activity_cents, row.available_cents) == (0, 0, 0)
@@ -655,8 +666,8 @@ def test_real_worker_reports_technical_categories_without_envelope_rows(store):
     try:
         assert [row.value for row in worker.insights(snapshot)] == ['$0.00', '$10.00']
         exported = worker.export(snapshot)
-        assert len(exported.rows) == 3
-        assert sum(row[4] for row in exported.rows) == -10500
+        assert len(exported.rows) == 4
+        assert sum(row[4] for row in exported.rows) == -11000
     finally:
         worker.close()
 

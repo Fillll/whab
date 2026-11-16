@@ -1,13 +1,24 @@
 # SQLite budget storage plugin changelog
 
-## 1.29.0 — 2026-11-15
+## 1.30.0 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)
 
-- Update changed record hashes and their tree paths for bounded native edits, with cache invalidation after external writes, triggers and rollback. Preserve old metadata on open and fence earlier writers after the first format-5 financial commit.
+- Update changed record hashes and their tree paths for bounded native edits, with cache invalidation after external writes, triggers and rollback. Preserve old metadata on open and fence earlier writers after the first format-6 financial commit.
 - Keep single-account scope edits and bulk classifications on indexed metadata reads while preserving confirmed-transfer guards, including implicit scope changes.
 - Reuse fully validated portable records during atomic cold restoration, and recognize populated local caches without loading their full transaction history. Every incoming file still receives independent validation before reuse.
-- Store a sanitized SQLite snapshot plus bounded checksummed audit additions in portable format 2. Compact without dropping history or receipts, validate independent restores, and keep every acknowledged edit inside the synchronously saved `.whab` file. Earlier raw SQLite payloads remain readable; new payloads require SQLite 1.29 or newer.
+- Store a sanitized SQLite snapshot plus bounded checksummed audit additions in portable format 3. Compact without dropping history or receipts, validate independent restores, and keep every acknowledged edit inside the synchronously saved `.whab` file. Earlier raw SQLite payloads remain readable; new payloads require SQLite 1.30 or newer.
+
+## 1.29.0 — 2026-11-15
+
+PR: [#210](https://github.com/Fillll/whab/pull/210)
+
+- Commit 1–100 explicit disjoint transfer pairs with optional review as one native operation, exact preview/fingerprint, before/after audit and restart-safe retry receipt. Reject every invalid batch before mutation; support historical closed accounts and differing current budget scopes without changing accounts or financial fields.
+- Enforce graph-proven two-leg transfer review in native annotation paths and public register projections, including peers outside page filters. Add complete paginated zero-hint/orphan/link audits and guarded explicit legacy repairs.
+- Index incoming transfer references so bounded previews, annotation checks and register pages do not scan unrelated history; keep this runtime index out of portable budget images.
+- Keep native format 5 sticky while transfer pairs remain in current state or permanent history, including restored/local-transfer records; older native readers refuse unsupported semantics.
+- Fence sanitized paired-budget payloads with portable version 2, including the first incremental save and history-only pairs. Older installations refuse restoration; current readers preserve support for unchanged version-1 payloads.
+- Permit explicit confirmation and review of two existing posted zero-valued records under the same reciprocal-pair rules. Suggestions omit zeros, and pairing never invents a transaction, direction or amount.
 
 ## 1.28.0 — 2026-11-14
 

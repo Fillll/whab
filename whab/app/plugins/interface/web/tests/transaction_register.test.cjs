@@ -1230,3 +1230,63 @@ test('finishing an exact amount without changes is a no-op and a real edit saves
   amount.value='68000.51';amount.emit('change');await tick();assert.equal(state.requests.length,1);assert.equal(state.requests[0].body.amount,-6800051);
   state.requests[0].resolve({ok:true});await tick();assert.equal(amount.value,'68000.51');assert.equal(state.register.dirty,false);state.register.dispose();
 });
+
+test('valid paired category labels and clearing preserve transfer and review state', async () => {
+  const state = harness(1);
+  const row = state.rows[0], category = row.controls['[data-transaction-field="categoryId"]'];
+  const review = row.controls['[data-transaction-reviewed]'];
+  const empty = {value: '', dataset: {}, textContent: 'Transfer (matched)'};
+  const transfer = {value: 'transfer-label', dataset: {categoryKind: 'transfer'}};
+  category.options = [empty, transfer];
+  Object.defineProperty(category, 'selectedOptions', {get: () => category.options.filter(option => option.value === category.value)});
+  row.controls['.transaction-status[aria-label="Transfer"]'] = {remove() {}};
+  row.applyCategory({categoryId: null, isTransfer: true, reviewed: true, transferPairValid: true});
+  assert.equal(row.dataset.reviewClassified, 'true');
+  assert.equal(review.disabled, false);
+  for (const value of ['transfer-label', '']) {
+    category.value = value; category.emit('change');
+    state.requests.at(-1).resolve({ok: true}); await tick();
+    assert.equal(row.dataset.reviewed, 'true');
+    assert.equal(row.dataset.transfer, 'true');
+    assert.equal(row.dataset.reviewClassified, 'true');
+    assert.equal(category.classList.contains('uncategorized'), false);
+    assert.equal(category.options[0].textContent, 'Transfer (matched)');
+    assert.equal(review.disabled, false);
+  }
+  state.register.dispose();
+});
+
+test('a legacy Transfer label or link affordance cannot invent review eligibility', () => {
+  const state = harness(1);
+  const row = state.rows[0], category = row.controls['[data-transaction-field="categoryId"]'];
+  const review = row.controls['[data-transaction-reviewed]'];
+  const transfer = {value: 'legacy-transfer', dataset: {categoryKind: 'transfer'}};
+  category.options = [{value: '', dataset: {}}, transfer];
+  row.controls['[data-transfer-unmatch]'] = {};
+  row.controls['.transaction-status[aria-label="Transfer"]'] = {remove() {}};
+  row.applyCategory({categoryId: 'legacy-transfer', isTransfer: true, reviewed: false, transferPairValid: false}, transfer);
+  assert.equal(row.dataset.reviewClassified, 'false');
+  assert.equal(review.disabled, true);
+  assert.match(review.title, /two valid reciprocal transfer legs/);
+  row.applyCategory({categoryId: null, isTransfer: true});
+  assert.equal(row.dataset.reviewClassified, 'false');
+  assert.equal(category.classList.contains('uncategorized'), true);
+  assert.equal(category.options[0].textContent, 'Transfer hint · choose category');
+  state.register.dispose();
+});
+
+test('explicit Expense and Opening Balance classification overrides an imported hint for review', () => {
+  const state = harness(1);
+  const row = state.rows[0], category = row.controls['[data-transaction-field="categoryId"]'];
+  const review = row.controls['[data-transaction-reviewed]'];
+  row.dataset.inferredTransfer = 'true';
+  row.controls['.transaction-status[aria-label="Transfer"]'] = {remove() {}};
+  for (const kind of ['expense', 'opening_balance']) {
+    const choice = {value: kind, dataset: {categoryKind: kind}};
+    category.options = [{value: '', dataset: {}}, choice];
+    row.applyCategory({categoryId: kind, isTransfer: kind === 'opening_balance', reviewed: false}, choice);
+    assert.equal(row.dataset.reviewClassified, 'true');
+    assert.equal(review.disabled, false);
+  }
+  state.register.dispose();
+});

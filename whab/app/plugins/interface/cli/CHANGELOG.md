@@ -1,11 +1,20 @@
 # Changelog
 
-## 2.22.1 — 2026-11-15
+## 2.23.1 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)
 
 - Build only the requested transaction parser and defer execution imports during offline help. Inspect the actual command position when selecting plugin documentation so a budget or merchant named bank does not trigger unrelated discovery. Keep complete group help, external discovery and existing single-record syntax.
 - Make 1–100-record atomic account classification prominent in command help; existing atomic bulk categorization and mixed edits share the improved native commit and durable save path.
+
+## 2.23.0 — 2026-11-15
+
+PR: [#210](https://github.com/Fillll/whab/pull/210)
+
+- Add `trnx match-transfers --file` with 1–100 explicit disjoint pairs, JSON/stdin, optional review in the same native atomic commit/save, exact previews/fingerprints, attribution and verified durable receipts.
+- Add read-only paginated `trnx transfer-audit` and guarded `trnx repair-transfers` for explicitly selected legacy issues; retain imported hints and financial fields without creating counterpart records.
+- Support explicitly confirmed existing zero-value pairs alongside nonzero pairs, without creating transactions or inferring direction; automatic proposals continue to exclude zeros.
+- Document strict two-leg Transfer eligibility, historical closed/cross-scope pairs, guarded history reversals, the WHAB 2.81 portable reader requirement and exact retry recovery throughout offline help and packaged operation examples.
 
 ## 2.22.0 — 2026-11-14
 

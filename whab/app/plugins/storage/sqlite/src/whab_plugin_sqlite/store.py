@@ -92,7 +92,7 @@ class Store(Authority):
             try:
                 with self._snapshot():
                     metadata = self._authority_metadata()
-                    if metadata["formatVersion"] not in {2, 3, 4, 5} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
+                    if metadata["formatVersion"] not in {2, 3, 4, 5, 6} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
                         raise StoreError("Read-only readiness requires the current native SQLite schema; upgrade it explicitly first.")
                     if metadata["budgetId"] != budget_id or metadata["environment"] != environment:
                         raise StoreError("SQLite storage identity belongs to another budget or environment.")
@@ -269,6 +269,9 @@ class Store(Authority):
                          for change in entry['changes'] if change['path'][0] == 'categories'
                          for row in (change['before'], change['after']) if row is not None)
             required = 4 if 'opening_balance' in kinds else 3 if kinds & {'income', 'transfer'} else 2
+            from .transfer_pairs import retains_pairs
+            if retains_pairs(state):
+                required = 5
             writing['metadata']['formatVersion'] = max(writing['metadata']['formatVersion'], required)
         workspace = state["_id"]
         if "history" in state:
@@ -697,14 +700,16 @@ class Store(Authority):
                 + " AND ".join(conditions) + " ORDER BY t.date DESC,t.id DESC",
                 arguments,
             )
+            from .transfer_pairs import public_validity
+            transactions = [
+                public_transaction({**dict(row), **{key: bool(row[key]) for key in (
+                    "pending", "reviewed", "isTransfer", "inferredTransfer",
+                )}}, categories={row["id"]: row for row in categories})
+                for row in rows
+            ]
             return {
                 "accounts": accounts, "categories": categories,
-                "transactions": [
-                    public_transaction({**dict(row), **{key: bool(row[key]) for key in (
-                        "pending", "reviewed", "isTransfer", "inferredTransfer",
-                    )}}, categories={row["id"]: row for row in categories})
-                    for row in rows
-                ],
+                "transactions": public_validity(self, workspace, transactions),
             }
 
     def transaction_register_page(
@@ -836,6 +841,32 @@ class Store(Authority):
     def supports_transfer_matching(self):
         return True
 
+    def supports_bulk_transfer_matching(self):
+        return True
+
+    def supports_transfer_integrity(self):
+        return True
+
+    def preview_transfer_matches(self, workspace, pairs, reviewed=False):
+        from .transfer_pairs import preview
+        return preview(self, workspace, pairs, reviewed)
+
+    def apply_transfer_matches(self, workspace, pairs, reviewed=False, fingerprint=None):
+        from .transfer_pairs import apply
+        return apply(self, workspace, pairs, reviewed, fingerprint)
+
+    def transfer_audit(self, workspace, parameters):
+        from .transfer_pairs import read_audit
+        return read_audit(self, workspace, parameters)
+
+    def preview_transfer_repair(self, workspace, transaction_ids):
+        from .transfer_pairs import preview_repair
+        return preview_repair(self, workspace, transaction_ids)
+
+    def repair_transfers(self, workspace, transaction_ids, fingerprint):
+        from .transfer_pairs import repair
+        return repair(self, workspace, transaction_ids, fingerprint)
+
     def transfer_candidates(self, workspace, parameters):
         from whab.domain.transfer_matching import candidates
         with self._snapshot():
@@ -845,7 +876,9 @@ class Store(Authority):
     def preview_transfer_match(self, workspace, transaction_ids, action):
         from whab.domain.transfer_matching import plan
         with self._snapshot():
-            return plan(self._read_state(workspace, transaction_ids=transaction_ids, include_history=False), transaction_ids, action=action)
+            # Validate through core before using arbitrary IDs as SQL parameters.
+            state = self._read_state(workspace, include_history=False)
+            return plan(state, transaction_ids, action=action)
 
     def apply_transfer_match(self, workspace, transaction_ids, action, fingerprint):
         from whab.domain.transfer_matching import plan

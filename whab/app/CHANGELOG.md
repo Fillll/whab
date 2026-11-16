@@ -1,11 +1,19 @@
 # Changelog
 
-## 2.81.0 — 2026-11-15
+## 2.82.0 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)
 
 - Add versioned incremental state and audit integrity with compatible old receipts, explicit algorithm evidence, independent transfer/copy verification and first-write migration. Preserve stale-revision refusal and exact replay across restarts.
 - Verify appended portable payloads using independent SHA-256 prefix state and retain synchronous complete-file saves. Extend fictional performance benchmarks with identical input seeds and saved-file, history and retry proofs.
+
+## 2.81.0 — 2026-11-15
+
+PR: [#210](https://github.com/Fillll/whab/pull/210)
+
+- Enforce reciprocal two-leg transfer classification/review and add native atomic matching of 1–100 explicit disjoint pairs, optionally reviewed in the same operation.
+- Add complete fingerprinted audit/repair, actor/batch history, exact durable retries and public CLI/worker/HTTPS contracts.
+- Permit historical closed/cross-scope pairs without changing accounts; account for dated transfer funding separately from income/spending. Explicitly selected existing zero-value pairs may be matched and reviewed without creating entries, amounts or direction.
 
 ## 2.80.0 — 2026-11-15
 

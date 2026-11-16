@@ -37,7 +37,8 @@ _FIELDS = {
     'rolloverModes': (ROLLOVER_MODE_FIELDS, set()),
     'categoryGroups': ({'id', 'name'}, set()),
 }
-REVERSIBLE = frozenset({'match_transfer', 'apply_transfer_match',
+REVERSIBLE = frozenset({'match_transfer', 'apply_transfer_match', 'match_transfers', 'apply_transfer_matches',
+    'repair_transfers', 'repair_transfer_matches',
     'add_account', 'update_account', 'add_category', 'add_category_group', 'move_category', 'delete_category', 'delete_category_group', 'add_transaction',
     'edit_transactions', 'change_transactions', 'classify_accounts', 'edit_transaction', 'edit_transaction_details', 'review_transactions', 'classify_category', 'rename_category', 'append_transaction_note',
     'assign', 'assign_next_month', 'set_rollover_mode',
@@ -351,11 +352,20 @@ def apply_to_state(state, wanted):
     if any(identifier not in candidate['transactions'] for identifier in state.get('receipts', {})):
         raise StoreError('This reversal would orphan a receipt attachment.')
     from .review import review_status
+    from .transfer_matching import incoming_links, valid_pair
+    current_context = {'transactions': state['transactions'], 'accounts': state['accounts'], 'incoming': incoming_links(state['transactions'])}
+    candidate_context = {'transactions': candidate['transactions'], 'accounts': candidate['accounts'], 'incoming': incoming_links(candidate['transactions'])}
     for identifier, row in candidate['transactions'].items():
         previous = state['transactions'].get(identifier, {})
+        if candidate['categories'].get(row.get('categoryId'), {}).get('kind') == 'transfer':
+            if (not valid_pair(row, candidate['transactions'], candidate['accounts'], candidate['categories'], incoming=candidate_context['incoming'])
+                    and (previous.get('categoryId') != row.get('categoryId')
+                         or state['categories'].get(previous.get('categoryId'), {}).get('kind') != 'transfer'
+                         or valid_pair(previous, state['transactions'], state['accounts'], state['categories'], incoming=current_context['incoming']))):
+                raise StoreError(f'{identifier}: This reversal would restore a Transfer category without exactly two valid legs.')
         if row.get('reviewed') and (not previous.get('reviewed') or
-                review_status(previous, state['categories'])['eligible'] and not review_status(row, candidate['categories'])['eligible']):
-            status = review_status(row, candidate['categories'])
+                review_status(previous, state['categories'], **current_context)['eligible'] and not review_status(row, candidate['categories'], **candidate_context)['eligible']):
+            status = review_status(row, candidate['categories'], **candidate_context)
             if not status['eligible']:
                 raise StoreError(f"{identifier}: This reversal would restore an invalid review. {status['reason']}")
     from .bank_setup import reconcile_account_closed

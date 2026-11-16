@@ -28,7 +28,7 @@ def test_general_console_changes_split_restart_and_history(tmp_path, storage):
     try:
         account = seed.add_account('personal', {'name': 'Fictional savings 🍏', 'type': 'depository', 'balance': 500000})
         category = seed.add_category('personal', {'name': 'Residence', 'group': 'Fictional home', 'target': 1000})
-        transfer = seed.add_category('personal', {'name': 'Transfers', 'group': 'Fictional finance', 'target': 0, 'kind': 'transfer'})
+        component = seed.add_category('personal', {'name': 'Principal', 'group': 'Fictional finance', 'target': 0})
         original = seed.add_transaction('personal', {'accountId': account, 'date': '2024-05-15', 'merchant': 'Fictional receipt', 'amount': -100000, 'categoryId': category, 'note': '  [YNAB: cleared]\nOriginal source note  '})
         payment = seed.add_transaction('personal', {'accountId': account, 'date': '2024-05-17', 'merchant': 'Fictional purchase', 'amount': 42500, 'categoryId': category, 'note': 'Untouched payment'})
         seed.edit_transaction('personal', original, reviewed=True)
@@ -57,7 +57,7 @@ def test_general_console_changes_split_restart_and_history(tmp_path, storage):
     def transactions():
         return {row['id']: row for row in query('transactions')['data']}
 
-    split = {'preserveBalances': True, 'edits': [{'transactionId': original, 'amount': -80000}], 'creates': [{'account': 'Fictional savings 🍏', 'date': '2024-05-15', 'amount': -20000, 'currency': 'USD', 'merchant': 'Fictional lender', 'category': 'Fictional finance / Transfers', 'note': original_row['note']}]}
+    split = {'preserveBalances': True, 'edits': [{'transactionId': original, 'amount': -80000}], 'creates': [{'account': 'Fictional savings 🍏', 'date': '2024-05-15', 'amount': -20000, 'currency': 'USD', 'merchant': 'Fictional lender', 'category': 'Fictional finance / Principal', 'note': original_row['note']}]}
     with patch.dict(os.environ, env, clear=True), local_connection(home, 'sandbox'):
         before = query('portable')['data']
         before_rows = transactions()
@@ -74,7 +74,7 @@ def test_general_console_changes_split_restart_and_history(tmp_path, storage):
         assert current[payment] == before_rows[payment]
         for key in ('id', 'accountId', 'date', 'merchant', 'categoryId', 'note', 'source'):
             assert current[original][key] == before_rows[original][key]
-        assert current[created_id]['accountId'] == account and current[created_id]['categoryId'] == transfer
+        assert current[created_id]['accountId'] == account and current[created_id]['categoryId'] == component
         assert current[created_id]['source'] == 'manual' and current[created_id]['note'] == original_row['note']
         assert not current[original]['reviewed'] and not current[created_id]['reviewed']
         assert query('portable')['data']['accounts'] == before['accounts']

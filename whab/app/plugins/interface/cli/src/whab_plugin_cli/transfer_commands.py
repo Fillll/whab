@@ -13,6 +13,10 @@ lazy from .account_commands import resolve_account
 
 
 def add_transfer_parsers(commands):
+    from .bulk_transfers import add_bulk_transfer_parser
+    from .transfer_integrity import add_integrity_parsers
+    add_bulk_transfer_parser(commands)
+    add_integrity_parsers(commands)
     read = commands.add_parser('transfers', help='Propose possible transfer pairs for explicit review (read-only)',
         epilog=TRANSFER_HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
     for name in ('since', 'until'):
@@ -36,6 +40,12 @@ def add_transfer_parsers(commands):
 
 
 def execute_transfer(connection, identifier, prefix, args, exchange, error):
+    if args.filter in {'transfer-audit', 'repair-transfers'}:
+        from .transfer_integrity import execute_integrity
+        return execute_integrity(connection, identifier, prefix, args, exchange, error)
+    if args.filter == 'match-transfers':
+        from .bulk_transfers import execute_bulk_transfers
+        return execute_bulk_transfers(connection, identifier, prefix, args, exchange, error)
     def query(operation, parameters):
         return checked(exchange(connection, 'POST', prefix + '/queries', ledger_errors=True, json={
             'operation': operation, 'workspace': 'personal', 'parameters': parameters,
@@ -77,6 +87,12 @@ def execute_transfer(connection, identifier, prefix, args, exchange, error):
 
 
 def transfer_table(result):
+    if result.get('readOnly') or result['data'].get('action') == 'repair':
+        from .transfer_integrity import integrity_table
+        return integrity_table(result)
+    if 'pairs' in result:
+        from .bulk_transfers import bulk_transfer_table
+        return bulk_transfer_table(result)
     data = result['data']
     if 'candidates' not in data:
         rows = [f"{data['action']}: {result.get('budget', result.get('budgetId'))} · both need review"]

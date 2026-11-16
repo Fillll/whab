@@ -40,8 +40,10 @@ from fastapi.testclient import TestClient
 target = Path(sys.argv[1]).resolve()
 with patch.object(metadata.EntryPoint, "load", side_effect=AssertionError("Documentation must not load hooks")):
     operation_catalog = installed_catalog()
-assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 44
-assert {"change_transactions", "preview_transaction_changes", "transaction_change_policy"} <= {
+assert len([row for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 50
+assert {"change_transactions", "preview_transaction_changes", "transaction_change_policy",
+        "transfer_policy", "preview_transfer_matches", "match_transfers",
+        "transfer_audit", "preview_transfer_repair", "repair_transfers"} <= {
     row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] in {"query", "command"}
 }
 assert {row["name"] for row in operation_catalog["core"]["operations"] if row["kind"] == "local"} == {
@@ -73,6 +75,9 @@ for args in (["--help"], ["budget", "--help"], ["budget", "create", "--help"],
              ["fictional", "trnx", "edit", "--help"],
              ["fictional", "trnx", "create", "--help"],
              ["fictional", "trnx", "edit-many", "--help"],
+             ["fictional", "trnx", "match-transfers", "--help"],
+             ["fictional", "trnx", "transfer-audit", "--help"],
+             ["fictional", "trnx", "repair-transfers", "--help"],
              ["fictional", "category", "--help"],
              ["fictional", "category", "list", "--help"],
              ["fictional", "category", "group", "--help"],

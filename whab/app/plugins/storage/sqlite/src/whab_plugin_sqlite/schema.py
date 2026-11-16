@@ -68,6 +68,7 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
     db.execute("CREATE INDEX IF NOT EXISTS tx_uncategorized ON transactions(workspace,account_id,source,pending,is_transfer,inferred_transfer,date) WHERE deleted=0 AND category_id IS NULL")
     db.execute("CREATE INDEX IF NOT EXISTS tx_uncategorized_recent ON transactions(workspace,date DESC,id DESC,pending,is_transfer,inferred_transfer) WHERE deleted=0 AND category_id IS NULL")
     db.execute("CREATE INDEX IF NOT EXISTS tx_confirmed_transfer_account ON transactions(workspace,account_id,id,transfer_peer_id) WHERE transfer_peer_id IS NOT NULL")
+    db.execute("CREATE INDEX IF NOT EXISTS tx_transfer_peer ON transactions(workspace,transfer_peer_id) WHERE transfer_peer_id IS NOT NULL")
     validate_month(selected_month)
     db.execute(
         "UPDATE meta SET budget_start_month=CASE WHEN workspace='demo' THEN COALESCE((SELECT MIN(substr(date,1,7)) FROM transactions WHERE workspace='demo'),?) ELSE COALESCE((SELECT MIN(month) FROM budget WHERE workspace='personal'),?) END WHERE budget_start_month IS NULL",

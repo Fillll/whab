@@ -1,6 +1,8 @@
 """Fictional transfer proposals, explicit pair approval and native recovery."""
 
+from contextlib import closing
 from copy import deepcopy
+from types import SimpleNamespace
 
 import pytest
 
@@ -76,12 +78,18 @@ def test_ineligible_pairs_never_publish_partial_changes(change):
 
 
 def test_pair_rules_scope_currency_archival_and_invalid_references():
-    for update in [{'onBudget': False}, {'currency': 'EUR'}, {'closed': True}]:
+    for update in [{'currency': 'EUR'}]:
         state = fictional_state()
         state['accounts']['b'].update(update)
         with pytest.raises(StoreError):
             plan(state, ['out', 'in'], apply=True)
         assert candidates(state['accounts'], state['transactions'].values(), {})['total'] == 0
+    for update in [{'onBudget': False}, {'closed': True}]:
+        state = fictional_state()
+        state['accounts']['b'].update(update)
+        assert candidates(state['accounts'], state['transactions'].values(), {})['total'] == 1
+        plan(state, ['out', 'in'], apply=True)
+        validate_matches(state)
     for identifiers in [['out'], ['out', 'out'], [True, 'in'], ['out', 'missing'], ['out', 'in', 'x']]:
         with pytest.raises(StoreError):
             plan(fictional_state(), identifiers, apply=True)
@@ -191,6 +199,41 @@ def test_unsupported_backend_refuses_without_any_mutation():
         supports_transfer_matching = None
     with pytest.raises(StoreError, match='Update the storage'):
         LedgerService(ReadOnly()).query('transfer_candidates', 'personal', parameters={})
+
+
+def test_older_backend_cannot_mutate_a_legacy_unpaired_transfer_hint(native_store, monkeypatch):
+    _, path, Store = native_store
+    state = fictional_state()
+    state['transactions']['out'].update(isTransfer=True, inferredTransfer=True)
+    with closing(Store(path.with_name('legacy-hint' + path.suffix), month='2026-11')) as legacy:
+        legacy.restore_budget('personal', portable_snapshot(state))
+        monkeypatch.setattr(legacy, 'supports_transfer_integrity', lambda: False)
+        saved = legacy.export_budget('personal')
+        checkpoints = []
+        service = LedgerService(legacy, on_commit=lambda: checkpoints.append(True))
+        revision = service.revision
+        with pytest.raises(StoreError, match='strict two-leg transfers'):
+            service.command('edit_transaction', 'personal', {'transactionId': 'out', 'note': 'New memo'},
+                            request_id='legacy-hint-write', expected_revision=revision)
+        assert service.revision == revision and checkpoints == []
+        assert legacy.export_budget('personal') == saved
+
+
+def test_older_backend_cannot_restore_a_reviewed_transfer_hint_from_history():
+    writes = []
+    backend = SimpleNamespace(
+        supports_classified_review=lambda: True, categories=lambda _: [], transactions=lambda _: [],
+        history_preview=lambda *args, **kwargs: {'changes': [{
+            'path': ['transactions', 'fictional-hint'], 'before': None,
+            'after': {'id': 'fictional-hint', 'isTransfer': True, 'reviewed': True},
+        }]}, history_apply=lambda *args: writes.append(args),
+    )
+    service = LedgerService(backend)
+    with pytest.raises(StoreError, match='strict two-leg transfers'):
+        service.command('history_apply', 'personal',
+                        {'action': 'redo', 'target': 'fictional-entry', 'fingerprint': 'a' * 64},
+                        request_id='restore-hint', expected_revision=service.revision)
+    assert writes == []
 
 
 def test_proposal_cap_is_explicit_and_bank_hint_never_proves_a_match():

@@ -3815,7 +3815,7 @@
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
+        "Missing/deleted/duplicate IDs, pending or expense/income-classified legs, differing currencies, zero/unequal opposite amounts, dates over seven days or existing links reject confirmation before mutation. Historical closed/cross-scope accounts are supported.",
         "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
         "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
       ],
@@ -3823,7 +3823,7 @@
       "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
       "name": "transfer_candidates",
       "kind": "query",
-      "summary": "Read-only possible transfer pairs: equal opposite nonzero amounts, same currency/budget scope, different active accounts, posted/uncategorized/unmatched, within seven days. All alternatives remain proposals; no automatic match or review.",
+      "summary": "Read-only possible transfer pairs: equal opposite nonzero amounts, same currency, different accounts (including closed or cross-scope history), posted/uncategorized/unmatched, within seven days. All alternatives remain proposals; no automatic match or review.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -3934,15 +3934,14 @@
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
-        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
-        "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
+        "Missing/deleted/duplicate IDs, pending or expense/income-classified legs, differing currencies, unequal opposite amounts (including a zero/nonzero mismatch), dates over seven days or existing links reject confirmation before mutation. Historical closed/cross-scope accounts are supported.",
+        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
       "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
       "name": "preview_transfer_match",
       "kind": "query",
-      "summary": "Inspect the exact proposed pair changes and fingerprint before explicit confirmation. Confirming links both IDs, marks transfer exclusion and leaves both unreviewed. Unmatching removes links and restores provider transfer hints, leaving both unreviewed.",
+      "summary": "Inspect the exact proposed pair changes and fingerprint before explicit confirmation. Confirming links both IDs, marks transfer exclusion and leaves both unreviewed. Unmatching removes links and restores provider transfer hints, leaving both unreviewed. Two existing posted zero-value entries can be explicitly paired without creating entries or assigning financial direction.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -4050,15 +4049,14 @@
       "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
       "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
       "errors": [
-        "Missing/deleted/duplicate IDs, pending/categorized entries, archived accounts, differing currencies/scopes, unequal opposite amounts, dates more than seven days apart or an existing pair reject confirmation before mutation.",
-        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation.",
-        "More than 1,000 proposals fails explicitly; narrow dates/accounts. Pagination is explicit, never silent truncation."
+        "Missing/deleted/duplicate IDs, pending or expense/income-classified legs, differing currencies, unequal opposite amounts (including a zero/nonzero mismatch), dates over seven days or existing links reject confirmation before mutation. Historical closed/cross-scope accounts are supported.",
+        "Stale preview/revision and conflicting request reuse fail. Unsupported backends fail before mutation."
       ],
       "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
       "availability": "WHAB 2.74+, optional TransferMatching SDK; SQLite 1.24+ / JSON 1.16+, or an authority with the same capability.",
       "name": "match_transfer",
       "kind": "command",
-      "summary": "Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, category attribution, source and original metadata. Both remain unreviewed for ordinary review.",
+      "summary": "Explicitly confirm or unmatch two transactions in one atomic native operation. Preserve transaction identities, financial fields, notes, source and original metadata. Matching preserves category attribution; unmatching clears any orphan Transfer label and that label's attribution. Both remain unreviewed for ordinary review. Two existing posted zero-value entries can be explicitly paired without creating entries or assigning financial direction.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -4167,7 +4165,7 @@
           }
         }
       ],
-      "side_effects": "One native transaction, one reversible exact before/after audit entry, durable receipt, revision and synchronous checkpoint. Matching writes reciprocal transferPeerId plus isTransfer=true and reviewed=false. Unmatching removes the links, restores isTransfer from existing inferredTransfer and sets reviewed=false. No bank sync. No standing future rule."
+      "side_effects": "One core-validated native atomic transaction, one coherent before/after history entry, one revision and one synchronous durable checkpoint. Exact replay returns its original receipt without another mutation/history/save, including after restart. No bank sync or future rule. Historical matching never reopens/reclassifies accounts; cross-scope on-budget movement is transferFunding, not ordinary income/spending. Single-pair matching leaves both unreviewed. Unmatching clears Transfer classification with invalidated reciprocal links."
     },
     {
       "name": "classify_category",
@@ -5079,6 +5077,826 @@
       ],
       "retry": "Read again as needed. Later writes still require their observed revision and a unique request ID; exact retries retain the original intent.",
       "availability": "WHAB 2.79+ and OpeningBalanceClassification; SQLite 1.28+, JSON 1.20+. Existing ordinary category workflows remain compatible."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
+      "errors": [
+        "Invalid, missing, deleted, repeated or shared IDs, unequal amounts (including a zero/nonzero mismatch), pending legs, same account/currency mismatch, existing links and dates over seven days reject the complete batch before mutation.",
+        "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail clearly before any mutation.",
+        "An uncertain write must retain its original intent; do not regenerate request ID, revision, fingerprint or payload."
+      ],
+      "name": "preview_transfer_matches",
+      "kind": "query",
+      "summary": "Confirm 1–100 explicit disjoint transfer pairs together; optionally review every complete pair. Closed historical accounts and differing current budget scopes are supported without changing accounts. Every pair validates before any mutation. Mixed batches may include two existing posted zero-value entries: outId/inId identify those two legs without inventing direction, entries or amounts. Suggestions never infer zero-value pairs.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "description": "Operation parameters.",
+              "properties": {
+                "outId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Positive internal minor-unit outflow ID."
+                },
+                "inId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Negative internal minor-unit inflow ID."
+                }
+              },
+              "required": [
+                "outId",
+                "inId"
+              ],
+              "additionalProperties": false
+            },
+            "description": "1–100 explicit disjoint pairs; every ID appears once. Never split or infer counterparts."
+          },
+          "reviewed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicitly review both legs of every complete valid pair in this same atomic operation. Omitted/false leaves both unreviewed."
+          }
+        },
+        "required": [
+          "pairs"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "match",
+            "description": "action."
+          },
+          "pairCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "pairCount."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 200,
+            "description": "count."
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "description": "changed."
+          },
+          "reviewed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicitly review both legs of every complete valid pair in this same atomic operation. Omitted/false leaves both unreviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact preview fingerprint; retain it with the original revision and request ID for retries."
+          },
+          "pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "pairs item."
+            },
+            "description": "Explicit outId/inId with cross-scope and archived-account diagnostics."
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "description": "Operation parameters.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this workspace."
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "before."
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "after."
+                }
+              },
+              "required": [
+                "id",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Exact before/after transaction records, preserving original metadata, financial fields, merchant whitespace and notes."
+          }
+        },
+        "required": [
+          "action",
+          "pairCount",
+          "count",
+          "changed",
+          "reviewed",
+          "fingerprint",
+          "pairs",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in"
+              }
+            ],
+            "reviewed": false
+          },
+          "output": {
+            "action": "match",
+            "pairCount": 1,
+            "count": 2,
+            "changed": 2,
+            "reviewed": false,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in",
+                "crossesBudgetScope": false,
+                "archivedAccounts": []
+              }
+            ],
+            "changes": [
+              {
+                "id": "fictional-out",
+                "before": {},
+                "after": {}
+              },
+              {
+                "id": "fictional-in",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read-only: no revision advancement, history entry, checkpoint, reservation or bank synchronization."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
+      "errors": [
+        "Invalid, missing, deleted, repeated or shared IDs, unequal amounts (including a zero/nonzero mismatch), pending legs, same account/currency mismatch, existing links and dates over seven days reject the complete batch before mutation.",
+        "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail clearly before any mutation.",
+        "An uncertain write must retain its original intent; do not regenerate request ID, revision, fingerprint or payload."
+      ],
+      "name": "match_transfers",
+      "kind": "command",
+      "summary": "Confirm 1–100 explicit disjoint transfer pairs together; optionally review every complete pair. Closed historical accounts and differing current budget scopes are supported without changing accounts. Every pair validates before any mutation. Mixed batches may include two existing posted zero-value entries: outId/inId identify those two legs without inventing direction, entries or amounts. Suggestions never infer zero-value pairs.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "description": "Operation parameters.",
+              "properties": {
+                "outId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Positive internal minor-unit outflow ID."
+                },
+                "inId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Negative internal minor-unit inflow ID."
+                }
+              },
+              "required": [
+                "outId",
+                "inId"
+              ],
+              "additionalProperties": false
+            },
+            "description": "1–100 explicit disjoint pairs; every ID appears once. Never split or infer counterparts."
+          },
+          "reviewed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicitly review both legs of every complete valid pair in this same atomic operation. Omitted/false leaves both unreviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact preview fingerprint; retain it with the original revision and request ID for retries."
+          }
+        },
+        "required": [
+          "pairs",
+          "fingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "match",
+            "description": "action."
+          },
+          "pairCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "pairCount."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 200,
+            "description": "count."
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "description": "changed."
+          },
+          "reviewed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicitly review both legs of every complete valid pair in this same atomic operation. Omitted/false leaves both unreviewed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact preview fingerprint; retain it with the original revision and request ID for retries."
+          },
+          "pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "pairs item."
+            },
+            "description": "Explicit outId/inId with cross-scope and archived-account diagnostics."
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "description": "Operation parameters.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this workspace."
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "before."
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "after."
+                }
+              },
+              "required": [
+                "id",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Exact before/after transaction records, preserving original metadata, financial fields, merchant whitespace and notes."
+          }
+        },
+        "required": [
+          "action",
+          "pairCount",
+          "count",
+          "changed",
+          "reviewed",
+          "fingerprint",
+          "pairs",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in"
+              }
+            ],
+            "reviewed": false,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "output": {
+            "action": "match",
+            "pairCount": 1,
+            "count": 2,
+            "changed": 2,
+            "reviewed": false,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pairs": [
+              {
+                "outId": "fictional-out",
+                "inId": "fictional-in",
+                "crossesBudgetScope": false,
+                "archivedAccounts": []
+              }
+            ],
+            "changes": [
+              {
+                "id": "fictional-out",
+                "before": {},
+                "after": {}
+              },
+              {
+                "id": "fictional-in",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One core-validated native atomic transaction, one coherent before/after history entry, one revision and one synchronous durable checkpoint. Exact replay returns its original receipt without another mutation/history/save, including after restart. No bank sync or future rule. Historical matching never reopens/reclassifies accounts; cross-scope on-budget movement is transferFunding, not ordinary income/spending."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
+      "errors": [
+        "Select 1–200 distinct existing IDs with invalid transfer state; include every existing malformed counterpart. Missing, duplicate, unrelated or incomplete selections reject the entire repair before mutation.",
+        "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail before mutation.",
+        "An uncertain save retains the complete original intent; never automatically retry with a fresh request. Guarded undo refuses to restore invalid Transfer classification or review."
+      ],
+      "name": "preview_transfer_repair",
+      "kind": "query",
+      "summary": "Inspect or explicitly repair selected invalid transfer records: unreview, clear orphan Transfer classification and malformed links, retain imported hints and exact financial fields. Never invent a missing leg; two existing posted zero-value records may instead be explicitly paired through match_transfers. Include all existing malformed counterparts explicitly.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Exact stable transaction ID in this workspace."
+            },
+            "description": "Explicit invalid transaction IDs; include every existing malformed linked counterpart. No hidden extra targets."
+          }
+        },
+        "required": [
+          "transactionIds"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "repair",
+            "description": "action."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "count."
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "description": "changed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact preview fingerprint; retain it with the original revision and request ID for retries."
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "description": "Operation parameters.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this workspace."
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "before."
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "after."
+                }
+              },
+              "required": [
+                "id",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Exact before/after transaction records, preserving original metadata, financial fields, merchant whitespace and notes."
+          }
+        },
+        "required": [
+          "action",
+          "count",
+          "changed",
+          "fingerprint",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-orphan"
+            ]
+          },
+          "output": {
+            "action": "repair",
+            "count": 1,
+            "changed": 1,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "changes": [
+              {
+                "id": "fictional-orphan",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "Read-only: no revision advancement, history entry, checkpoint, reservation or bank synchronization."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
+      "errors": [
+        "Select 1–200 distinct existing IDs with invalid transfer state; include every existing malformed counterpart. Missing, duplicate, unrelated or incomplete selections reject the entire repair before mutation.",
+        "Stale revisions/fingerprints and conflicting request-ID reuse reject; unsupported backends fail before mutation.",
+        "An uncertain save retains the complete original intent; never automatically retry with a fresh request. Guarded undo refuses to restore invalid Transfer classification or review."
+      ],
+      "name": "repair_transfers",
+      "kind": "command",
+      "summary": "Inspect or explicitly repair selected invalid transfer records: unreview, clear orphan Transfer classification and malformed links, retain imported hints and exact financial fields. Never invent a missing leg; two existing posted zero-value records may instead be explicitly paired through match_transfers. Include all existing malformed counterparts explicitly.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "transactionIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Exact stable transaction ID in this workspace."
+            },
+            "description": "Explicit invalid transaction IDs; include every existing malformed linked counterpart. No hidden extra targets."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact preview fingerprint; retain it with the original revision and request ID for retries."
+          }
+        },
+        "required": [
+          "transactionIds",
+          "fingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "const": "repair",
+            "description": "action."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "description": "count."
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200,
+            "description": "changed."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact preview fingerprint; retain it with the original revision and request ID for retries."
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "description": "Operation parameters.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this workspace."
+                },
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "before."
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "after."
+                }
+              },
+              "required": [
+                "id",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Exact before/after transaction records, preserving original metadata, financial fields, merchant whitespace and notes."
+          }
+        },
+        "required": [
+          "action",
+          "count",
+          "changed",
+          "fingerprint",
+          "changes"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "transactionIds": [
+              "fictional-orphan"
+            ],
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "output": {
+            "action": "repair",
+            "count": 1,
+            "changed": 1,
+            "fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+            "changes": [
+              {
+                "id": "fictional-orphan",
+                "before": {},
+                "after": {}
+              }
+            ]
+          }
+        }
+      ],
+      "side_effects": "One core-validated native atomic transaction, one coherent before/after history entry, one revision and one synchronous durable checkpoint. Exact replay returns its original receipt without another mutation/history/save, including after restart. No bank sync or future rule. Historical matching never reopens/reclassifies accounts; cross-scope on-budget movement is transferFunding, not ordinary income/spending."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
+      "errors": [
+        "Use inclusive valid ISO dates in ascending order, a nonnegative offset and limit 1–100. Unknown fields or invalid values are refused.",
+        "Unsupported authorities fail clearly. Keep the same revision across every page; a changed revision requires restarting the read, not combining inconsistent pages."
+      ],
+      "name": "transfer_audit",
+      "kind": "query",
+      "summary": "Read complete paginated transfer-integrity issues, including unpaired imported hints, invalid links/Transfer categories, legacy reviewed records and unpaired zero-value hints. Reads never clean up legacy data.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "since": {
+            "type": "string",
+            "description": "Inclusive transaction date bound YYYY-MM-DD."
+          },
+          "until": {
+            "type": "string",
+            "description": "Inclusive anchor end YYYY-MM-DD."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Explicit next offset from the previous result; require an unchanged revision across pages."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Page size, default 100."
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Operation parameters.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Exact stable transaction ID in this workspace."
+                },
+                "code": {
+                  "type": "string",
+                  "description": "code."
+                },
+                "message": {
+                  "type": "string",
+                  "description": "message."
+                },
+                "transaction": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "transaction."
+                },
+                "repairable": {
+                  "type": "boolean",
+                  "description": "repairable."
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "message",
+                "transaction",
+                "repairable"
+              ],
+              "additionalProperties": false
+            },
+            "description": "issues."
+          },
+          "total": {
+            "type": "integer",
+            "description": "total."
+          },
+          "next": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "next."
+          },
+          "zeroValuePolicy": {
+            "type": "string",
+            "description": "zeroValuePolicy."
+          }
+        },
+        "required": [
+          "issues",
+          "total",
+          "next",
+          "zeroValuePolicy"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "issues": [],
+            "total": 0,
+            "next": null,
+            "zeroValuePolicy": "Unpaired zero-value hints stay unreviewed; explicitly select two existing valid counterparts to pair them without inventing direction, or deliberately reclassify."
+          }
+        }
+      ],
+      "side_effects": "Read-only: no revision advancement, history entry, checkpoint, reservation or bank synchronization."
+    },
+    {
+      "permissions": "Existing verified HTTPS budget/workspace access; writes require an observed revision and unique request ID. Agent/batch attribution uses the public history context.",
+      "scope": "One addressed budget/environment/workspace. No cross-currency or cross-budget matching.",
+      "retry": "Reads may be repeated. Exact successful writes retain original operation/workspace/payload/revision/request ID/history and return the original durable receipt after restart. Never retry an uncertain write with fresh intent.",
+      "availability": "WHAB 2.81+, native TransferIntegrity capability or compatible remote authority.",
+      "errors": [
+        "Unsupported authoritative storage or an unavailable remote policy fails clearly without mutation."
+      ],
+      "name": "transfer_policy",
+      "kind": "query",
+      "summary": "Read authoritative strict two-leg transfer, native atomic bulk and historical-account support. Unsupported storage/remote authorities fail before mutation. zeroAmountPairing=true means explicit matching of two existing posted zero records, never inferred suggestions or zero creation.",
+      "input": {
+        "type": "object",
+        "description": "Operation parameters.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Capability version, limits and supported financial rules.",
+        "additionalProperties": true
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": {
+            "version": 1,
+            "maxPairs": 100,
+            "maxRepairTransactions": 200,
+            "twoLegsRequired": true,
+            "zeroAmountPairing": true,
+            "historicalClosedAccounts": true,
+            "crossScopeFunding": true
+          }
+        }
+      ],
+      "side_effects": "Read-only: no revision advancement, history entry, checkpoint, reservation or bank synchronization."
     }
   ]
 }

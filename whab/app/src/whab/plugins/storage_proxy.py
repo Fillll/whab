@@ -28,6 +28,8 @@ from .storage_worker_codec import CONTROL_WRITES, METHODS
 _MUTATIONS = {
     "change_transactions": (("workspace", "edits", "creates"), {"preserve_balances": False}),
     "apply_transfer_match": (("workspace", "transaction_ids", "action", "fingerprint"), {}),
+    "apply_transfer_matches": (("workspace", "pairs"), {"reviewed": False, "fingerprint": None}),
+    "repair_transfers": (("workspace", "transaction_ids", "fingerprint"), {}),
     "edit_transactions": (("workspace", "edits"), {}),
     "classify_accounts": (("workspace", "edits"), {}),
     "history_apply": (("workspace", "action", "target", "fingerprint"), {}),

@@ -1,0 +1,1196 @@
+{
+  "python": "3.15.1",
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "transactions": 100000,
+  "source_digest_before": "46b0a649aca2035ad108369fe46eecd4476e7df6f689d15f81301537fe5d962b",
+  "provider_latency": "excluded: fictional data; no provider calls",
+  "instrumentation": "one local metrics JSON write per successful checkpoint",
+  "cases": [
+    {
+      "pairs": 1,
+      "fresh_bulk_processes": 25,
+      "separate_workflows": 0,
+      "bulk": {
+        "p50_ms": 629.117582924664,
+        "p95_ms": 1424.9228341504931
+      },
+      "separate": null,
+      "per_pair_p50_ms": 629.117582924664,
+      "per_leg_p50_ms": 314.558791462332,
+      "workflow_saved_p50_ms": null,
+      "workflow_saved_percent": null,
+      "p95_target_ms": 250,
+      "p95_target_met": false,
+      "segments": [
+        {
+          "cold": {
+            "activation_ms": 36900.90641612187,
+            "first_mutation_ms": 18410.413125064224
+          },
+          "bulk_samples": [
+            {
+              "wall_ms": 1424.9228341504931,
+              "load_average": [
+                11.587890625,
+                7.712890625,
+                7.53125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 787.5204160809517,
+              "load_average": [
+                11.587890625,
+                7.712890625,
+                7.53125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 913.7619161047041,
+              "load_average": [
+                11.587890625,
+                7.712890625,
+                7.53125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 686.6264576092362,
+              "load_average": [
+                11.587890625,
+                7.712890625,
+                7.53125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 659.1591662727296,
+              "load_average": [
+                11.30029296875,
+                7.71728515625,
+                7.53369140625
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 1782.2793330997229,
+              "load_average": [
+                11.30029296875,
+                7.71728515625,
+                7.53369140625
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 744.1564998589456,
+              "load_average": [
+                11.30029296875,
+                7.71728515625,
+                7.53369140625
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 591.0268328152597,
+              "load_average": [
+                11.30029296875,
+                7.71728515625,
+                7.53369140625
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 533.0793750472367,
+              "load_average": [
+                11.30029296875,
+                7.71728515625,
+                7.53369140625
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 446.7328330501914,
+              "load_average": [
+                11.30029296875,
+                7.71728515625,
+                7.53369140625
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 443.4762909077108,
+              "load_average": [
+                11.30029296875,
+                7.71728515625,
+                7.53369140625
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 410.911416169256,
+              "load_average": [
+                11.11572265625,
+                7.73828125,
+                7.5419921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 667.6339157857001,
+              "load_average": [
+                11.11572265625,
+                7.73828125,
+                7.5419921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 575.3498752601445,
+              "load_average": [
+                11.11572265625,
+                7.73828125,
+                7.5419921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 529.3542924337089,
+              "load_average": [
+                11.11572265625,
+                7.73828125,
+                7.5419921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 468.4560000896454,
+              "load_average": [
+                11.11572265625,
+                7.73828125,
+                7.5419921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 590.7991668209434,
+              "load_average": [
+                11.11572265625,
+                7.73828125,
+                7.5419921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 629.117582924664,
+              "load_average": [
+                11.11572265625,
+                7.73828125,
+                7.5419921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 713.0727912299335,
+              "load_average": [
+                11.11572265625,
+                7.73828125,
+                7.5419921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 859.2362077906728,
+              "load_average": [
+                12.3076171875,
+                8.041015625,
+                7.64990234375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 773.1018750928342,
+              "load_average": [
+                12.3076171875,
+                8.041015625,
+                7.64990234375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 492.58004082366824,
+              "load_average": [
+                12.3076171875,
+                8.041015625,
+                7.64990234375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 460.8202497474849,
+              "load_average": [
+                12.3076171875,
+                8.041015625,
+                7.64990234375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 451.6378748230636,
+              "load_average": [
+                12.3076171875,
+                8.041015625,
+                7.64990234375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 640.4462498612702,
+              "load_average": [
+                12.3076171875,
+                8.041015625,
+                7.64990234375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            }
+          ],
+          "separate_samples": [],
+          "restored": {
+            "restored_actual_checkpoint": true,
+            "transactions": 100000,
+            "history_entries": 26,
+            "expanded_payload_bytes": 47181824,
+            "saved_bytes": 2808304
+          }
+        }
+      ]
+    },
+    {
+      "pairs": 10,
+      "fresh_bulk_processes": 25,
+      "separate_workflows": 0,
+      "bulk": {
+        "p50_ms": 476.26904118806124,
+        "p95_ms": 756.668415851891
+      },
+      "separate": null,
+      "per_pair_p50_ms": 47.626904118806124,
+      "per_leg_p50_ms": 23.813452059403062,
+      "workflow_saved_p50_ms": null,
+      "workflow_saved_percent": null,
+      "p95_target_ms": 250,
+      "p95_target_met": false,
+      "segments": [
+        {
+          "cold": {
+            "activation_ms": 37328.608750365674,
+            "first_mutation_ms": 13946.119958069175
+          },
+          "bulk_samples": [
+            {
+              "wall_ms": 980.6917076930404,
+              "load_average": [
+                6.96875,
+                7.55224609375,
+                7.521484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 457.3630830273032,
+              "load_average": [
+                6.96875,
+                7.55224609375,
+                7.521484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 429.73229195922613,
+              "load_average": [
+                6.96875,
+                7.55224609375,
+                7.521484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 533.8384578935802,
+              "load_average": [
+                6.96875,
+                7.55224609375,
+                7.521484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 519.8506661690772,
+              "load_average": [
+                6.96875,
+                7.55224609375,
+                7.521484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 460.93345899134874,
+              "load_average": [
+                6.96875,
+                7.55224609375,
+                7.521484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 441.77479203790426,
+              "load_average": [
+                6.96875,
+                7.55224609375,
+                7.521484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 476.26904118806124,
+              "load_average": [
+                6.96875,
+                7.55224609375,
+                7.521484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 625.5440418608487,
+              "load_average": [
+                6.96875,
+                7.55224609375,
+                7.521484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 501.4408747665584,
+              "load_average": [
+                6.96875,
+                7.55224609375,
+                7.521484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 415.70812510326505,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 444.1042076796293,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 525.8935829624534,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 506.61375001072884,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 400.6905001588166,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 441.3832500576973,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 528.228959068656,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 460.30866680666804,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 416.24708380550146,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 511.81958289816976,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 450.180625077337,
+              "load_average": [
+                6.73095703125,
+                7.4931640625,
+                7.50048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 480.8632922358811,
+              "load_average": [
+                6.51220703125,
+                7.43505859375,
+                7.4794921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 435.41058292612433,
+              "load_average": [
+                6.51220703125,
+                7.43505859375,
+                7.4794921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 756.668415851891,
+              "load_average": [
+                6.51220703125,
+                7.43505859375,
+                7.4794921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 531.0099576599896,
+              "load_average": [
+                6.51220703125,
+                7.43505859375,
+                7.4794921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            }
+          ],
+          "separate_samples": [],
+          "restored": {
+            "restored_actual_checkpoint": true,
+            "transactions": 100000,
+            "history_entries": 26,
+            "expanded_payload_bytes": 47202304,
+            "saved_bytes": 2821524
+          }
+        }
+      ]
+    },
+    {
+      "pairs": 50,
+      "fresh_bulk_processes": 25,
+      "separate_workflows": 0,
+      "bulk": {
+        "p50_ms": 664.8208750411868,
+        "p95_ms": 1107.5129169039428
+      },
+      "separate": null,
+      "per_pair_p50_ms": 13.296417500823736,
+      "per_leg_p50_ms": 6.648208750411868,
+      "workflow_saved_p50_ms": null,
+      "workflow_saved_percent": null,
+      "p95_target_ms": 250,
+      "p95_target_met": false,
+      "segments": [
+        {
+          "cold": {
+            "activation_ms": 39638.26404185966,
+            "first_mutation_ms": 17827.036125119776
+          },
+          "bulk_samples": [
+            {
+              "wall_ms": 851.5043342486024,
+              "load_average": [
+                8.4296875,
+                7.6171875,
+                7.52294921875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 630.232541821897,
+              "load_average": [
+                7.99462890625,
+                7.54052734375,
+                7.49609375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 658.5900420323014,
+              "load_average": [
+                7.99462890625,
+                7.54052734375,
+                7.49609375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 562.3021656647325,
+              "load_average": [
+                7.99462890625,
+                7.54052734375,
+                7.49609375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 726.4863331802189,
+              "load_average": [
+                7.99462890625,
+                7.54052734375,
+                7.49609375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 582.6223334297538,
+              "load_average": [
+                7.99462890625,
+                7.54052734375,
+                7.49609375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 664.8208750411868,
+              "load_average": [
+                7.99462890625,
+                7.54052734375,
+                7.49609375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 1086.9088331237435,
+              "load_average": [
+                7.99462890625,
+                7.54052734375,
+                7.49609375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 855.6204997003078,
+              "load_average": [
+                8.07470703125,
+                7.564453125,
+                7.5048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 805.6493336334825,
+              "load_average": [
+                8.07470703125,
+                7.564453125,
+                7.5048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 512.9545000381768,
+              "load_average": [
+                8.07470703125,
+                7.564453125,
+                7.5048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 567.2672083601356,
+              "load_average": [
+                8.07470703125,
+                7.564453125,
+                7.5048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 530.1706655882299,
+              "load_average": [
+                8.07470703125,
+                7.564453125,
+                7.5048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 610.8067496679723,
+              "load_average": [
+                8.07470703125,
+                7.564453125,
+                7.5048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 566.2392908707261,
+              "load_average": [
+                8.07470703125,
+                7.564453125,
+                7.5048828125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 2193.774084094912,
+              "load_average": [
+                7.98828125,
+                7.5546875,
+                7.50146484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 671.5621249750257,
+              "load_average": [
+                7.98828125,
+                7.5546875,
+                7.50146484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 586.9138753041625,
+              "load_average": [
+                7.98828125,
+                7.5546875,
+                7.50146484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 549.4798752479255,
+              "load_average": [
+                7.98828125,
+                7.5546875,
+                7.50146484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 547.9532079771161,
+              "load_average": [
+                7.98828125,
+                7.5546875,
+                7.50146484375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            }
+          ],
+          "separate_samples": [],
+          "restored": {
+            "restored_actual_checkpoint": true,
+            "transactions": 100000,
+            "history_entries": 21,
+            "expanded_payload_bytes": 48386048,
+            "saved_bytes": 2857715
+          }
+        },
+        {
+          "cold": {
+            "activation_ms": 48876.39470770955,
+            "first_mutation_ms": 23802.57449997589
+          },
+          "bulk_samples": [
+            {
+              "wall_ms": 1107.5129169039428,
+              "load_average": [
+                10.1796875,
+                8.244140625,
+                7.75830078125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 778.7804170511663,
+              "load_average": [
+                10.1796875,
+                8.244140625,
+                7.75830078125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 796.0585406981409,
+              "load_average": [
+                9.6845703125,
+                8.17333984375,
+                7.73583984375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 868.0232092738152,
+              "load_average": [
+                9.6845703125,
+                8.17333984375,
+                7.73583984375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 971.6042918153107,
+              "load_average": [
+                9.6845703125,
+                8.17333984375,
+                7.73583984375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            }
+          ],
+          "separate_samples": [],
+          "restored": {
+            "restored_actual_checkpoint": true,
+            "transactions": 100000,
+            "history_entries": 6,
+            "expanded_payload_bytes": 47259648,
+            "saved_bytes": 2811758
+          }
+        }
+      ]
+    },
+    {
+      "pairs": 100,
+      "fresh_bulk_processes": 25,
+      "separate_workflows": 0,
+      "bulk": {
+        "p50_ms": 992.2839589416981,
+        "p95_ms": 3861.9669168256223
+      },
+      "separate": null,
+      "per_pair_p50_ms": 9.92283958941698,
+      "per_leg_p50_ms": 4.96141979470849,
+      "workflow_saved_p50_ms": null,
+      "workflow_saved_percent": null,
+      "p95_target_ms": 250,
+      "p95_target_met": false,
+      "segments": [
+        {
+          "cold": {
+            "activation_ms": 46529.82341591269,
+            "first_mutation_ms": 20631.303667090833
+          },
+          "bulk_samples": [
+            {
+              "wall_ms": 1366.0097080282867,
+              "load_average": [
+                8.97314453125,
+                8.08837890625,
+                7.748046875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 945.6593752838671,
+              "load_average": [
+                8.97314453125,
+                8.08837890625,
+                7.748046875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 1113.5900001972914,
+              "load_average": [
+                8.97314453125,
+                8.08837890625,
+                7.748046875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 1227.5373339653015,
+              "load_average": [
+                9.13525390625,
+                8.13623046875,
+                7.76708984375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 883.7010413408279,
+              "load_average": [
+                9.13525390625,
+                8.13623046875,
+                7.76708984375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 2672.3620421253145,
+              "load_average": [
+                9.13525390625,
+                8.13623046875,
+                7.76708984375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 1945.9412079304457,
+              "load_average": [
+                10.0048828125,
+                8.3330078125,
+                7.83837890625
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 3861.9669168256223,
+              "load_average": [
+                10.0048828125,
+                8.3330078125,
+                7.83837890625
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 826.7775410786271,
+              "load_average": [
+                9.36376953125,
+                8.2275390625,
+                7.8037109375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 595.0932917185128,
+              "load_average": [
+                9.36376953125,
+                8.2275390625,
+                7.8037109375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            }
+          ],
+          "separate_samples": [],
+          "restored": {
+            "restored_actual_checkpoint": true,
+            "transactions": 100000,
+            "history_entries": 11,
+            "expanded_payload_bytes": 48451584,
+            "saved_bytes": 2866321
+          }
+        },
+        {
+          "cold": {
+            "activation_ms": 39114.96908310801,
+            "first_mutation_ms": 17498.283749911934
+          },
+          "bulk_samples": [
+            {
+              "wall_ms": 1023.4044999815524,
+              "load_average": [
+                7.56005859375,
+                8.00048828125,
+                7.7783203125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 939.3161251209676,
+              "load_average": [
+                7.56005859375,
+                8.00048828125,
+                7.7783203125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 1182.5389168225229,
+              "load_average": [
+                7.51513671875,
+                7.9833984375,
+                7.7734375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 758.7452917359769,
+              "load_average": [
+                7.51513671875,
+                7.9833984375,
+                7.7734375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 992.2839589416981,
+              "load_average": [
+                7.51513671875,
+                7.9833984375,
+                7.7734375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 782.1680419147015,
+              "load_average": [
+                7.51513671875,
+                7.9833984375,
+                7.7734375
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 2698.749916162342,
+              "load_average": [
+                7.7138671875,
+                8.0166015625,
+                7.7861328125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 5819.1657909192145,
+              "load_average": [
+                7.576171875,
+                7.98291015625,
+                7.775390625
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 3381.839540787041,
+              "load_average": [
+                8.25048828125,
+                8.11572265625,
+                7.8232421875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 1309.4529998488724,
+              "load_average": [
+                8.25048828125,
+                8.11572265625,
+                7.8232421875
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            }
+          ],
+          "separate_samples": [],
+          "restored": {
+            "restored_actual_checkpoint": true,
+            "transactions": 100000,
+            "history_entries": 11,
+            "expanded_payload_bytes": 48451584,
+            "saved_bytes": 2866311
+          }
+        },
+        {
+          "cold": {
+            "activation_ms": 38403.29899964854,
+            "first_mutation_ms": 14270.122334361076
+          },
+          "bulk_samples": [
+            {
+              "wall_ms": 591.5574580430984,
+              "load_average": [
+                7.77197265625,
+                8.51611328125,
+                8.08642578125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 572.2415000200272,
+              "load_average": [
+                7.77197265625,
+                8.51611328125,
+                8.08642578125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 669.0736673772335,
+              "load_average": [
+                7.77197265625,
+                8.51611328125,
+                8.08642578125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 533.3212092518806,
+              "load_average": [
+                7.77197265625,
+                8.51611328125,
+                8.08642578125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            },
+            {
+              "wall_ms": 514.9706248193979,
+              "load_average": [
+                7.77197265625,
+                8.51611328125,
+                8.08642578125
+              ],
+              "checkpoints": 1,
+              "native_commits": 1
+            }
+          ],
+          "separate_samples": [],
+          "restored": {
+            "restored_actual_checkpoint": true,
+            "transactions": 100000,
+            "history_entries": 6,
+            "expanded_payload_bytes": 47337472,
+            "saved_bytes": 2838438
+          }
+        }
+      ]
+    }
+  ],
+  "source_digest_after": "46b0a649aca2035ad108369fe46eecd4476e7df6f689d15f81301537fe5d962b",
+  "source_unchanged": true
+}

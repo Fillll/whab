@@ -1,10 +1,20 @@
 # Changelog
 
-## 1.21.0 — 2026-11-15
+## 1.22.0 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)
 
-- Preserve versioned logical integrity across native local imports and copies from SQLite, retaining legacy evidence and exact durable receipts. Read native format 5 and reject mismatched receipt and copy integrity versions.
+- Preserve versioned logical integrity across native local imports and copies from SQLite, retaining legacy evidence and exact durable receipts. Use native format 6 for version-2 evidence, retain legacy format-5 transfer fences and reject mismatched receipt and copy integrity versions.
+
+## 1.21.0 — 2026-11-15
+
+PR: [#210](https://github.com/Fillll/whab/pull/210)
+
+- Commit 1–100 explicit disjoint transfer pairs with optional review as one native operation, exact preview/fingerprint, before/after audit and restart-safe retry receipt. Reject every invalid batch before mutation; support historical closed accounts and differing current budget scopes without changing accounts or financial fields.
+- Enforce graph-proven two-leg transfer review in native annotation paths and public register projections, including peers outside page filters. Add complete paginated zero-hint/orphan/link audits and guarded explicit legacy repairs.
+- Keep native format 5 sticky while transfer pairs remain in current state or permanent history, including restored/local-transfer records; older native readers refuse unsupported semantics.
+- Fence sanitized paired-budget payloads with portable version 2, including history-only pairs after undo. Older installations refuse restoration; current readers preserve support for unchanged version-1 payloads.
+- Permit explicit confirmation and review of two existing posted zero-valued records under the same reciprocal-pair rules. Suggestions omit zeros, and pairing never invents a transaction, direction or amount.
 
 ## 1.20.0 — 2026-11-14
 

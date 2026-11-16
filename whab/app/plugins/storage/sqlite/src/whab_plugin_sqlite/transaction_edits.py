@@ -48,6 +48,9 @@ def edit_transaction(
                     peer = state["transactions"][row["id"]].pop("transfer_peer_id")
                     if peer is not None:
                         state["transactions"][row["id"]]["transferPeerId"] = peer
+                        from .transfer_pairs import context
+                        for key, related in context(store, workspace, [transaction_id])['transactions'].items():
+                            state['transactions'].setdefault(key, related)
             if details is not None:
                 transaction = state["transactions"].get(transaction_id)
                 if transaction is not None:

@@ -22,7 +22,7 @@ def identifier(name):
 def creation(**extra):
     return {'creationId': identifier('creation'), 'accountId': 'checking', 'date': '2026-05-02',
             'merchant': '  Fictional café 東京  ', 'amount': -25000, 'currency': 'USD',
-            'categoryId': 'transfers', 'note': 'Exact new memo\n  ', **extra}
+            'categoryId': None, 'note': 'Exact new memo\n  ', **extra}
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ def test_imported_split_preview_and_commit_preserve_cash_and_identity(ledger):
     new = ledger['transactions'][creates[0]['creationId']]
     assert new['source'] == 'manual' and not new['reviewed'] and not new['pending']
     assert new['merchant'] == creates[0]['merchant'] and new['note'] == creates[0]['note']
-    assert new['categoryId'] == 'transfers' and new['isTransfer']
+    assert new['categoryId'] is None and not new['isTransfer']
     assert original['amount'] + new['amount'] == before['transactions']['receipt']['amount']
     assert ledger['accounts'] == before['accounts']
     assert ledger['transactions']['unrelated'] == before['transactions']['unrelated']
@@ -167,9 +167,14 @@ def test_annotation_batches_and_noop_financial_fields_keep_review_and_original(l
 
 def test_combined_financial_and_category_correction_validates_final_account_pair(ledger):
     edits = [{'transactionId': 'receipt', 'amount': -75000, 'categoryId': 'transfers', 'categoryAgent': 'Codex', 'note': ''}]
+    before = deepcopy(ledger)
+    with pytest.raises(StoreError, match='exactly two'):
+        transaction_changes(ledger, edits, [], apply=True)
+    assert ledger == before
+    edits[0]['categoryId'] = 'groceries'
     transaction_changes(ledger, edits, [], apply=True)
     row = ledger['transactions']['receipt']
-    assert row['categoryId'] == 'transfers' and row['categoryAgent'] == 'Codex' and row['isTransfer']
+    assert row['categoryId'] == 'groceries' and row['categoryAgent'] == 'Codex' and not row['isTransfer']
     assert row['note'] == '' and not row['reviewed']
 
 

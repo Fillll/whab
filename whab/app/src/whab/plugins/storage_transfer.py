@@ -34,6 +34,7 @@ STORAGE_ROLES = frozenset({"primary", "staged", "copy", "fenced", "retired"})
 STORAGE_OPERATIONS = frozenset({
     "change_transactions",
     "apply_transfer_match",
+    "apply_transfer_matches", "repair_transfers",
     "edit_transactions", "classify_accounts",
     "delete_category", "delete_category_group", "rename_category", "classify_category",
     "add_category_group", "move_category", "add_account", "update_account", "add_category", "add_transaction", "edit_transaction", "edit_transaction_details", "recorded_command", "history_apply",
@@ -45,6 +46,8 @@ _BULK_OPERATIONS = frozenset({"recorded_command", "restore_budget", "restore_bud
 _OPERATION_FIELDS = {
     "change_transactions": ({"edits", "creates"}, {"preserveBalances"}),
     "apply_transfer_match": ({"transactionIds", "action", "fingerprint"}, set()),
+    "apply_transfer_matches": ({"pairs", "reviewed", "fingerprint"}, set()),
+    "repair_transfers": ({"transactionIds", "fingerprint"}, set()),
     "edit_transactions": ({"edits"}, set()),
     "classify_accounts": ({"edits"}, set()),
     "recorded_command": ({"operation", "parameters", "context"}, set()),
@@ -385,6 +388,10 @@ def dispatch_storage_operation(backend, operation):
         return dispatch_storage_operation(backend, nested)
     if name == "apply_transfer_match":
         return backend.apply_transfer_match(workspace, payload["transactionIds"], payload["action"], payload["fingerprint"])
+    if name == "apply_transfer_matches":
+        return backend.apply_transfer_matches(workspace, payload["pairs"], payload["reviewed"], payload["fingerprint"])
+    if name == "repair_transfers":
+        return backend.repair_transfers(workspace, payload["transactionIds"], payload["fingerprint"])
     if name == "history_apply":
         return backend.history_apply(workspace, payload['action'], payload['target'], payload['fingerprint'])
     if name == "add_category_group":

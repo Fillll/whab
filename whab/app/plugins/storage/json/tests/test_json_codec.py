@@ -27,7 +27,7 @@ def _item(value):
 
 @pytest.mark.parametrize("mutate", [
     lambda value: value.update(extra=True),
-    lambda value: value.update(formatVersion=6),
+    lambda value: value.update(formatVersion=7),
     lambda value: value.update(formatVersion=True),
     lambda value: value.update(generation=True),
     lambda value: value.update(generation=-1),
@@ -167,7 +167,7 @@ def test_portable_payload_requires_exact_filename(files):
 
 
 @pytest.mark.parametrize("change", [
-    {"formatVersion": 2}, {"formatVersion": True}, {"items": [{}]}, {"associations": [{}]},
+    {"formatVersion": 3}, {"formatVersion": True}, {"items": [{}]}, {"associations": [{}]},
 ])
 def test_portable_payload_rejects_runtime_records_and_incompatible_version(json_store, change):
     value = json.loads(json_store.export_budget_files()["budget.json"])

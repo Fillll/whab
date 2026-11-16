@@ -107,3 +107,71 @@ def test_json_reopen_rejects_same_generation_receipt_algorithm_corruption(tmp_pa
     finally:
         source.close()
         destination.close()
+
+
+@pytest.mark.parametrize('destination_class', [SqliteStore, JsonStore], ids=['sqlite', 'json'])
+@pytest.mark.parametrize('role', ['staged', 'copy'])
+def test_legacy_transfer_format_five_keeps_sha_evidence_through_copy_reopen_and_migration(tmp_path, destination_class, role):
+    import json
+
+    from whab.plugins.storage_transfer import StorageOperation, canonical_storage_json
+
+    source = JsonStore(tmp_path / 'legacy-transfer.json', month='2026-11')
+    target_path = tmp_path / 'destination'
+    destination = destination_class(target_path, month='2026-11', initial_role=role)
+    try:
+        accounts = [source.add_account('personal', {'name': name, 'type': 'depository', 'balance': 10000})
+                    for name in ('Fictional cash', 'Fictional savings')]
+        ids = [source.add_transaction('personal', {'accountId': account, 'date': '2026-11-01',
+                'merchant': 'Fictional transfer', 'amount': amount}) for account, amount in zip(accounts, (100, -100))]
+        pairs = [{'outId': ids[0], 'inId': ids[1]}]
+        evidence = source.commit_evidence()
+        operation = StorageOperation('legacy-pair', evidence.authority_epoch, evidence.generation,
+            'personal', 'apply_transfer_matches', canonical_storage_json({
+                'pairs': pairs, 'reviewed': False,
+                'fingerprint': source.preview_transfer_matches('personal', pairs)['fingerprint'],
+            }))
+        receipt = source.execute_operation(operation).receipt
+        assert json.loads(source.path.read_bytes())['formatVersion'] == 5
+        assert receipt.evidence.digest_version == 1
+        source.close()
+        source = JsonStore(tmp_path / 'legacy-transfer.json')
+        assert source.commit_evidence() == receipt.evidence
+        snapshot = source.export_local()
+        if role == 'copy':
+            watermark = destination.apply_replica(str(uuid4()), snapshot, 'a' * 64,
+                destination.commit_evidence(), namespace_generation=0)
+            assert watermark.digest_version == 1
+        else:
+            destination.import_local('legacy-copy', snapshot)
+        copied = destination.commit_evidence()
+        assert copied.digest_version == 1 and copied.state_digest == snapshot.source.state_digest
+        def native_version():
+            return (destination._authority_metadata()['formatVersion'] if destination_class is SqliteStore
+                    else json.loads(destination.path.read_bytes())['formatVersion'])
+        assert native_version() == 5
+        destination.close()
+        destination = destination_class(target_path, read_only=True)
+        assert native_version() == 5 and destination.commit_evidence() == copied
+        destination.close()
+        destination = destination_class(target_path)
+        if role == 'copy':
+            destination.prepare_promotion('legacy-promote', copied, watermark)
+        transition = 'legacy-promote' if role == 'copy' else 'legacy-copy'
+        destination.set_role(transition, copied, 'primary', authority_epoch=str(uuid4()))
+        assert destination.execute_operation(operation).receipt == receipt
+        before = destination.commit_evidence()
+        destination.edit_transaction('personal', ids[0], note='First subsequent edit')
+        after = destination.commit_evidence()
+        assert after.generation == before.generation + 1
+        assert after.digest_version == (2 if destination_class is SqliteStore else 1)
+        assert native_version() == (6 if destination_class is SqliteStore else 5)
+        assert all(row['transferPairValid'] for row in destination.transactions('personal'))
+        assert destination.execute_operation(operation).receipt == receipt
+        destination.close()
+        destination = destination_class(target_path)
+        assert destination.commit_evidence() == after
+        assert destination.execute_operation(operation).receipt == receipt
+    finally:
+        source.close()
+        destination.close()

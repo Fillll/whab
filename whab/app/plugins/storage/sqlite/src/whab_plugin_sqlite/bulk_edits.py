@@ -8,7 +8,10 @@ def selection(store, workspace, operation, edits):
     selected = validate_edits(operation, edits)
     identifiers = [row['transactionId'] for row in selected] if operation == 'edit_transactions' else ()
     # The existing native reader preserves raw annotations and original metadata.
+    from .transfer_pairs import context
     state = store._read_state(workspace, transaction_ids=identifiers, include_history=False)
+    if any(row.get('transferPeerId') for row in state['transactions'].values()):
+        state = context(store, workspace, identifiers)
     if operation == 'classify_accounts':
         from whab.domain.accounts import is_on_budget
         changed = [row['accountId'] for row in selected if 'onBudget' in row
@@ -26,7 +29,7 @@ def selection(store, workspace, operation, edits):
                 if row is not None:
                     matched.append(row[0])
             if matched:
-                state = store._read_state(workspace, transaction_ids=matched, include_history=False)
+                state = context(store, workspace, matched)
     return state, selected
 
 
@@ -46,7 +49,7 @@ def apply(store, workspace, operation, edits):
         if operation == 'edit_transactions':
             store.db.executemany('UPDATE transactions SET category_id=?,category_agent=?,reviewed=?,note=?,is_transfer=?,category_edited=? WHERE workspace=? AND id=?', [
                 (row['categoryId'], row.get('categoryAgent'), int(row['reviewed']), row['note'], int(row['isTransfer']), int(row['categoryEdited']), workspace, identifier)
-                for identifier, row in state['transactions'].items()
+                for identifier in identifiers for row in (state['transactions'][identifier],)
             ])
         else:
             store.db.executemany('UPDATE accounts SET type=?,on_budget=?,subtype=? WHERE workspace=? AND id=?', [

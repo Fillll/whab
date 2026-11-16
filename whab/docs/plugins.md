@@ -585,7 +585,7 @@ The concrete backend checks provider ownership and accepts normalized `ImportedA
 | `ImportedTransaction` | `id`, `accountId`, `date`, `merchant`, `amount`, `suggestedCategoryId`, `pending`, `source`, `inferredTransfer`, `pendingTransactionId` | `merchantLogo` (WHAB 1.7+, opaque artwork key or `None`) |
 | `SyncChanges` | `added`, `modified`, `removed` | None |
 
-`added` and `modified` are lists of normalized transactions; `removed` is a list of transaction IDs. Nullable category/pending-match values use `None`. `balance` and `amount` are integer minor units of the account currency, `currency` is a supported uppercase ISO code, and flags are booleans. A transaction inherits its account currency. Existing account currencies cannot change during synchronization; category references must resolve to children of the same currency. Invalid provider suggestions become uncategorized, while incompatible user overrides fail the complete atomic batch. The bundled Plaid adapter still imports USD only. The scoped backend owns provider namespacing of record IDs. It retains only supported fields, preserves matched pending annotations, and commits changes together with the cursor; `expected_cursor` provides an optimistic synchronization guard. `item_identity` is the provider-bound identity for token encryption's associated data, preserving existing Plaid ciphertext identities. The backend exposes no global state, generic database connection, unrelated provider tokens, or close method. This is an API boundary for trusted plugins, not an OS security boundary.
+`added` and `modified` are lists of normalized transactions; `removed` is a list of transaction IDs. Nullable category/pending-match values use `None`. `balance` and `amount` are integer minor units of the account currency, `currency` is a supported uppercase ISO code, and flags are booleans. A transaction inherits its account currency. Existing account currencies cannot change during synchronization; category references must resolve to children of the same currency. Invalid provider suggestions become uncategorized. New Transfer-category suggestions/import rows become unreviewed transfer hints, preserving original source metadata; only an explicit confirmed pair establishes Transfer classification. Existing saved annotations remain intact for explicit legacy audit. Incompatible user overrides fail the complete atomic batch. The bundled Plaid adapter still imports USD only. The scoped backend owns provider namespacing of record IDs. It retains only supported fields, preserves matched pending annotations, and commits changes together with the cursor; `expected_cursor` provides an optimistic synchronization guard. `item_identity` is the provider-bound identity for token encryption's associated data, preserving existing Plaid ciphertext identities. The backend exposes no global state, generic database connection, unrelated provider tokens, or close method. This is an API boundary for trusted plugins, not an OS security boundary.
 
 ### Bank UI resources
 
@@ -1326,43 +1326,89 @@ Worker RPC and supported HTTPS transports carry the same public operations.
 
 ## Reviewed transfer matching
 
-WHAB 2.74 introduces optional public `TransferMatching` SDK capability. The financial
-core owns equal nonzero opposite amounts, same currency and budget scope, distinct
-active accounts, posted/nondeleted/uncategorized eligibility and the seven-day date
-window. Deterministic proposals are read-only and preserve every ambiguous alternative;
-merchant names and provider hints never prove a pair. Date/account filters select an
-anchor; its counterpart may lie outside those filters. Pagination returns total/next;
-over 1,000 candidates requires narrower filters. No initial-page background scan runs.
+WHAB 2.81 adds `TransferIntegrity` alongside the existing `TransferMatching` SDK.
+The domain requires exactly two reciprocal nondeleted, posted legs, equal
+opposite amounts, different accounts of one currency, and dates within seven days.
+Two existing posted zero-value records can be explicitly paired; their zero amounts,
+identities, dates, notes, import provenance and account balances remain unchanged.
+Suggestions continue to exclude zeros. Ordinary creation/correction guards remain
+nonzero: matching does not manufacture a leg, amount or direction.
+No third record may claim either leg. A Transfer category or imported bank hint
+alone is not a complete transfer and cannot qualify for review. New orphan Transfer
+classification is rejected; legacy records remain readable until explicit repair.
+Ordinary Expense, Income and Opening Balance classification retain their own rules.
 
-The interface plugins own presentation: Web's Transactions **Suggest transfers** panel
-shows both sides and requires **Review this pair**, then **Confirm transfer match**.
-CLI `trnx transfers`, `match-transfer --dry-run`, `match-transfer` and `unmatch-transfer`
-use the same public operations. Neither matching nor unmatching reviews a transaction:
-both become unreviewed for the normal review workflow. No bank synchronization or
-persistent future rule is created. Refunds may look identical and require judgment.
-Cross-currency, fees/splits and cross-budget-scope transfers need manual handling.
+Historical pairs can use closed accounts or accounts with different current budget
+scopes. Matching does not reopen, reclassify or synchronize accounts. On-budget
+eligible movements contribute signed `summary.transferFunding` on each leg's date;
+same-month cash-to-cash on-budget pairs net to zero. Different months or scopes can
+change the available funding, separately from income and expense activity. Credit
+funding is bounded by actual debt change; an overpayment creates no spendable cash.
+Unverified/stale cash creates no positive transfer funding. Accounts' current scope
+continues to apply to their entire history; no historical scope is inferred.
 
-Confirmation uses an observed revision and fingerprint, one native operation, one
-reversible before/after audit entry, one durable receipt and one synchronous checkpoint.
-Exact successful retries keep operation, IDs/order, action, fingerprint, revision,
-request ID and history attribution, including after restart. Unknown outcomes must
-retain that intent; no fresh-intent automatic replay. Unsupported backends/authorities
-fail before mutation. SQLite 1.24 and JSON 1.16 implement the capability through their
-existing native transactions; remote transports delegate to the authority.
+Public query `transfer_policy` advertises strict pair support, 100-pair and 200-repair
+limits. The optional SDK methods are:
 
-Optional `transferPeerId` is a reciprocal stable identity; absence preserves legacy
-records and historical digests. Match changes only this link, `isTransfer=true` and
-`reviewed=false`. Unmatch removes both links, restores each existing `inferredTransfer`
-hint and sets both unreviewed. IDs, amounts, dates, accounts, currencies, merchants
-(including whitespace), notes, category attribution, original metadata and receipts
-are retained. Unmatch before editing a paired amount/date/account/category or changing
-an account's budget scope. Ordinary notes/merchant/review edits preserve the pair.
-Provider corrections/removals that invalidate a pair remove both links and require
-fresh review; this never automatically creates another pair.
+- `supports_transfer_integrity()` and `supports_bulk_transfer_matching()`.
+- `preview_transfer_matches(workspace, pairs, reviewed=False)` and
+  `apply_transfer_matches(workspace, pairs, reviewed=False, fingerprint=None)`.
+- `transfer_audit(workspace, parameters)` and
+  `preview_transfer_repair(workspace, transaction_ids)` /
+  `repair_transfers(workspace, transaction_ids, fingerprint)`.
 
-The shared contract is necessary because no previous public operation could atomically
-link two transactions with reciprocal identity, validated preview and reversible audit.
-Storage internals stay behind SDK/native operations; interfaces never inspect databases.
+The public host query `preview_transfer_matches` takes `pairs` and optional
+`reviewed`; command `match_transfers` additionally requires its exact fingerprint.
+Pairs are an ordered array of `{outId, inId}` stable IDs. OUT is a positive internal
+minor-unit amount, IN negative. For two existing zero-value records, these keys
+only identify the first and second leg; no financial direction is inferred.
+All 1–100 pairs must be explicit and disjoint; any
+invalid pair rejects the entire operation. `reviewed=true` is an explicit request to
+review both legs of every valid pair in that same commit, not automatic inference.
+The receipt has `pairCount`, `count`, `changed`, `reviewed`, `fingerprint`, exact
+`changes` before/after, and pair diagnostics for scope and archived accounts.
+
+SQLite 1.29 and JSON 1.21 validate all items before one native commit, one coherent
+per-record audit entry, one revision advancement and one synchronous durable save.
+The SDK contract is necessary because repeated single-pair commands cannot provide
+whole-batch atomicity. Local worker IPC and authenticated HTTPS/remote transports
+forward the public operations. Unsupported authorities fail before mutation.
+Exact retries retain operation, ordered pairs, reviewed choice, fingerprint,
+revision, request ID and actor/batch attribution. They return the original saved
+receipt without another history entry, mutation or save, including after restart.
+An unknown outcome never authorizes a fresh intent. `--batch` groups history only.
+Native format 5 preserves the stricter transfer semantics, including retained
+history, and older readers must fail rather than reinterpret supported pairs.
+WHAB 2.81 SQLite and JSON portable payloads use format 2 when current records or retained
+history contain pairs, including the first pairing saved through an incremental
+checkpoint. Current readers accept both formats; genuine older readers refuse
+format 2 before replacing destination data. The plugin namespace/state schema
+remains version 1 because no record migration is required.
+
+`transfer_audit` is read-only with inclusive since/until bounds and explicit
+offset/limit/total/next pagination. It reports unmatched imported hints, invalid
+reciprocal graphs, orphan Transfer classification and legacy invalid review states.
+Unpaired zero-value hints have no direction and stay unreviewed until their two
+existing counterparts are explicitly paired or deliberately reclassified. They are
+never omitted from the audit. A verified zero-value pair can be reviewed and is not
+reported as invalid merely because its amounts are zero.
+`preview_transfer_repair` and `repair_transfers` accept 1–200 explicit transaction IDs;
+the command also requires its fingerprint. Repair removes invalid links and orphan
+Transfer classification and clears invalid review while retaining imported hints,
+identities, financial fields, notes and original metadata. Every existing malformed
+linked counterpart must be included explicitly. It never manufactures a missing
+leg, guesses a pair or repairs production data during upgrade. Audit reversals are
+guarded: a reversal that would recreate an invalid reviewed transfer is refused.
+
+Single-pair `match_transfer`/`unmatch-transfer` retain their ordinary CLI syntax.
+Matching without the new bulk `--reviewed` option leaves both legs unreviewed.
+Unmatching clears reciprocal links and Transfer classification, retains bank hints,
+and unreviews both legs. Paired financial edits still require unmatching first;
+notes and merchant edits retain the pair. Bank corrections invalidate both links
+and review when a pair no longer balances. No command creates a standing future
+rule or triggers bank synchronization. Proposals are suggestions, never proof;
+refunds can look identical and require explicit judgment. Cross-currency pairs,
+fees and splits remain unsupported.
 
 ## Local browser category selections
 
@@ -1456,16 +1502,22 @@ Optional `PreflightInspection.inspection_scope()` lets a remote storage facade s
 WHAB 2.77 supports Expense, Income and Transfer child types (`kind` in public
 records, `--type` in CLI). Missing kind remains Expense. Income and Transfer have
 no expense target or assignment rows. Transfer is explicit account movement,
-excluded from ordinary income/spending without changing account balances. It may
-be classified before pairing; matching still requires equal opposite posted
-amounts, different active accounts, same currency/budget scope and dates within
-seven days. Matching remains separate and never reviews automatically.
+excluded from ordinary income/spending without changing account balances. Since
+WHAB 2.81, Transfer classification requires a complete reciprocal pair: equal
+opposite posted amounts (including two explicitly selected existing zero records), different same-currency accounts and dates within
+seven days. Closed historical accounts and differing current scopes are supported.
+Single matching leaves both unreviewed; atomic bulk matching can explicitly review
+both legs with --reviewed.
 
-A posted, nondeleted transaction needs a valid child of any type, or a previously
-confirmed transfer pair, before explicit review. A bank hint alone is insufficient.
-Assigning classification does not manufacture review. Clearing it makes unreviewed
-in the same native operation. An explicit conflicting clear+review rejects the
-whole operation. Mixed batches validate their final proposed state atomically.
+A posted, nondeleted transaction needs Expense, Income or Opening Balance
+classification, or a valid complete transfer pair, before explicit review. A bank
+hint or orphan Transfer category is insufficient.
+Assigning classification does not manufacture review. Clearing the last valid
+classification makes the record unreviewed in the same native operation; an
+explicit conflicting clear+review rejects the whole operation. A still-valid
+matched pair remains explicitly Transfer when only its optional category label is
+cleared, so its review eligibility remains. Mixed batches validate their final
+proposed state atomically.
 Pending records cannot be reviewed. Undo/redo cannot restore a newly invalid review.
 
 Old saved reviewed/unclassified flags and historical audit hashes remain readable
@@ -1510,7 +1562,12 @@ atomic persistence, annotations, original/import records and native receipts.
 
 ## Incremental integrity
 
-WHAB 2.81 adds `CommitEvidence.digest_version` and
+SQLite 1.30 adds portable envelope format 3 (`WHAB-SQLITE-3`), accepting earlier
+raw SQLite payload versions 1/2. The envelope itself fences older readers even
+when its first appended audit entry introduces a transfer pair. Compacted bases
+retain the earlier version-2 pair/history fence. JSON portable formats are unchanged.
+
+WHAB 2.82 adds `CommitEvidence.digest_version` and
 `ReplicaWatermark.digest_version`. Omitted fields mean version 1 and retain the
 exact previous wire encoding and canonical SHA-256 calculation. Version 2 uses
 the deterministic Merkle format in
@@ -1547,10 +1604,11 @@ only their ancestor paths. Arrays retain counts and ordering; insertions,
 unknown writes and invalidated native generations rebuild. Cached hashes are
 not persistent authority and never bypass schema validation on reopen.
 
-SQLite adopts native metadata format 5 in the same commit as its next financial
+SQLite adopts native metadata format 6 in the same commit as its next financial
 mutation, without changing identity or advancing the revision merely on open.
-It retains format-1 evidence for an untouched older native generation. JSON
-native format 5 supports version-2 local transfers and copies, preserving the
+It retains version-1 evidence for untouched native formats 1–5; format 5 remains
+the earlier transfer-semantics fence and never implies Merkle evidence. JSON
+native format 6 supports version-2 local transfers and copies, preserving the
 source version through promotion and subsequent writes. Older native readers
 reject these new formats; upgrade the stopped host and selected storage plugin
 together. This is not a storage-backend migration.
