@@ -35,6 +35,10 @@ class RequestConflict(StoreError):
     """An idempotency key was reused for a different command."""
 
 
+class CommandSavePending(RuntimeError):
+    """The native command committed, but its portable save is not confirmed."""
+
+
 def _identifier(value: object) -> None:
     if type(value) is not str or not 1 <= len(value) <= 200 or "\x00" in value:
         raise StoreError("Invalid identifier.")
@@ -64,6 +68,7 @@ class LedgerService:
     def __init__(
         self, store, *, budget_id: str = "default", revision: str | None = None,
         on_commit: Callable[[], None] | None = None, lock=None,
+        confirm_saved: Callable[[bool], bool] | None = None,
     ):
         _identifier(budget_id)
         self.budget_id = budget_id
@@ -75,6 +80,7 @@ class LedgerService:
         self._features = {}
         self._feature_docs = {}
         self._on_commit = on_commit
+        self._confirm_saved = confirm_saved
 
     def register_feature(self, plugin_id, operations):
         """Register public feature operations during a local interface's startup."""
@@ -694,6 +700,22 @@ class LedgerService:
         self, operation: str, workspace: str, payload: dict, *,
         request_id: str, expected_revision: str, history: dict | None = None,
     ) -> dict:
+        with self._lock:
+            response, replayed = self._command(operation, workspace, payload,
+                request_id=request_id, expected_revision=expected_revision, history=history)
+            # Native/durable/history scopes have exited. Keep their committed
+            # receipt unchanged even when the separately durable file is pending.
+            if self._confirm_saved is not None and not self._confirm_saved(replayed):
+                raise CommandSavePending(
+                    "Command committed to native storage, but saving the portable budget file is pending. "
+                    "Retain the exact original request, including its request ID and revision. "
+                    "An exact retry can finish the save without repeating the edit.")
+            return response
+
+    def _command(
+        self, operation: str, workspace: str, payload: dict, *,
+        request_id: str, expected_revision: str, history: dict | None = None,
+    ) -> tuple[dict, bool]:
         self._workspace(workspace)
         _identifier(request_id)
         _identifier(expected_revision)
@@ -758,12 +780,12 @@ class LedgerService:
                 previous, response, _ = self._receipts[request_id]
                 if previous != fingerprint:
                     raise RequestConflict("Request ID already belongs to another command.")
-                return deepcopy(response)
+                return deepcopy(response), True
             durable_replay = getattr(self._store, "durable_command_replay", None)
             if operation not in {"categorization", "feature"} and callable(durable_replay):
                 replayed = durable_replay(request_id, fingerprint)
                 if replayed is not None:
-                    return deepcopy(replayed)
+                    return deepcopy(replayed), True
             if expected_revision != self._revision:
                 raise RevisionConflict("Budget changed. Refresh before making this change.")
             if operation not in {'feature', 'categorization'}:
@@ -898,7 +920,7 @@ class LedgerService:
                     self._receipts.popitem(last=False)
                 if self._on_commit is not None:
                     self._on_commit()
-                return response
+                return response, False
 
     def accounts(self, workspace):
         return self.query("accounts", workspace)["data"]

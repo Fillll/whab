@@ -1,5 +1,15 @@
 # SQLite budget storage plugin changelog
 
+## 1.31.0 — 2026-11-15
+
+PR: [#211](https://github.com/Fillll/whab/pull/211)
+
+- Update changed record hashes and their tree paths for bounded native edits, with cache invalidation after external writes, triggers and rollback. Preserve old metadata on open and fence earlier writers after the first format-7 financial commit.
+- Keep single-account scope edits and bulk classifications on indexed metadata reads while preserving confirmed-transfer guards, including implicit scope changes.
+- Reuse fully validated portable records during atomic cold restoration, and recognize populated local caches without loading their full transaction history. Every incoming file still receives independent validation before reuse.
+- Carry the locally constructed append and copied SHA state through commit promotion, avoiding repeated full-image prefix scans while retaining independent host verification and rollback behavior.
+- Store a sanitized SQLite snapshot plus bounded checksummed audit additions in portable format 4. Omit unused native history padding from immutable portable bases, compact without dropping history or receipts, and validate independent restores. Guarded ledger commands require complete primary-file saves before success is acknowledged. Earlier raw SQLite payloads remain readable; new payloads require SQLite 1.31 or newer.
+
 ## 1.30.0 — 2026-11-15
 
 PR: [#215](https://github.com/Fillll/whab/pull/215)

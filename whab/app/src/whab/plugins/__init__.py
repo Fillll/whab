@@ -14,6 +14,7 @@ lazy from whab.domain.bulk import validate_edits as validate_bulk_edits
 lazy from whab.domain.errors import StoreError
 lazy from whab.domain.file_imports import WorkspaceImport
 lazy from whab.domain.formatting import format_date, format_money
+lazy from whab.domain.history import replay_portable_entries
 lazy from whab.domain.imports import ImportedAccount, ImportedTransaction, SyncChanges
 lazy from whab.domain.money import SUPPORTED_CURRENCIES, currency_code, currency_minor_units
 lazy from whab.domain.receipts import MAX_RECEIPT_BYTES, validate_receipt_selection
@@ -124,6 +125,7 @@ lazy from .sdk import (
 )
 
 __all__ = [
+    "replay_portable_entries",
     "AtomicBulkEdits", "validate_bulk_edits", "AtomicTransactionChanges", "validate_transaction_changes",
     "BankAdapter",
     "BankContinuationService",

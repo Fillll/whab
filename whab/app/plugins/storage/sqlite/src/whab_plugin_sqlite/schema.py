@@ -69,6 +69,7 @@ def initialize_schema(db: sqlite3.Connection, selected_month: str) -> None:
                     raise
     db.execute("CREATE INDEX IF NOT EXISTS tx_uncategorized ON transactions(workspace,account_id,source,pending,is_transfer,inferred_transfer,date) WHERE deleted=0 AND category_id IS NULL")
     db.execute("CREATE INDEX IF NOT EXISTS tx_uncategorized_recent ON transactions(workspace,date DESC,id DESC,pending,is_transfer,inferred_transfer) WHERE deleted=0 AND category_id IS NULL")
+    db.execute("CREATE INDEX IF NOT EXISTS tx_confirmed_transfer_account ON transactions(workspace,account_id,id,transfer_peer_id) WHERE transfer_peer_id IS NOT NULL")
     db.execute("CREATE INDEX IF NOT EXISTS tx_transfer_peer ON transactions(workspace,transfer_peer_id) WHERE transfer_peer_id IS NOT NULL")
     validate_month(selected_month)
     db.execute(

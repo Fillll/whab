@@ -94,7 +94,7 @@ class Store(Authority):
             try:
                 with self._snapshot():
                     metadata = self._authority_metadata()
-                    if metadata["formatVersion"] not in {2, 3, 4, 5, 6} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
+                    if metadata["formatVersion"] not in {2, 3, 4, 5, 6, 7} or "kind" not in {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}:
                         raise StoreError("Read-only readiness requires the current native SQLite schema; upgrade it explicitly first.")
                     if metadata["budgetId"] != budget_id or metadata["environment"] != environment:
                         raise StoreError("SQLite storage identity belongs to another budget or environment.")
@@ -625,7 +625,8 @@ class Store(Authority):
         if workspace != "personal":
             raise StoreError("Portable budgets require the personal workspace.")
         snapshot, images = read_files(files, with_receipts=True)
-        self.restore_budget(workspace, snapshot, _receipts=images)
+        # The owned image reader already validated the detached ledger/history.
+        self._mutate(workspace, lambda state: self._restore_validated_snapshot(state, snapshot, images))
 
     def prepare_budget_files(
         self, workspace: str, files: Mapping[str, bytes], *, existing: bool = False,
@@ -801,11 +802,24 @@ class Store(Authority):
         return self._mutate(workspace, lambda state: commands.add_account(state, account_id, account))
 
     def update_account(self, workspace: str, account_id: str, changes: dict) -> None:
-        if type(changes) is not dict or changes.keys() & {"currency", "closed", "onBudget"}:
+        if type(changes) is not dict or changes.keys() & {"currency", "closed"}:
             self._mutate(workspace, lambda state: commands.update_account(state, account_id, changes))
             return
         with self._authority_write(workspace=workspace, transaction_ids=()) as write:
             state = {"accounts": {row["id"]: row for row in self._read_accounts(workspace)}, "transactions": {}}
+            if account_id in state['accounts'] and changes.keys() & {'type', 'onBudget'}:
+                # One real paired row suffices for the core's scope guard, including
+                # implicit scope changes caused by a type change. Other transaction
+                # fields cannot affect this metadata-only operation.
+                paired = self.db.execute(
+                    'SELECT id,account_id,transfer_peer_id FROM transactions '
+                    'WHERE workspace=? AND account_id=? AND transfer_peer_id IS NOT NULL LIMIT 1',
+                    (workspace, account_id),
+                ).fetchone()
+                if paired is not None:
+                    state['transactions'][paired['id']] = {
+                        'accountId': paired['account_id'], 'transferPeerId': paired['transfer_peer_id'],
+                    }
             commands.update_account(state, account_id, changes)
             row = state["accounts"][account_id]
             self.db.execute("UPDATE accounts SET name=?,type=?,on_budget=?,subtype=?,bank_website=?,name_overridden=? WHERE workspace=? AND id=?",

@@ -11,7 +11,7 @@ from starlette.routing import Match
 from whab.budgets.runtime import RuntimeResource
 from whab.plugins.interface_adapter import RemoteLedgerInterface, validate_interface_owners
 from whab.plugins.runtime import PluginError
-from whab.services.ledger import RequestConflict, RevisionConflict
+from whab.services.ledger import CommandSavePending, RequestConflict, RevisionConflict
 
 
 class RemoteCommand(BaseModel):
@@ -104,6 +104,8 @@ class BoundRemoteInterface:
             result = self.context.service.command(body.operation, body.workspace, body.payload,
                 request_id=body.request_id, expected_revision=body.expected_revision,
                 **({"history": body.history} if body.history is not None else {}))
+        except CommandSavePending as error:
+            raise HTTPException(503, str(error)) from None
         except (RevisionConflict, RequestConflict) as error:
             if self.context.service.revision != revision:
                 raise HTTPException(503, 'Command outcome is uncertain. Inspect saved state and retain the original intent.') from None

@@ -1924,7 +1924,7 @@
     {
       "name": "Storage.export_budget_file_changes",
       "kind": "sdk",
-      "summary": "Return complete sanitized files or bounded offset patches bound to exact previous and resulting SHA-256 hashes.",
+      "summary": "Return complete sanitized snapshot journals or bounded append/offset patches bound to exact previous and resulting SHA-256 hashes. Portable format 4 includes all acknowledged financial changes and remains readable without a sidecar.",
       "input": {
         "type": "object",
         "description": "Storage-owned SDK arguments for one workspace.",
@@ -4199,7 +4199,7 @@
           }
         }
       ],
-      "side_effects": "One native transaction, one revision advancement, one coherent audit entry, one receipt and one synchronous durable checkpoint. Optional reviewed=true reviews both legs in that same commit. Paired records or retained pair history require native format 5 and portable payload version 2; older readers refuse these financial semantics. No bank synchronization."
+      "side_effects": "One native transaction, one revision advancement, one coherent audit entry, one receipt and one synchronous durable checkpoint. Optional reviewed=true reviews both legs in that same commit. SQLite uses native format 7 and portable envelope version 4, retaining the earlier pair/history interpretation fence; older readers refuse these financial semantics. No bank synchronization."
     },
     {
       "kind": "sdk",
@@ -4463,7 +4463,7 @@
           }
         }
       ],
-      "side_effects": "One guarded atomic commit/save with complete audit and receipt. Does not create counterparts or delete transactions; undo is refused when it would recreate invalid reviewed/Transfer state. Native format 5 and portable payload version 2 remain required while paired before/after history is retained."
+      "side_effects": "One guarded atomic commit/save with complete audit and receipt. Does not create counterparts or delete transactions; undo is refused when it would recreate invalid reviewed/Transfer state. Native Merkle format 7 and portable envelope 4 retain the earlier pair-history fence; compacted bases use raw version 2 or the newer tombstone version 3."
     },
     {
       "kind": "sdk",
@@ -5103,7 +5103,7 @@
           }
         }
       ],
-      "side_effects": "One native atomic commit, one revision, one coherent exact before/after audit entry and one synchronous durable checkpoint. Exact retries return the original receipt without duplicate mutation/history/save, including after restart. User tombstones survive refresh/reimport; later provider removals prevent unvoid. No record deletion, fabricated reversal, new zero record, bank sync or future rule. Guarded history reversals preserve the same financial safety."
+      "side_effects": "One native atomic commit, one revision, one coherent exact before/after audit entry and one synchronous durable checkpoint. Exact retries return the original receipt without duplicate mutation/history/save, including after restart. User tombstones survive refresh/reimport; later provider removals prevent unvoid. No record deletion, fabricated reversal, new zero record, bank sync or future rule. Guarded history reversals preserve the same financial safety. SQLite uses native Merkle format 7 and envelope 4; compacted tombstone bases retain raw version 3. Warm void/unvoid edits append bounded history and portable changes while preserving archived receipts."
     },
     {
       "kind": "sdk",

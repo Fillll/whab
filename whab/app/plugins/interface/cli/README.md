@@ -181,7 +181,9 @@ does not prove that nothing was saved; inspect state using the original intent.
 `--agent` records audit attribution without changing
 existing category attribution. Unsupported backends fail before mutation.
 
-Requires CLI 2.24 / WHAB 2.82 and native SQLite 1.30 or JSON 1.22. Root, budget,
+Requires CLI 2.24 / WHAB 2.82 and native SQLite 1.30 or JSON 1.22. Current SQLite
+journal saves require WHAB 2.83 with SQLite 1.31 or newer; older readers refuse
+them. Root, budget,
 transaction group, both command help pages and packaged operation documentation
 are available offline. Public financial rules and persistence stay in the shared
 ledger contracts; the CLI owns parsing, guarded intent handling and presentation.
@@ -1103,8 +1105,17 @@ resources offline. Validation results are cached privately by document content,
 plugin identity, validator implementation and installed JSON Schema library metadata. A
 changed resource is validated again. Read-only cache locations retain validation.
 Parser construction defers unused distribution-version reads; explicit discovery
-still reports installed plugin versions. Python 3.15 lazy imports defer SDK and
-transport modules until they are used.
+still reports installed plugin versions. Root help builds only its visible
+top-level choices, and command help copies only its needed, fully validated core
+schemas. Unused plugin documents stay unloaded; external plugin identities and
+reserved-name conflicts remain discoverable. Validator identity reads are shared
+within each catalog and refreshed for the next call. Python 3.15 lazy imports defer SDK and
+transport modules until they are used. A selected transaction action builds only
+its parser family: `trnx list --help` does not import bulk writes, notes, review,
+transfer execution or the HTTP client. Root/group help still lists every command,
+including `match-transfers`, `transfer-audit`, `repair-transfers`, `void` and `unvoid`. Each action
+retains the same complete examples, limits and recovery guidance. Transfer and
+void/unvoid guides remain available in root help without importing their execution code.
 
 Current local hosts expose a coherent filtered transaction read. `trnx list`
 selects complete date/merchant matches in storage and returns names with the same
@@ -1135,11 +1146,28 @@ system load, with separate help-only samples before and after the workflow.
 Activation and initial merchant-index construction are reported separately.
 Each size receives distinct real edits, stale-intent checks and exact retries;
 the saved files and audit entries are verified after restart and by independent
-restoration into empty stores. `--sizes` accepts a comma-separated list up to the
+restoration into empty stores. An additional public copy-status read requires
+saved state after every mutation. These small reads run outside the command
+timer and can affect pacing; final restoration alone does not prove that each
+earlier acknowledgement completed its save. `--sizes` accepts a comma-separated list up to the
 existing row bound; fixture images must still fit the existing 50 MiB limit.
 The 250 ms p95 goal concerns warm bounded reads and edits on measured hardware.
 Complete unbounded output, cold activation and provider latency require separate
 measurements; their work grows with output, stored state or external services.
+
+For a before/after comparison, generate immutable fictional inputs once from the
+baseline checkout, then pass the same directory to each checkout's benchmark:
+
+```sh
+.venv/bin/python scripts/benchmark_cli_matrix.py --sizes 1000,14550,100000,110000 --prepare-fixtures /tmp/whab-fictional-seeds
+.venv/bin/python scripts/benchmark_cli_matrix.py --runs 100 --sizes 1000,14550,100000,110000 --fixtures-directory /tmp/whab-fictional-seeds
+```
+
+The bulk benchmark also accepts `--fixtures-directory`. Each run copies and checks
+the seed hashes, records installed versions and source identity, and flags source
+changes during measurement. Keep each checkout unchanged until its run finishes.
+The incremental-integrity comparison and its limitations are tracked in
+[PR #211](https://github.com/Fillll/whab/pull/211).
 
 
 ## Atomic bulk performance evidence
@@ -1166,7 +1194,9 @@ read and guarded advanced edit. Every intent changes real fictional records.
 
 Measurements include startup, verified local HTTPS, output and the synchronous
 portable save. A small checkpoint-counter write and a public native evidence query
-after each successful checkpoint are included as diagnostic overhead. Provider
+after each returned checkpoint call are included as diagnostic overhead. Untimed
+public copy-status checks separately require every acknowledged mutation to be
+saved; checkpoint counts alone cannot prove that. Provider
 latency is excluded: no provider calls or household runtime is used. Cold host/fixture
 activation and each first bulk mutation are reported separately from warm p50/p95.
 Fresh identical fixtures after at most 2,000 bulk changed records, plus at most
@@ -1180,8 +1210,10 @@ The JSON comparison intentionally uses a smaller populated budget within its
 full-file persistence costs and limits; it is not a same-size backend speed comparison.
 The script emits raw per-process timings, total batch p50/p95, per-record costs,
 workflow savings, commit/checkpoint counts, cold timings and independent restoration
-evidence. The final measured tables, target misses and validation evidence are in
-[PR #188](https://github.com/Fillll/whab/pull/188). The 250 ms p95 is a measured target,
+evidence. Historical bulk measurements are in
+[PR #188](https://github.com/Fillll/whab/pull/188); current incremental-save measurements,
+target misses and validation evidence are in [PR #211](https://github.com/Fillll/whab/pull/211).
+The 250 ms p95 is a measured target,
 not a promise for arbitrary hardware, maximum memo sizes, cold work or full-file JSON.
 
 ## Reviewed transfer proposals and atomic pairing
@@ -1300,8 +1332,9 @@ reported intent: exact ordered file, --reviewed choice, original --revision,
 --fingerprint, --request-id, --agent and --batch. Repeat that exact command only;
 successful retries return the original durable receipt after restart, without a
 second mutation/history/save. Never retry with fresh intent. Conflicting reuse
-is refused. Unsupported authoritative backends fail before mutation. Paired-transfer
-portable budgets require WHAB 2.81 or newer; older readers refuse them. Help works
+is refused. Unsupported authoritative backends fail before mutation. Legacy paired-
+transfer portable formats require WHAB 2.81 or newer. Current SQLite journal saves
+require WHAB 2.83 with SQLite 1.31 or newer; older readers refuse them. Help works
 offline. Use match-transfer for one pair with its existing result shape, or
 match-transfers for a batch and optional review in the same commit.
 

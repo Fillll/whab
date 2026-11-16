@@ -6,6 +6,7 @@ from types import MappingProxyType
 
 import pytest
 from whab_plugin_sqlite import Store
+from whab_plugin_sqlite.portable_journal import read as read_journal
 
 from whab.domain.errors import StoreError
 from whab.domain.file_imports import WorkspaceImport
@@ -24,7 +25,7 @@ def payload(store):
 def altered(payload, statements):
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(payload["budget.sqlite"])
+        connection.deserialize(read_journal(payload["budget.sqlite"])[0])
         for sql, parameters in statements:
             connection.execute(sql, parameters)
         connection.commit()
@@ -57,12 +58,12 @@ def test_binary_roundtrip_preserves_currencies_history_annotations_and_demo_with
     assert files == store.export_budget_files()
     assert set(files) == {"budget.sqlite"}
     raw = files["budget.sqlite"]
-    assert raw.startswith(b"SQLite format 3\x00")
+    assert read_journal(raw)[0].startswith(b"SQLite format 3\x00")
     for forbidden in (b"binary-export-must-not-contain-this-token", b"private-final-cursor"):
         assert forbidden not in raw
     image = sqlite3.connect(":memory:")
     try:
-        image.deserialize(raw)
+        image.deserialize(read_journal(raw)[0])
         assert image.execute("SELECT workspace FROM meta").fetchall() == [("personal",)]
         assert image.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 0
         assert image.execute("SELECT COUNT(*) FROM workspace_imports").fetchone()[0] == 0
@@ -198,7 +199,7 @@ def test_money_and_references_are_revalidated_after_reading_database_rows(store,
 def test_constraint_damage_is_rejected_by_database_integrity_check(store, payload):
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(payload["budget.sqlite"])
+        connection.deserialize(read_journal(payload["budget.sqlite"])[0])
         original = connection.execute("SELECT sql FROM sqlite_schema WHERE name='accounts'").fetchone()[0]
         version = connection.execute("PRAGMA schema_version").fetchone()[0]
         connection.execute("PRAGMA writable_schema=ON")
@@ -264,14 +265,26 @@ def test_prepare_first_open_is_idempotent_after_restore_commit_and_does_not_rewr
         target.close()
 
 
-def test_preparing_existing_cache_keeps_newer_ledger_and_connections_but_always_checks_image(store, payload):
+def test_preparing_existing_cache_keeps_newer_ledger_and_connections_but_always_checks_image(store, payload, monkeypatch):
     store.add_account("personal", {"name": "Newer local account", "type": "depository", "balance": 2})
     store.save_item("local", "synthetic-machine-only-token", "Fixture")
     before = store.state("personal")
-    store.prepare_budget_files("personal", payload, existing=True)
-    assert store.state("personal") == before
-    with pytest.raises(StoreError):
-        store.prepare_budget_files("personal", {"budget.sqlite": b"not sqlite"}, existing=True)
+    evidence = store.commit_evidence()
+
+    def no_native_materialization(*args, **kwargs):
+        raise AssertionError("An established cache must not load its full transaction history")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(store, "_read_state", no_native_materialization)
+        store.prepare_budget_files("personal", payload, existing=True)
+        for invalid in (
+            {"budget.sqlite": b"not sqlite"},
+            altered(payload, [("UPDATE transactions SET amount=1.5", ())]),
+            altered(payload, [("UPDATE budget_history SET record='{}'", ())]),
+        ):
+            with pytest.raises(StoreError):
+                store.prepare_budget_files("personal", invalid, existing=True)
+        assert store.commit_evidence() == evidence
     assert store.state("personal") == before
 
 
@@ -314,3 +327,62 @@ def test_prior_empty_migration_receipt_is_an_authoritative_existing_cache(store,
 def test_prepare_cache_flag_is_an_exact_boolean(store, payload, existing):
     with pytest.raises(StoreError, match="boolean cache flag"):
         store.prepare_budget_files("personal", payload, existing=existing)
+
+
+@pytest.mark.parametrize("method", ["restore", "prepare-new", "prepare-existing"])
+def test_owned_image_restore_validates_history_once_and_reopens_exactly(store, payload, method, tmp_path, monkeypatch):
+    from tests.receipt_images import png
+    from whab.domain import history
+
+    store.save_receipt("personal", "fixture", png())
+    files = store.export_budget_files()
+    expected = store.export_budget()
+    target = Store(tmp_path / "restored.sqlite", month="2026-11")
+    validate = history.validate_history
+    checked = []
+
+    def count_validation(value, **kwargs):
+        checked.append(value)
+        return validate(value, **kwargs)
+
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(history, "validate_history", count_validation)
+            if method == "restore":
+                target.restore_budget_files("personal", files)
+            else:
+                target.prepare_budget_files("personal", files, existing=method == "prepare-existing")
+        assert len(checked) == 1
+        assert target.export_budget() == expected
+        assert target.get_receipt("personal", "fixture") == png()
+        evidence = target.commit_evidence()
+    finally:
+        target.close()
+    reopened = Store(tmp_path / "restored.sqlite")
+    try:
+        assert reopened.export_budget() == expected
+        assert reopened.get_receipt("personal", "fixture") == png()
+        assert reopened.commit_evidence() == evidence
+    finally:
+        reopened.close()
+
+
+@pytest.mark.parametrize("existing", ["categories", "category-groups", "history"])
+def test_empty_account_cache_still_preserves_every_nonpristine_guard(store, payload, existing):
+    target = Store(":memory:", month="2026-11")
+    try:
+        if existing == "category-groups":
+            target.add_category_group("personal", "Retained empty group")
+        else:
+            original = next(row["name"] for row in target.categories("personal") if row["id"] == "groceries")
+            target.rename_category("personal", "groceries", "Retained name")
+            if existing == "history":
+                target.rename_category("personal", "groceries", original)
+        assert target.accounts("personal") == []
+        before = target.state("personal")
+        evidence = target.commit_evidence()
+        target.prepare_budget_files("personal", payload, existing=True)
+        assert target.state("personal") == before
+        assert target.commit_evidence() == evidence
+    finally:
+        target.close()

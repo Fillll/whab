@@ -69,6 +69,10 @@ def rows(store):
 def portable_version(files):
     if 'budget.json' in files:
         return json.loads(files['budget.json'])['formatVersion']
+    from whab_plugin_sqlite.portable_journal import MAGIC
+
+    if files['budget.sqlite'].startswith(MAGIC):
+        return 4
     with closing(sqlite3.connect(':memory:')) as db:
         db.deserialize(files['budget.sqlite'])
         return db.execute('PRAGMA user_version').fetchone()[0]
@@ -104,7 +108,14 @@ def test_atomic_mixed_void_unvoid_history_restart_and_receipt_restore(void_store
             'operation': 'apply_transaction_void', 'parameters': {'transactionIds': ['tx-0'],
                 'action': 'void', 'fingerprint': None}, 'context': {'actor': 'Other', 'actorKind': 'agent'}})))
     files = store.export_budget_files()
-    assert portable_version(files) == 3
+    assert portable_version(files) == (4 if Store is SQLiteStore else 3)
+    if Store is SQLiteStore:
+        from whab_plugin_sqlite.portable import read_files
+        from whab_plugin_sqlite.portable_journal import read
+
+        raw, entries = read(files['budget.sqlite'])
+        assert not entries and portable_version({'budget.sqlite': raw}) == 3
+        assert read_files({'budget.sqlite': raw}, with_receipts=True) == (saved, [('tx-0', png())])
     restored = Store(tmp_path / ('restored' + path.suffix), month='2026-11')
     try:
         restored.restore_budget_files('personal', files)
@@ -114,7 +125,7 @@ def test_atomic_mixed_void_unvoid_history_restart_and_receipt_restore(void_store
         assert restored.get_receipt('personal', 'tx-0') == png()
         assert all(not row['deleted'] and not row['reviewed'] and row.get('voided') is False for row in rows(restored).values())
         assert [a['balance'] for a in restored.export_budget('personal')['accounts']] == [a['balance'] for a in before['accounts']]
-        assert portable_version(restored.export_budget_files()) == 3
+        assert portable_version(restored.export_budget_files()) == (4 if Store is SQLiteStore else 3)
     finally:
         restored.close()
     store.close()
@@ -128,7 +139,7 @@ def test_atomic_mixed_void_unvoid_history_restart_and_receipt_restore(void_store
         for action in ('undo', 'redo'):
             proposal = reopened.history_preview('personal', action, entry['id'])
             reopened.history_apply('personal', action, entry['id'], proposal['fingerprint'])
-            assert portable_version(reopened.export_budget_files()) == 3
+            assert portable_version(reopened.export_budget_files()) == (4 if Store is SQLiteStore else 3)
         assert rows(reopened) == {row['id']: row for row in saved['transactions']}
     finally:
         reopened.close()
@@ -182,24 +193,24 @@ def test_first_bounded_void_save_fences_legacy_payload_and_retains_history(void_
     store, path, Store = void_store
     store.edit_transaction('personal', 'tx-0', note='Warm fictional history')
     legacy = store.export_budget_files()
-    assert portable_version(legacy) == 1
+    assert portable_version(legacy) == (4 if Store is SQLiteStore else 1)
     with monkeypatch.context() as bounded:
         if Store is SQLiteStore:
             bounded.setattr(store, 'export_budget', lambda *args: pytest.fail('Bounded void save must not rebuild the full ledger'))
         proposal = store.preview_transaction_void('personal', ['tx-0'], 'void')
         store.execute_operation(recorded(store, ['tx-0'], fingerprint=proposal['fingerprint']))
         files = store.export_budget_files()
-        assert portable_version(files) == 3
+        assert portable_version(files) == (4 if Store is SQLiteStore else 3)
     proposal = store.preview_transaction_void('personal', ['tx-0'], 'unvoid')
     store.execute_operation(recorded(store, ['tx-0'], action='unvoid', fingerprint=proposal['fingerprint']))
     assert not any(row.get('voided') for row in rows(store).values())
-    assert portable_version(store.export_budget_files()) == 3
+    assert portable_version(store.export_budget_files()) == (4 if Store is SQLiteStore else 3)
     native = json.loads(path.read_bytes()) if Store is JSONStore else store._authority_metadata()
-    assert native['formatVersion'] == 6
+    assert native['formatVersion'] == (7 if Store is SQLiteStore else 6)
     restored = Store(tmp_path / ('history-only' + path.suffix), month='2026-11')
     try:
         restored.restore_budget_files('personal', store.export_budget_files())
-        assert portable_version(restored.export_budget_files()) == 3
+        assert portable_version(restored.export_budget_files()) == (4 if Store is SQLiteStore else 3)
         assert rows(restored) == rows(store)
     finally:
         restored.close()
@@ -330,8 +341,10 @@ def test_portable_rejects_malformed_tombstone_flags_before_restore(tmp_path, col
         store.restore_budget('personal', portable_snapshot(fictional_state()))
         apply_void(store, ['tx-0'], 'void')
         files = store.export_budget_files()
+        from whab_plugin_sqlite.portable_journal import read
+
         with closing(sqlite3.connect(':memory:')) as image:
-            image.deserialize(files['budget.sqlite'])
+            image.deserialize(read(files['budget.sqlite'])[0])
             image.execute(f'UPDATE transactions SET {column}=? WHERE id=?', (value, 'tx-0'))
             image.commit()
             corrupted = {'budget.sqlite': image.serialize()}
@@ -339,3 +352,45 @@ def test_portable_rejects_malformed_tombstone_flags_before_restore(tmp_path, col
         with pytest.raises(StoreError, match='integer booleans'):
             read_files(corrupted)
         assert store.export_budget('personal') == before and store.commit_evidence() == evidence
+
+
+def test_warm_void_unvoid_keep_incremental_evidence_history_and_archived_receipts(tmp_path, monkeypatch):
+    from whab_plugin_sqlite import history_writes
+    from whab_plugin_sqlite.portable import read_files
+    from whab_plugin_sqlite.portable_journal import MAGIC, read
+
+    from whab.domain.history import financial, state_digest
+    from whab.plugins.storage_transfer import encode_local_state, local_state_digest
+
+    with closing(SQLiteStore(tmp_path / 'bounded-void.sqlite', month='2026-11')) as store:
+        # A populated baseline reserves room for both complete two-row audit entries.
+        store.restore_budget('personal', portable_snapshot(fictional_state(500)))
+        store.save_receipt('personal', 'tx-0', png())
+        store.edit_transaction('personal', 'tx-0', note='Warm cache with retained memo')
+        initial = store.export_budget_files()['budget.sqlite']
+        base, frames = read(initial)
+        assert initial.startswith(MAGIC) and not frames
+        with closing(sqlite3.connect(':memory:')) as db:
+            db.deserialize(base)
+            assert db.execute('PRAGMA user_version').fetchone()[0] == 1
+        original_dumps = history_writes.json.dumps
+        def only_entry(value, *args, **kwargs):
+            assert not (isinstance(value, dict) and 'baseline' in value), 'Warm void must append audit entry'
+            return original_dumps(value, *args, **kwargs)
+        for action in ('void', 'unvoid'):
+            proposal = store.preview_transaction_void('personal', ['tx-0', 'tx-1'], action)
+            operation = recorded(store, ['tx-0', 'tx-1'], action, proposal['fingerprint'])
+            with monkeypatch.context() as bounded:
+                bounded.setattr(store, '_local_states', lambda: pytest.fail('Warm void must not rebuild native state'))
+                bounded.setattr(store, 'export_budget', lambda *args: pytest.fail('Warm void must append portable journal'))
+                bounded.setattr(history_writes.json, 'dumps', only_entry)
+                store.execute_operation(operation)
+                files = store.export_budget_files()
+            expected = store.export_budget()
+            assert store.commit_evidence().state_digest == local_state_digest(*encode_local_state(store._local_states()), version=2)
+            assert expected['history']['entries'][-1]['afterDigest'] == state_digest(financial(expected), 2)
+            restored, images = read_files(files, with_receipts=True)
+            assert restored == expected and images == [('tx-0', png())]
+            same_base, entries = read(files['budget.sqlite'])
+            assert same_base == base and entries[-1]['operation'] == action + '_transactions'
+            assert len(entries) == (1 if action == 'void' else 2)

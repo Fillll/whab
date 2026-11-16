@@ -8,11 +8,12 @@ from uuid import uuid4
 
 lazy import httpx
 
-from whab.plugins import StoreError, validate_bulk_edits, validate_category_agent
+from whab.plugins import StoreError, validate_category_agent
+lazy from whab.plugins import validate_bulk_edits
 
-from .account_commands import resolve_account
 from .bulk_help import BULK_HELP
 from .transaction_commands import category_id, checked
+lazy from .account_commands import resolve_account
 
 
 def bulk_options(parser, *, attribution=True, formatting=True, recovery=True):

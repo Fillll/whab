@@ -106,7 +106,8 @@ class Authority:
         financial, protected = encode_local_state(document["workspaces"], validate=False)
         return CommitEvidence(metadata["budgetId"], metadata["environment"], metadata["instanceId"],
                               document["authorityEpoch"], document["generation"], document["operationId"],
-                              metadata["role"], local_state_digest(financial, protected))
+                              metadata["role"], local_state_digest(financial, protected, version=2 if document["formatVersion"] >= 7 else 1),
+                              2 if document["formatVersion"] >= 7 else 1)
 
     def commit_evidence(self):
         with self._lock:
@@ -229,7 +230,7 @@ class Authority:
         if current.role not in ({"staged", "copy"} if preview else {"staged"}) or not self._data["authority"]["empty"] or not pristine_document(self._data):
             raise StoreError("Local transfer requires an empty staged destination.")
         candidate = copy.deepcopy(self._data)
-        candidate.update(generation=source.generation, operationId=source.operation_id,
+        candidate.update(formatVersion=7 if source.digest_version == 2 else 4, generation=source.generation, operationId=source.operation_id,
                          authorityEpoch=source.authority_epoch,
                          workspaces=decode_local_state(snapshot.financial, snapshot.protected))
         candidate["authority"].update(
@@ -275,7 +276,7 @@ class Authority:
             if replayed:
                 return watermark
             candidate = copy.deepcopy(self._data)
-            candidate.update(generation=snapshot.source.generation, operationId=snapshot.source.operation_id,
+            candidate.update(formatVersion=7 if snapshot.source.digest_version == 2 else 4, generation=snapshot.source.generation, operationId=snapshot.source.operation_id,
                              authorityEpoch=snapshot.source.authority_epoch,
                              workspaces=decode_local_state(snapshot.financial, snapshot.protected))
             candidate["authority"].update(empty=False, replica=replica_record(watermark),

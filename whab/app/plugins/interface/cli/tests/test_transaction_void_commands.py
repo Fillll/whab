@@ -191,7 +191,8 @@ def test_offline_help_is_prominent_complete_without_profile(parts, capsys):
     assert result.value.code == 0
     text = capsys.readouterr().out
     assert all(phrase in text for phrase in ['trnx void', 'trnx unvoid', 'balanceChanges', '1–100', 'tombstones',
-        '--dry-run', '--revision', '--fingerprint', '--request-id', 'provider', 'manual', 'both', 'uncertain', 'offline'])
+        '--dry-run', '--revision', '--fingerprint', '--request-id', 'provider', 'manual', 'both', 'uncertain', 'offline',
+        'WHAB 2.83 with SQLite 1.31 or newer'])
 
 
 @pytest.mark.parametrize('action,format', [('void', 'json'), ('unvoid', 'table')])

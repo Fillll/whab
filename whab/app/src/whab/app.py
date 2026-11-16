@@ -411,7 +411,8 @@ def create_app(store=None, settings=None, plugins=None, bank_services=None, *, b
                         budget_session.add_copy(path.stem, str(target))
             store = TrackedStorage(store, budget_session)
             store.storage_plugin_id = settings.storage if owned_store or remote_bootstrap is not None else None
-            service = LedgerService(store, budget_id=budget_session.id if budget_session else "default", lock=store.lock)
+            service = LedgerService(store, budget_id=budget_session.id if budget_session else "default",
+                lock=store.lock, confirm_saved=store.confirm_saved)
             store.on_mutation = service.invalidate_revision
             plugins, worker_bindings = restore_visual_worker(worker_home, plugins, visual_choice, worker_owner=startup.worker)
             if remote_bootstrap is not None:

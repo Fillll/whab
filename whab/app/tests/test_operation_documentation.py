@@ -239,6 +239,19 @@ def test_source_check_rejects_omitted_and_unshipped_resources(tmp_path):
     assert "Registered feature" in " ".join(module.check(root)[1])
     (package / "plugin.py").write_text('"""No additional actions."""\n')
     assert not module.check(root)[1]
+    ledger = root / "src/whab/services/ledger.py"
+    source = ledger.read_text()
+    # Both the acknowledgement wrapper and its private dispatcher stay checked.
+    for changed in (
+        source.replace('elif operation == "update_account":', 'elif operation == "undocumented_account":'),
+        source.replace('response, replayed = self._command(',
+                       'assert operation != "undocumented_wrapper"\n            response, replayed = self._command('),
+    ):
+        assert changed != source
+        ledger.write_text(changed)
+        assert "Core dispatch and documented operation names differ" in " ".join(module.check(root)[1])
+    ledger.write_text(source)
+    assert not module.check(root)[1]
 
 
 def test_parser_catalog_can_defer_versions_without_hiding_external_discovery(monkeypatch):
@@ -255,3 +268,81 @@ def test_parser_catalog_can_defer_versions_without_hiding_external_discovery(mon
     assert light['plugins'][0]['version'] is None and versions == []
     full = docs.installed_catalog(document_plugins=set())
     assert full['plugins'][0]['version'] == '1.2.3' and versions == ['read']
+
+
+def test_projected_catalog_is_detached_and_shares_validation_identity_only_within_one_call(monkeypatch):
+    calls = []
+    identity = docs._validation_identity
+
+    def observed_identity():
+        calls.append('read')
+        return identity()
+
+    monkeypatch.setattr(docs, '_validation_identity', observed_identity)
+    arguments = {'document_plugins': {'cli'}, 'include_versions': False,
+                 'core_operations': {('query', 'accounts'), ('command', 'update_account')}}
+    first = docs.installed_catalog(**arguments)
+    assert calls == ['read']
+    assert {(row['kind'], row['name']) for row in first['core']['operations']} == arguments['core_operations']
+    first['core']['operations'][0]['input'].clear()
+    next(row for row in first['plugins'] if row['id'] == 'cli')['documentation']['operations'].clear()
+    second = docs.installed_catalog(**arguments)
+    assert calls == ['read', 'read']
+    assert second['core']['operations'][0]['input']
+    assert next(row for row in second['plugins'] if row['id'] == 'cli')['documentation']['operations']
+    assert {row['id'] for row in second['plugins']} == {
+        row['id'] for row in docs.installed_catalog()['plugins']
+    }
+    assert len(docs.core_document()['operations']) > 2
+
+
+def test_document_and_validator_changes_invalidate_projected_catalog_caches(tmp_path, monkeypatch):
+    core = docs.core_document()
+    plugin = docs.plugin_document('cli')
+    core_home, plugin_home = tmp_path / 'core', tmp_path / 'plugin'
+    core_home.mkdir()
+    plugin_home.mkdir()
+    core_file, plugin_file = core_home / 'operations.json', plugin_home / 'operations.json'
+    core_file.write_text(json.dumps(core))
+    plugin_file.write_text(json.dumps(plugin))
+    entry = SimpleNamespace(name='cli', value='fictional:plugin')
+    monkeypatch.setattr(docs.resources, 'files', lambda _: core_home)
+    monkeypatch.setattr(docs.util, 'find_spec', lambda _: SimpleNamespace(submodule_search_locations=[str(plugin_home)]))
+    monkeypatch.setattr(docs.metadata, 'entry_points', lambda **_: [entry])
+    monkeypatch.setattr(docs.Path, 'home', lambda: tmp_path)
+    validation = [b'fictional validator 1', 'fictional library 1']
+    monkeypatch.setattr(docs, '_validation_identity', lambda: tuple(validation))
+    checked = []
+    from whab.plugins import operation_schema
+    validate = operation_schema.validate_document
+
+    def observed_validate(document, identifier):
+        checked.append(identifier)
+        return validate(document, identifier)
+
+    monkeypatch.setattr(operation_schema, 'validate_document', observed_validate)
+    arguments = {'document_plugins': {'cli'}, 'include_versions': False,
+                 'core_operations': {('query', 'accounts')}}
+    docs.installed_catalog(**arguments)
+    assert checked == ['cli', 'core']
+    docs.installed_catalog(**arguments)
+    assert checked == ['cli', 'core']
+    # Markers bind complete source bytes, even when the changed operation is
+    # outside the requested parser projection.
+    core['operations'][-1]['summary'] += ' Fictional revision.'
+    core_file.write_text(json.dumps(core))
+    docs.installed_catalog(**arguments)
+    assert checked == ['cli', 'core', 'core']
+    plugin['summary'] += ' Fictional revision.'
+    plugin_file.write_text(json.dumps(plugin))
+    docs.installed_catalog(**arguments)
+    assert checked[-1] == 'cli' and len(checked) == 4
+    for index in (0, 1):
+        validation[index] += b' changed' if index == 0 else ' changed'
+        docs.installed_catalog(**arguments)
+        assert checked[-2:] == ['cli', 'core']
+    assert len(checked) == 8
+    core['operations'][-1]['input'] = {'type': 'invented-invalid-type'}
+    core_file.write_text(json.dumps(core))
+    with pytest.raises(ValueError):
+        docs.installed_catalog(**arguments)

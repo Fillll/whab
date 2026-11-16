@@ -11,66 +11,7 @@ lazy import httpx
 from whab.plugins import validate_category_agent
 
 from .transaction_commands import checked
-
-BULK_TRANSFER_HELP = '''Atomic transfer matching (1–100 explicit pairs):
-  whab "My budget" trnx match-transfers --file pairs.json --dry-run
-  whab "My budget" trnx match-transfers --file pairs.json --reviewed --dry-run --agent Codex
-  whab "My budget" trnx match-transfers --file pairs.json --reviewed --agent Codex
-  printf '%s\\n' '[{"outId":"out-1","inId":"in-1"}]' | whab "My budget" trnx match-transfers --file - --dry-run
-
-Complete pairs.json example (UTF-8 JSON array, maximum 2 MiB):
-[
-  {"outId": "out-1", "inId": "in-1"},
-  {"outId": "zero-a", "inId": "zero-b"}
-]
-Here zero-a/zero-b are two already-existing posted zero entries confirmed by the
-user; names do not establish their amounts. Inspect the exact preview.
-Use stable IDs from trnx list/transfers. For nonzero pairs, outId is the positive
-minor-unit outflow and inId its negative inflow. For two explicitly confirmed
-zero-value entries, these are simply the first/second IDs; no direction is inferred.
-Each ID may appear exactly once in the whole file.
-No fuzzy matching or inferred counterpart. Every pair must pass core validation;
-one invalid, missing, repeated, already paired or otherwise disallowed leg rejects
-ALL pairs. Oversized batches are refused, never split. Empty batches are refused.
-Pairing requires equal opposite amounts (or two explicitly confirmed zero-value
-entries) in different same-currency accounts, posted/nondeleted legs within seven
-days, and compatible classification. Zero and nonzero pairs may share one batch.
-Closed historical accounts and different current on/off-budget scopes may pair
-without reopening/reclassifying. Dated transferFunding accounts for signed
-eligible budget movement; transfers never become income/spending. Same-month
-cash pairs net to zero; cross-month legs affect their posting months. Unknown/
-stale cash creates no funding; credit debt changes cannot invent overpayment cash.
-Automatic proposals exclude zero-value entries. Explicit matching may pair two
-existing zeros, without inventing a counterpart, direction or value. An unpaired
-zero hint stays unreviewed until paired or independently classified. Bank hints
-and merchant names are not proof; inspect the transfer audit.
-
-This is ONE native atomic commit, revision advancement, durable checkpoint and
-coherent reversible before/after audit entry for the complete batch, not repeated
-single-pair edits. --batch groups history only. --agent labels the audit actor,
-without changing existing category-agent attribution. Omitted --reviewed leaves
-both legs unreviewed; --reviewed explicitly reviews every validated complete pair
-inside that same commit. No financial fields, notes or merchant whitespace are
-changed; no bank sync or persistent future matching rule is created.
-
---dry-run is read-only and reports exact before/after, revision and fingerprint.
-Inspect every pair, then bind the chosen preview with --revision REV and
---fingerprint HASH. Omitting them previews current state internally. Execution
-stays noninteractive. A stale revision or changed fingerprint rejects all changes.
-JSON is complete; --format table shows every saved before/after record. Verify
-trnx list and history list/show. Guarded undo/redo refuses invalid legacy Transfer
-labels or invalid reviewed state; undo to safely unclassified, unpaired records remains allowed.
-
-After an uncertain response, inspect saved pairs/history and retain the ENTIRE
-reported intent: exact ordered file, --reviewed choice, original --revision,
---fingerprint, --request-id, --agent and --batch. Repeat that exact command only;
-successful retries return the original durable receipt after restart, without a
-second mutation/history/save. Never retry with fresh intent. Conflicting reuse
-is refused. Unsupported authoritative backends fail before mutation. Paired-transfer
-portable budgets require WHAB 2.81 or newer; older readers refuse them. Help works
-offline. Use match-transfer for one pair with its existing result shape, or
-match-transfers for a batch and optional review in the same commit.
-'''
+from .transfer_help import BULK_TRANSFER_HELP
 
 
 def add_bulk_transfer_parser(commands):

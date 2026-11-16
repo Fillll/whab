@@ -50,7 +50,7 @@ def endpoint():
             else:
                 state["posts"].append(deepcopy(body))
                 fault = state["fault"]
-                if fault in (400, 409):
+                if fault in (400, 409, 503):
                     failure = console.CommandError("Fictional refusal")
                     failure.status_code = fault
                     raise failure
@@ -113,7 +113,7 @@ def execute(endpoint, options, edits=None):
 
 
 @pytest.mark.parametrize(
-    "fault", [400, 409, "lost", "foreign", "wrong", "none", "count", "ids", "missing"]
+    "fault", [400, 409, 503, "lost", "foreign", "wrong", "none", "count", "ids", "missing"]
 )
 def test_write_failures_never_retry_and_retain_exact_intent(endpoint, fault):
     state, *_ = endpoint

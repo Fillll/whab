@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from whab.domain.errors import StoreError
 from whab.plugins import BankError, PluginError
 from whab.plugins.effect_store import EffectError
+from whab.services.ledger import CommandSavePending
 
 
 def install_error_handlers(app):
@@ -18,6 +19,10 @@ def install_error_handlers(app):
 
     for error_type in (StoreError, BankError, PluginError):
         app.add_exception_handler(error_type, authored_error)
+
+    @app.exception_handler(CommandSavePending)
+    async def pending_save(_request, error):
+        return JSONResponse({"error": str(error)}, status_code=503)
 
     @app.exception_handler(EffectError)
     async def effect_error(_request, error):

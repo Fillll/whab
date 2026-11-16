@@ -78,7 +78,9 @@ def main():
     argparse.ArgumentParser(description=__doc__).parse_args()
     from whab_plugin_json import Store as JSONStore
     from whab_plugin_sqlite import Store as SQLiteStore
+    from whab_plugin_sqlite.portable_journal import read as read_journal
 
+    from whab.budgets.container import decode_container, encode_container
     from whab.budgets.session import BudgetSession, TrackedStorage
     from whab.domain.ledger_state import portable_snapshot
     from whab.plugins import LedgerService
@@ -106,7 +108,16 @@ def main():
                 store.restore_budget('personal', portable_snapshot(fixture()))
                 session.bind(store)
                 ledger = LedgerService(TrackedStorage(store, session), budget_id=session.id)
-                artifacts = [('legacy', session.path.read_bytes(), False)]
+                saved = session.path.read_bytes()
+                artifacts = [('snapshot', saved, backend == 'sqlite')]
+                if backend == 'sqlite':
+                    # Envelope 4 fences readers without incremental replay. Keep
+                    # the genuine pre-void raw SQLite acceptance check separate.
+                    container = decode_container(saved)
+                    base_image, entries = read_journal(container.files['plugins/sqlite/budget.sqlite'])
+                    assert not entries
+                    legacy_files = {**container.files, 'plugins/sqlite/budget.sqlite': base_image}
+                    artifacts.append(('legacy-raw', encode_container(container.manifest, legacy_files), False))
                 ids = ['out', 'in']
                 preview = ledger.query('preview_void_transactions', 'personal', parameters={'transactionIds': ids})
                 ledger.command('void_transactions', 'personal', {'transactionIds': ids, 'fingerprint': preview['data']['fingerprint']},

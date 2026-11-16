@@ -11,7 +11,7 @@ from .store import Store
 MAX_DATABASE_BYTES = 50 * 1024 * 1024
 _FILENAME = "budget.sqlite"
 _FORMAT_VERSION = 3
-_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized", "tx_uncategorized_recent", "tx_transfer_peer")
+_ADDITIVE_INDEXES = ("tx_register", "tx_register_account", "tx_account_history", "tx_uncategorized", "tx_uncategorized_recent", "tx_confirmed_transfer_account", "tx_transfer_peer")
 _ROW_LIMITS = {"accounts": 1000, "categories": 10000, "transactions": 250000, "budget": 250000, "future_funding": 250000, "rollover_modes": 250000, "transaction_receipts": 10000, "budget_history": 1}
 
 
@@ -53,82 +53,70 @@ def _incremental_image(store, workspace, cached):
 
 
 def _build_image(raw, previous, journal, hints):
-    """Pure preparation from an already sanitized image and immutable audit rows."""
+    """Append audited changes to a sanitized snapshot, compacting when bounded."""
+    from .portable_journal import append
     entries = journal.get('entries', []) if journal else []
-    positions = [i for i, entry in enumerate(entries) if entry['hash'] == previous]
+    if previous is None and journal and any(
+        not row['stale'] and row['source'] not in {'manual', 'demo'}
+        for row in journal['baseline']['accounts']
+    ):
+        # A legacy provider ledger without audit history has no verified
+        # pre-detachment baseline in its saved image. Establish one once before
+        # appending later edits; a frame alone cannot reconstruct stale flags.
+        return None
+    # A verified sanitized base without audit entries is the initial baseline.
+    # Replay creates that same baseline from its validated financial snapshot;
+    # the first financial edit needs only its entry, not a second full image.
+    positions = [-1] if previous is None else [i for i, entry in enumerate(entries) if entry['hash'] == previous]
     if len(positions) != 1:
         return None
-    changes = entries[positions[0] + 1:]
-    if not changes or any(entry['operation'] not in {'edit_transaction', 'edit_transaction_details', 'update_account', 'edit_transactions', 'classify_accounts', 'match_transfers', 'void_transactions', 'unvoid_transactions'}
-                          or any(change['path'][0] not in {'accounts', 'transactions'} or change['before'] is None or change['after'] is None
-                                 for change in entry['changes']) for entry in changes):
+    frames = hints.get('frames', 0)
+    result = append(raw, entries[positions[0] + 1:], frames)
+    if result is None:
         return None
-    # Deserialize only an image previously built from allowlisted, validated data.
-    # The private source database is never copied into a portable image.
-    clean = sqlite3.connect(':memory:')
-    try:
-        clean.deserialize(raw)
-        voids = any(row is not None and 'voided' in row for entry in changes
-                    for change in entry['changes'] if change['path'][0] == 'transactions'
-                    for row in (change['before'], change['after']))
-        if voids:
-            present = {row[1] for row in clean.execute("PRAGMA table_info(transactions)")}
-            for column in ('voided', 'provider_deleted'):
-                if column not in present:
-                    declaration = "INTEGER" if column == "voided" else "INTEGER NOT NULL DEFAULT 0"
-                    clean.execute(f"ALTER TABLE transactions ADD COLUMN {column} {declaration}")
-            clean.execute(f"PRAGMA user_version={_FORMAT_VERSION}")
-        elif any(row is not None and row.get('transferPeerId') for entry in changes
-               for change in entry['changes'] if change['path'][0] == 'transactions'
-               for row in (change['before'], change['after'])):
-            # Fence the first pairing even when its save uses only bounded
-            # record deltas against a previously exported format-1 image.
-            clean.execute(f"PRAGMA user_version={max(2, clean.execute('PRAGMA user_version').fetchone()[0])}")
-        void_columns = "voided" in {row[1] for row in clean.execute("PRAGMA table_info(transactions)")}
-        for entry in changes:
-            for change in entry['changes']:
-                row = change['after']
-                if change['path'][0] == 'accounts':
-                    clean.execute("UPDATE accounts SET name=?,type=?,balance=?,currency=?,on_budget=?,subtype=?,bank_website=?,name_overridden=?,closed=? WHERE workspace=? AND id=?",
-                                  (row['name'], row['type'], row['balance'], row['currency'], int(row['onBudget']), row['subtype'], row.get('bankWebsite'), int(row.get('nameOverridden', False)), int(row.get('closed', False)), 'personal', row['id']))
-                else:
-                    clean.execute("UPDATE transactions SET account_id=?,date=?,merchant=?,merchant_logo=?,amount=?,category_id=?,pending=?,reviewed=?,source=?,note=?,is_transfer=?,inferred_transfer=?,category_edited=?,deleted=?,original_details=?,category_agent=?,transfer_peer_id=?" + (",voided=?,provider_deleted=?" if void_columns else "") + " WHERE workspace=? AND id=?",
-                                  (row['accountId'], row['date'], row['merchant'], row['merchantLogo'], row['amount'], row['categoryId'], int(row['pending']), int(row['reviewed']), row['source'], row['note'], int(row['isTransfer']), int(row['inferredTransfer']), int(row['categoryEdited']), int(row['deleted']), json.dumps(row['original']) if 'original' in row else None, row.get('categoryAgent'), row.get('transferPeerId'), *((int(row['voided']) if 'voided' in row else None, int(row.get('providerDeleted', False))) if void_columns else ()), 'personal', row['id']))
-        from types import SimpleNamespace
+    return result, {'frames': frames + 1}
 
-        from .history_writes import save_history
-        holder = SimpleNamespace(db=clean, _history_blob_positions=dict(hints))
-        previous = {**journal, 'entries': entries[:positions[0] + 1]}
-        save_history(holder, 'personal', journal, previous, cache_valid=True)
-        clean.commit()
-        raw = clean.serialize()
-        if len(raw) > MAX_DATABASE_BYTES:
-            clean.execute("VACUUM")
-            raw = clean.serialize()
-            hint = holder._history_blob_positions['personal']
-            rowid = clean.execute("SELECT rowid FROM budget_history WHERE workspace='personal'").fetchone()[0]
-            holder._history_blob_positions['personal'] = (rowid, *hint[1:])
-        return raw, holder._history_blob_positions
-    finally:
-        clean.close()
+
+
+
+def _file_hash(raw, cached=None):
+    """Reuse independently computed SHA state only for an identical prefix."""
+    from hashlib import sha256
+    if cached is not None and cached[0] is raw:
+        return cached
+    if cached is not None and len(cached) == 3 and raw.startswith(cached[0]):
+        state = cached[2].copy()
+        state.update(memoryview(raw)[len(cached[0]):])
+    else:
+        state = sha256(raw)
+    return raw, state.hexdigest(), state
 
 
 def _prepared_delta(cached, journal, hints, cached_digest):
-    from hashlib import sha256
     result = _build_image(cached[1], cached[2], journal, hints)
     if result is None or len(result[0]) > MAX_DATABASE_BYTES:
         return None
     raw, hints = result
-    base = cached_digest[1] if cached_digest is not None and cached_digest[0] is cached[1] else sha256(cached[1]).hexdigest()
-    value = sha256(raw).hexdigest()
-    patch = {'name': _FILENAME, 'base': base, 'digest': value, 'size': len(raw),
-             'chunks': _changed_pages(cached[1], raw)}
-    return raw, hints, patch
+    cached_digest = _file_hash(cached[1], cached_digest)
+    base = cached_digest[1]
+    # _build_image only returns the immutable base plus an audited suffix;
+    # compaction returns None. Keep that local construction evidence instead of
+    # scanning the full prefix again for hashing, diffing and commit promotion.
+    offset = len(cached[1])
+    suffix = raw[offset:]
+    state = cached_digest[2].copy()
+    state.update(suffix)
+    digest = (raw, state.hexdigest(), state)
+    patch = {'name': _FILENAME, 'base': base, 'digest': digest[1], 'size': len(raw),
+             'chunks': [[offset, suffix]]}
+    return raw, hints, patch, digest
 
 
 def _changed_pages(previous, raw):
     if previous is raw:
         return []
+    if raw.startswith(previous):
+        return [[len(previous), raw[len(previous):]]]
     return [[offset, raw[offset:offset + 4096]] for offset in range(0, len(raw), 4096)
             if raw[offset:offset + 4096] != previous[offset:offset + 4096]]
 
@@ -160,16 +148,15 @@ def promote_prepared_image(store, transaction, stamp):
     prepared = transaction.get('prepared_portable')
     if prepared is None or stamp[1] != transaction['before_stamp'][1]:
         return
-    workspace, (raw, hints, patch) = prepared
+    workspace, (raw, hints, patch, digest) = prepared
     head = transaction['history_after'][workspace]['history']['entries'][-1]['hash']
     store._portable_images[workspace] = (stamp, raw, head)
     store._portable_history_positions[workspace] = hints
-    store._portable_file_digest = (raw, patch['digest'])
+    store._portable_file_digest = digest
     store._prepared_portable_changes = (workspace, stamp, patch)
 
 
 def export_file_changes(store, workspace, previous):
-    from hashlib import sha256
     with store._snapshot():
         stamp = (store.db.total_changes, store.db.execute("PRAGMA data_version").fetchone()[0])
         prepared = getattr(store, '_prepared_portable_changes', None)
@@ -179,11 +166,11 @@ def export_file_changes(store, workspace, previous):
     old = getattr(store, '_portable_images', {}).get(workspace)
     cached_digest = getattr(store, '_portable_file_digest', None)
     if old is not None and (cached_digest is None or cached_digest[0] is not old[1]):
-        cached_digest = (old[1], sha256(old[1]).hexdigest())
+        cached_digest = _file_hash(old[1], cached_digest)
     files = export_files(store, workspace)
     raw = files[_FILENAME]
-    current_digest = cached_digest[1] if cached_digest is not None and cached_digest[0] is raw else sha256(raw).hexdigest()
-    store._portable_file_digest = (raw, current_digest)
+    store._portable_file_digest = _file_hash(raw, cached_digest)
+    current_digest = store._portable_file_digest[1]
     if (type(previous) is not dict or previous.keys() != {_FILENAME} or old is None
             or previous[_FILENAME] != cached_digest[1]):
         return {'files': files}
@@ -239,9 +226,10 @@ def export_files(store, workspace):
         clean.db.execute("ALTER TABLE items DROP COLUMN sync_settings")
         clean.db.execute("ALTER TABLE items DROP COLUMN closed_account_cursors")
         if snapshot.get('history'):
-            from .history_writes import save_history
-            save_history(clean, 'personal', snapshot['history'], None, cache_valid=False)
-        clean.db.execute("VACUUM")
+            # This sanitized base is immutable: later audit entries append to the
+            # outer journal, so native incremental-BLOB padding wastes capacity.
+            clean.db.execute("UPDATE budget_history SET record=? WHERE workspace='personal'",
+                             (json.dumps(snapshot['history'], ensure_ascii=True, separators=(',', ':')),))
         from .transaction_voids import retains_voids
         from .transfer_pairs import retains_pairs
         version = _FORMAT_VERSION if retains_voids(snapshot) else 2 if retains_pairs(snapshot) else 1
@@ -249,27 +237,21 @@ def export_files(store, workspace):
             clean.db.execute("ALTER TABLE transactions DROP COLUMN voided")
             clean.db.execute("ALTER TABLE transactions DROP COLUMN provider_deleted")
         clean.db.execute(f"PRAGMA user_version={version}")
+        clean.db.execute("VACUUM")
         raw = clean.db.serialize()
-        if len(raw) > MAX_DATABASE_BYTES and snapshot.get('history'):
-            clean.db.execute("UPDATE budget_history SET record=? WHERE workspace='personal'", (json.dumps(snapshot['history'], separators=(',', ':')),))
-            clean.db.execute("VACUUM")
-            raw = clean.db.serialize()
-            clean._history_blob_positions = {}
-        if len(raw) > MAX_DATABASE_BYTES:
+        from .portable_journal import HEADER_BYTES
+        if len(raw) + HEADER_BYTES > MAX_DATABASE_BYTES:
             raise StoreError("This SQLite budget exceeds the portable database size limit.")
+        from .portable_journal import snapshot as wrap_snapshot
+        raw = wrap_snapshot(raw)
         journal = snapshot.get('history')
         head = journal['entries'][-1]['hash'] if journal and journal['entries'] else None
         if not hasattr(store, '_portable_images'):
             store._portable_images = {}
         store._portable_images[workspace] = (stamp, raw, head)
-        hints = getattr(clean, '_history_blob_positions', {})
-        if 'personal' in hints:
-            rowid = clean.db.execute("SELECT rowid FROM budget_history WHERE workspace='personal'").fetchone()[0]
-            hint = hints['personal']
-            hints['personal'] = (rowid, *hint[1:])
         if not hasattr(store, '_portable_history_positions'):
             store._portable_history_positions = {}
-        store._portable_history_positions[workspace] = hints
+        store._portable_history_positions[workspace] = {'frames': 0}
         return {_FILENAME: raw}
     finally:
         clean.close()
@@ -317,6 +299,19 @@ def read_files(files, *, with_receipts=False):
     if not isinstance(files, Mapping) or set(files) != {_FILENAME}:
         raise StoreError("This SQLite budget requires exactly one budget.sqlite payload.")
     raw = files[_FILENAME]
+    from .portable_journal import MAGIC
+    from .portable_journal import read as read_journal
+    if type(raw) is bytes and raw.startswith(MAGIC):
+        from whab.plugins import replay_portable_entries
+        base, entries = read_journal(raw)
+        snapshot, images = read_files({_FILENAME: base}, with_receipts=True)
+        if entries:
+            snapshot = replay_portable_entries(snapshot, entries, trusted_base=True,
+                                               detach_external_accounts=True)
+        retained = {row['id'] for row in snapshot['transactions'] if not row['deleted'] or row.get('voided')}
+        if any(identifier not in retained for identifier, _ in images):
+            raise StoreError('Receipt images must belong to an active or explicitly voided transaction.')
+        return (snapshot, images) if with_receipts else snapshot
     if (
         type(raw) is not bytes or not raw or len(raw) > MAX_DATABASE_BYTES
         or not raw.startswith(b"SQLite format 3\x00")
@@ -426,6 +421,11 @@ def prepare_files(store, files, *, existing):
     snapshot, images = read_files(files, with_receipts=True)
     if existing:
         with store._snapshot():
+            # Any personal account proves this is not a pristine replacement
+            # cache. The input image was independently validated above; avoid
+            # materializing unrelated transactions just to preserve this cache.
+            if store.db.execute("SELECT 1 FROM accounts WHERE workspace='personal' LIMIT 1").fetchone():
+                return
             state = store._read_state("personal")
             try:
                 receipt = store._workspace_import_receipt(state, "portable-budget-files", "restore")
@@ -435,4 +435,5 @@ def prepare_files(store, files, *, existing):
             return
     elif _semantic(store.export_budget()) == _semantic(snapshot) and images == _retained_images(store, "personal"):
         return
-    store.restore_budget("personal", snapshot, _receipts=images)
+    # read_files already validated this detached snapshot and its full history.
+    store._mutate("personal", lambda state: store._restore_validated_snapshot(state, snapshot, images))

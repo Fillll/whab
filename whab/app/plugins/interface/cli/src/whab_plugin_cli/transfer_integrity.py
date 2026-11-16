@@ -11,53 +11,7 @@ from whab.plugins import validate_category_agent
 from .bulk_transfers import valid_record
 from .transaction_commands import checked
 from .transaction_search import calendar_date
-
-TRANSFER_AUDIT_HELP = '''A confirmed Transfer has exactly two reciprocal, valid legs. A provider hint,
-a merchant name or an isolated Transfer category does not prove a pair. A zero
-amount imported hint has no inferred direction and is excluded from proposals.
-Two explicitly confirmed existing posted zero entries can be paired. An unpaired
-zero hint stays unreviewed until paired or classified on independent evidence.
-
-Audit first (read-only):
-  whab "My budget" trnx transfer-audit --format table
-  whab "My budget" trnx transfer-audit --since 2026-01-01 --until 2026-12-31
-  whab "My budget" trnx transfer-audit --offset NEXT --limit 100
-The inclusive dates select audited transactions. Inspect total/next and keep the
-same revision across pages; next=null means complete. Default limit 100; no silent
-truncation. JSON exposes stable IDs, exact saved records and issue reasons.
-
-Repair only explicitly inspected legacy issues:
-  whab "My budget" trnx repair-transfers TX1 TX2 --dry-run --agent Codex
-  whab "My budget" trnx repair-transfers TX1 TX2 --revision REV --fingerprint HASH --agent Codex
-Repair clears invalid reviewed flags, orphan Transfer classification and invalid
-links, as shown by the exact core before/after preview. Include every affected
-malformed counterpart explicitly. It preserves import hints, identities, amounts,
-dates, merchants (including whitespace), notes, account balances and history.
-It neither manufactures a missing leg nor guesses a category or counterpart.
-Explicit non-Transfer categories are retained; imported hint evidence cannot
-override their financial treatment after repair.
-After repair, unpaired hints (including zero values) stay unreviewed. Inspect trnx list and
-history list/show; use match-transfers only for confirmed complete pairs.
-An already unreviewed hint can appear as unchanged in the exact repair receipt.
-Audit history is permanent; guarded undo/redo refuses to restore invalid legacy
-Transfer labels or invalid reviewed state, including an invalid pre-repair state.
-
-1–200 explicit transaction IDs (up to 100 malformed pairs); all validation precedes one native atomic commit,
-revision advancement, durable save and reversible audit entry. One invalid,
-missing, duplicate or incomplete repair selection rejects the entire operation.
-No automatic upgrade/read cleanup, bank sync or future matching rule. --batch
-groups history only; --agent records the audit actor. Normal use is noninteractive.
-
---dry-run returns exact changes, revision and fingerprint without mutation/save.
-Bind a chosen preview with --revision and --fingerprint; otherwise the CLI previews
-current state internally. Stale state or changed fingerprints fail safely. After
-an uncertain result, inspect saved records/history and keep the complete original
-IDs, revision, fingerprint, request ID and actor/batch metadata. Exact successful
-retries return the durable original receipt, including after restart, without
-duplicated changes/history/saves. Never retry with a new intent. Unsupported
-authorities fail before mutation. JSON is complete; tables show every before/after.
-All help works offline.
-'''
+from .transfer_help import TRANSFER_AUDIT_HELP
 
 
 def add_integrity_parsers(commands):

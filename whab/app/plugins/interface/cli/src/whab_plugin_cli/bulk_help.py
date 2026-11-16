@@ -53,6 +53,9 @@ syntax and output stay compatible. Normal execution is noninteractive. Revisions
 returned with the complete original intent. Optional --revision/--request-id are
 for an observed decision or EXACT recovery. Exact successful retries return the
 original receipt without another change/history/save, including after restart.
+If the native commit succeeded but the portable save is pending, the command
+fails confirmation. An exact retry retries that save only; a healthy saved receipt
+still needs no additional save. Inspect budget status before continuing.
 Keep identical resolved IDs, payload, original revision, request ID and actor/batch
 metadata. Conflicting request-ID reuse and stale/expired receipts fail safely.
 An uncertain response may have committed: inspect records/history and retain the

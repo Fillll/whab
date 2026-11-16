@@ -64,14 +64,17 @@ def check(root=ROOT):
             raise ValueError("Core command inputs must declare properties and required fields.")
         ledger = ast.parse((root / "src/whab/services/ledger.py").read_text())
         service = next(node for node in ledger.body if isinstance(node, ast.ClassDef) and node.name == "LedgerService")
-        for method, kind in (("query", "query"), ("command", "command")):
-            function = next(node for node in service.body if isinstance(node, ast.FunctionDef) and node.name == method)
+        # Public command acknowledgement wraps the private financial dispatcher.
+        # Inspect both so neither wrapper nor dispatcher can add undocumented names.
+        for methods, kind in ((("query",), "query"), (("command", "_command"), "command")):
             names = set()
-            for node in ast.walk(function):
-                if isinstance(node, ast.Compare) and isinstance(node.left, ast.Name) and node.left.id == "operation":
-                    for value in node.comparators:
-                        values = value.elts if isinstance(value, (ast.Set, ast.Tuple, ast.List)) else [value]
-                        names.update(item.value for item in values if isinstance(item, ast.Constant) and isinstance(item.value, str))
+            for method in methods:
+                function = next(node for node in service.body if isinstance(node, ast.FunctionDef) and node.name == method)
+                for node in ast.walk(function):
+                    if isinstance(node, ast.Compare) and isinstance(node.left, ast.Name) and node.left.id == "operation":
+                        for value in node.comparators:
+                            values = value.elts if isinstance(value, (ast.Set, ast.Tuple, ast.List)) else [value]
+                            names.update(item.value for item in values if isinstance(item, ast.Constant) and isinstance(item.value, str))
             if kind == "command":
                 names.add("assign")  # The final dispatch branch uses the assign backend port.
             if names != {row["name"] for row in document["operations"] if row["kind"] == kind}:

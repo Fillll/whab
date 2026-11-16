@@ -4878,7 +4878,7 @@
           }
         }
       ],
-      "side_effects": "One native atomic commit, one revision, one coherent exact before/after audit entry and one synchronous durable checkpoint. Exact retries return the original receipt without duplicate mutation/history/save, including after restart. User tombstones survive refresh/reimport; later provider removals prevent unvoid. No record deletion, fabricated reversal, new zero record, bank sync or future rule. Guarded history reversals preserve the same financial safety."
+      "side_effects": "One native atomic commit, one revision, one coherent exact before/after audit entry and one synchronous durable checkpoint. Exact retries return the original receipt without duplicate mutation/history/save, including after restart. User tombstones survive refresh/reimport; later provider removals prevent unvoid. No record deletion, fabricated reversal, new zero record, bank sync or future rule. Guarded history reversals preserve the same financial safety. Tombstone records or retained history require native format 6 or Merkle-copy format 7, and portable version 3; copies preserve the source evidence algorithm and exact retries."
     },
     {
       "kind": "sdk",

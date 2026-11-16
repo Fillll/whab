@@ -18,9 +18,16 @@ def selection(store, workspace, operation, edits):
                    and row['accountId'] in state['accounts']
                    and row['onBudget'] != is_on_budget(state['accounts'][row['accountId']])]
         if changed:
-            matched = [row[0] for row in store.db.execute(
-                'SELECT id FROM transactions WHERE workspace=? AND transfer_peer_id IS NOT NULL AND account_id IN (' + ','.join('?' for _ in changed) + ')',
-                (workspace, *changed))]
+            matched = []
+            for identifier in changed:
+                # Core scope validation needs one witness per account, not every
+                # matched transaction in that account's complete history.
+                row = store.db.execute(
+                    'SELECT id FROM transactions WHERE workspace=? AND account_id=? '
+                    'AND transfer_peer_id IS NOT NULL LIMIT 1', (workspace, identifier),
+                ).fetchone()
+                if row is not None:
+                    matched.append(row[0])
             if matched:
                 state = context(store, workspace, matched)
     return state, selected

@@ -48,6 +48,7 @@ def test_explicit_parent_order_is_identical_in_cached_and_reopened_native_receip
             actual = native_state_digest(
                 store._local_states(),
                 chunks=lambda value, limit: (canonical_storage_json(value, limit=limit),),
+                version=saved.receipt.evidence.digest_version,
             )
             assert saved.receipt.evidence.state_digest == actual
         evidence = store.commit_evidence()

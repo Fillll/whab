@@ -4,6 +4,7 @@ import sqlite3
 
 import pytest
 from whab_plugin_sqlite import Store
+from whab_plugin_sqlite.portable_journal import read as read_journal
 
 from whab.domain.errors import StoreError
 from whab.domain.file_imports import WorkspaceImport
@@ -248,7 +249,7 @@ def test_every_previous_portable_schema_remains_supported(store, legacy_accounts
     snapshot = store.export_budget()
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(store.export_budget_files()["budget.sqlite"])
+        connection.deserialize(read_journal(store.export_budget_files()["budget.sqlite"])[0])
         connection.execute("DROP TABLE rollover_modes")
         if omit_funding:
             connection.execute("DROP TABLE future_funding")
@@ -285,7 +286,7 @@ def test_neutral_snapshot_without_rollover_settings_restores_canonical_defaults(
 def test_portable_rollover_rows_are_revalidated_as_untrusted_data(store, statement):
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(store.export_budget_files()["budget.sqlite"])
+        connection.deserialize(read_journal(store.export_budget_files()["budget.sqlite"])[0])
         connection.execute(statement)
         connection.commit()
         files = {"budget.sqlite": connection.serialize()}
@@ -302,7 +303,7 @@ def test_portable_rollover_record_count_is_bounded_before_projection(store, monk
 
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(store.export_budget_files()["budget.sqlite"])
+        connection.deserialize(read_journal(store.export_budget_files()["budget.sqlite"])[0])
         connection.execute("INSERT INTO rollover_modes VALUES('personal','2026-10','USD','balance')")
         connection.execute("INSERT INTO rollover_modes VALUES('personal','2026-11','USD','category')")
         connection.commit()

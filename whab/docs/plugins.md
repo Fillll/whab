@@ -444,7 +444,7 @@ From WHAB 2.14, `UserInterface(..., transaction_page_size=100)` requests a bound
 
 From WHAB 2.16, optional `BulkReviewStorage.review_transactions(workspace, transaction_ids, reviewed)` atomically sets review flags for one to 100 distinct transaction IDs. `validate_review_batch` validates the bounded selection and exact boolean and returns an immutable tuple. Apply core annotation rules to every target before changing any row; failure must leave the whole batch unchanged. Other columns, amounts, classifications and receipt images remain untouched. The host invokes this as one ledger command and tracked mutation, so it makes one checkpoint attempt under the shared budget lock. Existing saved/pending recovery behavior is unchanged. Legacy providers, including remote clients without this capability, keep their individual-edit path; core never fakes atomicity by looping over independent writes. The optional capability does not change the required `StorageBackend` protocol. Extensions importing it require `whab>=2.16,<3`.
 
-The local bulk-review route accepts an immutable request ID and payload. Replays within the bounded in-process command receipts use the original expected revision and return the first result without another mutation/checkpoint; conflicting payloads still fail. After eviction or restart, a local review-only retry is a fresh idempotent boolean assignment. Remote command callers retain their explicit expected-revision checks. Interfaces must retain an unconfirmed batch ticket and confirm it before sending later edits for its rows; submitted batch errors must not trigger automatic individual-write fallback.
+The local bulk-review route accepts an immutable request ID and payload. Replays within the bounded in-process command receipts use the original expected revision and return the first result without another mutation; a pending primary save is retried, while a healthy saved replay makes no checkpoint. Conflicting payloads still fail. After eviction or restart, a local review-only retry is a fresh idempotent boolean assignment. Remote command callers retain their explicit expected-revision checks. Interfaces must retain an unconfirmed batch ticket and confirm it before sending later edits for its rows; submitted batch errors must not trigger automatic individual-write fallback.
 
 From WHAB 2.9, projections advertise `monthlyFundingFlow: true`. Each currency's `summary` exposes `carriedIn`, `carriedInUnassigned`, `carriedInSetAside`, signed `balanceCarryover`, explicit `assignedNextMonth`, `assigned`, `income`, `readyToAssign` and conservative `fundingCapacity`, all integer minor units. The exact display identity is `readyToAssign = income + carriedIn - assignedNextMonth - assigned`. Carry-in includes previously unassigned funds, the preceding source month's explicit set-aside, and pooled category balances only under Overall balance. By-category balances remain allocated in category rows. The existing `previousOverspending` magnitude remains available for compatible consumers. Source-month transfers and target-month category plans are independent; a set-aside may be smaller than the target's assignments. Core validates edits against applicable monthly pools and actual eligible cash rather than reserving all future category plans in earlier displays.
 
@@ -745,6 +745,13 @@ Resources ship in wheels and are read without importing inactive plugin code. Cr
 
 The [CLI](../app/plugins/interface/cli/README.md) builds `--help` and operation-specific help from these resources. `whab-cli describe --json` works offline without a URL or token and includes schemas, examples and installed-plugin availability. `describe --plugin ID --kind KIND --operation NAME` filters the catalog. Supplying authenticated `--url` and `--budget` reads the authority's catalog through the public `describe` query, including enabled/disabled status; `--offline` deliberately uses local installed resources. This is read-only discovery and never starts inference or banking work. The shared ledger command validator derives accepted/required fields from the same core definitions while retaining domain validation and normalization. Feature inputs are checked against their action's documented schema before dispatch.
 
+Parser callers may request `installed_catalog(core_operations={(kind, name), ...})`
+to copy only selected core operations after complete document validation. The
+default catalog remains complete, and every returned document is detached from
+cached data. Plugin identities still include external registrations. Validation
+markers bind document bytes, validator code and JSON Schema library identity;
+identity reads are shared within one catalog, then refreshed on the next call.
+
 The [contribution requirement](../app/CONTRIBUTING.md#required-operation-documentation), repository checker, wheel smoke checks and [developer toolkit](../app/devtools/plugin-devkit/README.md) enforce these rules. A plugin change that adds or changes a public operation must update its resource, README and examples in the same change.
 
 Authenticated online discovery also includes `http.openapi`, the running application's complete OpenAPI contract with HTTP paths, methods, parameter/body schemas and response schemas. Human-readable `describe` lists methods and paths; `describe --json` includes their full definitions. Its `http.access` explains the existing HTTPS, local Host/origin, bearer authorization and signed-webhook boundaries. Documentation never grants route access. Offline documentation covers installed operation resources; it cannot claim the runtime's exact HTTP route selection or enablement.
@@ -774,6 +781,8 @@ The bundled `server` descriptor belongs to Interface and contributes `/remote/v1
 The remote public protocol exposes accounts, categories, transactions, workspace projections and portable ledger snapshots. Commands support manual accounts/categories/transactions, account classification changes, transaction edits and allocations. A command includes `operation`, `workspace`, `payload`, `request_id` and `expected_revision`. Unknown operations/fields fail validation. Responses include `budgetId`, `revision` and `data`; the client verifies budget identity. Bank tokens, Item operations and synchronization cursors are outside this protocol.
 
 The server serializes public operations per budget. A stale revision returns a conflict; reusing a request ID for different content fails. Ordinary host backends retain at most 1,024 in-memory request receipts. Participating native storage workers additionally bind the caller identity and canonical command to an atomic native receipt, which can prove an exact replay before checking the original revision. Server revisions change on restart; without a matching retained receipt, the original stale revision refuses the command. The HTTP protocol does not expose a public receipt-lookup endpoint.
+
+For a portable budget, command acknowledgement also requires the primary budget file to be saved. A native commit whose portable checkpoint remains pending returns HTTP 503 with an explicit pending-save message; it is not a validation refusal or rollback. The native result, revision and retry receipt remain committed. An exact retry retains the complete original request and retries only the pending checkpoint before returning the original receipt; healthy saved replays do not checkpoint again. This acknowledgement runs after native and history scopes have completed, under the same budget lock, for local and remote command routes and the Web ledger facade. Secondary copy destinations continue to report their independent status.
 
 Declarative remote clients durably record payload-free original intent metadata before sending a mutation. A lost result blocks new writes across client restart and code replacement; reads remain available while enabled. Reads, a `409` and restart never clear an unknown result. Explicit Finish validates the original public command and submits only its exact ID, body fingerprint, authority binding and original revision; it is not automatic retry or a receipt lookup. A correlated success records completion, while a conflict retains the unknown outcome. Legacy callable clients retain their older in-memory retry path. Neither path silently falls back to another ledger.
 
@@ -1372,8 +1381,11 @@ retain the same pair, tombstone and balance safety.
 Exact retries retain ordered IDs, action, revision, fingerprint, request ID and
 actor/batch context, and return the original durable receipt after restart without
 another change/history/save. Never replay uncertainty with a fresh intent.
-Native format 6 and conditional portable payload format 3 prevent older readers
-from dropping tombstones. Current readers still accept older budgets.
+WHAB 2.82 introduced native format 6 and conditional portable payload format 3
+to prevent older readers from dropping tombstones. SQLite 1.31 uses native Merkle
+format 7 and portable envelope 4 while retaining raw version-3 tombstone snapshots.
+JSON preserves native format 6 for legacy evidence or format 7 for Merkle copies,
+and portable version 3. Current readers still accept older budgets.
 
 Ordinary transaction search continues to exclude deleted records. Verify voided
 records through the complete saved receipt, `history list/show`, or an exact
@@ -1435,7 +1447,7 @@ receipt without another history entry, mutation or save, including after restart
 An unknown outcome never authorizes a fresh intent. `--batch` groups history only.
 Native format 5 preserves the stricter transfer semantics, including retained
 history, and older readers must fail rather than reinterpret supported pairs.
-SQLite and JSON portable payloads use format 2 when current records or retained
+WHAB 2.81 SQLite and JSON portable payloads use format 2 when current records or retained
 history contain pairs, including the first pairing saved through an incremental
 checkpoint. Current readers accept both formats; genuine older readers refuse
 format 2 before replacing destination data. The plugin namespace/state schema
@@ -1614,3 +1626,82 @@ Native SQLite/JSON advertise optional `ClassifiedReview`; the public `review_pol
 query probes the authority. Unsupported storage/remote authorities fail before
 classification/review writes. Financial rules remain in core; adapters retain
 atomic persistence, annotations, original/import records and native receipts.
+
+
+## Incremental integrity
+
+SQLite 1.31 adds portable envelope format 4 (`WHAB-SQLITE-4`), accepting earlier
+raw SQLite payload versions 1/2/3. The envelope itself fences older readers even
+when its first appended audit entry introduces a transfer pair. Compacted bases
+retain the earlier version-2 pair/history fence or version-3 tombstone fence.
+JSON portable formats are unchanged.
+
+WHAB 2.83 adds `CommitEvidence.digest_version` and
+`ReplicaWatermark.digest_version`. Omitted fields mean version 1 and retain the
+exact previous wire encoding and canonical SHA-256 calculation. Version 2 uses
+the deterministic Merkle format in
+[`domain/integrity.py`](../app/src/whab/domain/integrity.py). Evidence always binds
+the algorithm as well as its root: same-generation receipts, local transfers and
+copy watermarks must match both. Unknown versions fail before mutation. Older
+receipts remain valid after a later generation adopts version 2.
+
+The version-2 format hashes logical values with SHA-256 and the following binary
+domain separators. Canonical JSON is UTF-8, sorted keys, compact separators and
+literal Unicode (`ensure_ascii=False`); financial/schema validation still precedes
+untrusted hashing. Integers and strings retain their exact values.
+
+- A scalar hashes byte `01` followed by its canonical JSON.
+- An object containing `id` is one record leaf: byte `06`, then its complete
+  canonical JSON. Editing a field replaces that record's leaf.
+- Other objects sort their keys. Each field hashes byte `04`, the canonical
+  JSON key's byte length as an unsigned eight-byte big-endian integer, those key
+  bytes, and the child hash. The object hashes byte `03`, its eight-byte field
+  count and the binary tree root of its ordered field hashes.
+- Arrays hash byte `02`, their eight-byte element count and the binary tree root
+  of their ordered child hashes. Tuple-backed trusted views have the same form.
+- A binary tree pads to the next power of two, with a minimum capacity of one.
+  Its empty leaves are `SHA256(UTF8("whab-merkle-v2:empty"))`; each parent hashes
+  byte `05` followed by its two child hashes. All interior hashes use raw
+  32-byte digests; the public root is lowercase hexadecimal.
+
+Native version-2 evidence is the root of the two financial/protected record
+envelopes, in that order. `local_state_digest(..., version=2)` independently
+validates bounded JSON and computes the same root;
+`native_records_digest(..., version=2, hasher=..., selections=...)` permits a
+trusted adapter to retain immutable trees. Selected record replacements update
+only their ancestor paths. Arrays retain counts and ordering; insertions,
+unknown writes and invalidated native generations rebuild. Cached hashes are
+not persistent authority and never bypass schema validation on reopen.
+
+SQLite adopts native metadata format 7 in the same commit as its next financial
+mutation, without changing identity or advancing the revision merely on open.
+It retains version-1 evidence for untouched native formats 1–6; formats 5 and 6 remain
+the earlier transfer and tombstone fences and never imply Merkle evidence. JSON
+native format 7 supports version-2 local transfers and copies, preserving the
+source version through promotion and subsequent writes. Older native readers
+reject these new formats; upgrade the stopped host and selected storage plugin
+together. This is not a storage-backend migration.
+
+Financial journal format 2 retains every existing format-1 entry and its hash.
+New Merkle entries carry `digestVersion: 2`; `beforeDigest` and `afterDigest` use
+the version-2 financial snapshot root. Entry `hash` and `previousHash` retain
+canonical SHA-256 chaining. At an algorithm transition, validation recomputes the
+preceding financial state under the new algorithm rather than equating different
+hash formats. The last legacy state root is independently checked before that
+transition. Versions are monotonic: legacy entries form a prefix and version-2
+entries cannot be followed by a downgrade. Independent reopen, history export, undo/redo and guarded restore
+validate the mixed chain. No audit entry is pruned or rewritten to migrate it.
+
+`replay_portable_entries(snapshot, entries)` independently validates bounded
+replacement-only account/transaction audit additions and their final financial
+state. Storage adapters may pass `trusted_base=True` only for a detached base
+snapshot they have already fully validated. New identities, deletions, malformed
+chains, snapshot entries and mismatched before-values are rejected; unsupported
+operations require the owning storage's complete snapshot path.
+
+`detach_external_accounts=True` is an explicit opt-in, currently used by SQLite,
+for saved images that mark provider accounts stale. The saved base must exactly
+match its verified audit state after that projection; names, balances, manual
+account flags and every other field remain strict. Replay validates the original
+financial state and audit chain before marking provider accounts stale in the
+returned snapshot. The original audit records and hashes are preserved.

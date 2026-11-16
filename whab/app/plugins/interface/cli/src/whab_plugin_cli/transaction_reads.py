@@ -4,7 +4,7 @@ import argparse
 from collections import Counter
 from urllib.parse import urlencode
 
-from whab.plugins import format_money
+lazy from whab.plugins import format_money
 
 
 def optimized_read(connection, identifier, prefix, params, exchange, error):

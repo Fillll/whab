@@ -87,7 +87,7 @@ class Store(Authority):
             self._disk_identity = self._identity() if raw is not None else None
             if raw is not None:
                 self._data = codec.decode(raw)
-                if read_only and self._data["formatVersion"] not in {3, 4, 5, 6}:
+                if read_only and self._data["formatVersion"] not in {3, 4, 5, 6, 7}:
                     raise StoreError("Read-only readiness requires the current native JSON schema; upgrade it explicitly first.")
                 if self._data["formatVersion"] == 1:
                     preserve_schema_one(self.path, raw)

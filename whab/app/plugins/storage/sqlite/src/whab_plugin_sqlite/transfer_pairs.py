@@ -23,7 +23,11 @@ def related_ids(store, workspace, transaction_ids):
         placeholders = ','.join('?' for _ in pending)
         rows = store.db.execute(
             'SELECT id,transfer_peer_id FROM transactions WHERE workspace=? AND id IN (' + placeholders + ') '
-            'UNION ALL SELECT id,transfer_peer_id FROM transactions WHERE workspace=? AND transfer_peer_id IN (' + placeholders + ')',
+            # Select rowids through the peer key before reading both fields. This
+            # keeps the peer index covering even when an account-specific partial
+            # index exists; old read-only files without the index still work.
+            'UNION ALL SELECT id,transfer_peer_id FROM transactions WHERE rowid IN ('
+            'SELECT rowid FROM transactions WHERE workspace=? AND transfer_peer_id IN (' + placeholders + '))',
             (workspace, *pending, workspace, *pending),
         )
         found = {identifier for row in rows for identifier in row if identifier is not None}

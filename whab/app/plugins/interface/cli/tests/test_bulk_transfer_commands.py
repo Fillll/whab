@@ -281,6 +281,7 @@ def test_offline_bulk_transfer_help_is_prominent_complete_and_copyable(parts, ca
     if not parts or parts == ['trnx'] or parts[-1] == 'match-transfers':
         for expected in ('match-transfers', '--file -', 'outId', 'inId', '1–100', '--reviewed', '--fingerprint', 'ONE native atomic commit'):
             assert expected in text
+        assert 'WHAB 2.83 with SQLite 1.31 or newer' in text
     if not parts or parts == ['trnx'] or parts[-1] != 'match-transfers':
         assert 'transfer-audit' in text and 'repair-transfers' in text and 'zero' in text
     assert 'offline' in text and 'uncertain' in text

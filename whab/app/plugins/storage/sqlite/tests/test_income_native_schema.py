@@ -11,7 +11,7 @@ def test_income_fence_read_only_readiness_and_undo_retains_native_identity(tmp_p
     before = store.commit_evidence()
     assert store._authority_metadata()['formatVersion'] == 2
     category = store.add_category('personal', {'name': 'Salary', 'group': 'Income only', 'target': 0, 'kind': kind})
-    expected_format = 4 if kind == 'opening_balance' else 3
+    expected_format = 7
     assert store._authority_metadata()['formatVersion'] == expected_format
     store.classify_category('personal', category, 'expense')
     # Even removing the last income kind cannot turn an older interpreter back on.
@@ -57,7 +57,7 @@ def test_income_fence_also_survives_complete_local_storage_transfer(tmp_path, ki
     try:
         source.add_category('personal', {'name': 'Salary', 'group': 'Finance', 'target': 0, 'kind': kind})
         destination.import_local('fictional-income-transfer', source.export_local())
-        assert destination._authority_metadata()['formatVersion'] == (4 if kind == 'opening_balance' else 3)
+        assert destination._authority_metadata()['formatVersion'] == 7
         before, after = source.export_budget(), destination.export_budget()
         before['categories'].sort(key=lambda row: row['id'])
         after['categories'].sort(key=lambda row: row['id'])
@@ -74,20 +74,20 @@ def test_opening_fence_survives_later_income_write_undo_and_history_only_file_re
     try:
         opening = source.add_category('personal', {'name': 'Beginning', 'group': 'Finance', 'kind': 'opening_balance'})
         source.add_category('personal', {'name': 'Salary', 'group': 'Finance', 'kind': 'income'})
-        assert source._authority_metadata()['formatVersion'] == 4
+        assert source._authority_metadata()['formatVersion'] == 7
         with source.history_scope({'operation': 'delete_category'}):
             source.delete_category('personal', opening)
         assert all(row.get('kind') != 'opening_balance' for row in source.categories('personal'))
         files = source.export_budget_files('personal')
         destination.restore_budget_files('personal', files)
-        assert destination._authority_metadata()['formatVersion'] == 4
+        assert destination._authority_metadata()['formatVersion'] == 7
         local.import_local('fictional-opening-history', source.export_local())
-        assert local._authority_metadata()['formatVersion'] == 4
+        assert local._authority_metadata()['formatVersion'] == 7
         entry = next(row for row in source.budget_history('personal')['entries'] if row['operation'] == 'delete_category')
         for action in ('undo', 'redo'):
             plan = source.history_preview('personal', action, entry['id'])
             source.history_apply('personal', action, entry['id'], plan['fingerprint'])
-            assert source._authority_metadata()['formatVersion'] == 4
+            assert source._authority_metadata()['formatVersion'] == 7
     finally:
         source.close()
         destination.close()

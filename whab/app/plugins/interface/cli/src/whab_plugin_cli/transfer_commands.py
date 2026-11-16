@@ -7,66 +7,9 @@ lazy import httpx
 
 from whab.plugins import validate_category_agent
 
-from .account_commands import resolve_account
-from .bulk_transfers import BULK_TRANSFER_HELP
 from .transaction_commands import checked
-from .transfer_integrity import TRANSFER_AUDIT_HELP
-
-TRANSFER_HELP = '''Transfer proposals are suggestions, never automatic matches or reviews.
-  whab "My budget" trnx transfers --since 2026-11-01 --until 2026-11-30 --format table
-  whab "My budget" trnx match-transfer OUT_ID IN_ID --dry-run
-  whab "My budget" trnx match-transfer OUT_ID IN_ID --agent Codex
-  whab "My budget" trnx unmatch-transfer OUT_ID IN_ID --dry-run
-
-Explicit matching: two existing posted, nondeleted transactions with no category
-or a Transfer category, in different accounts, equal opposite amounts (including
-two explicitly confirmed zero-value entries), same currency, within seven days. Historical closed accounts and differing
-current on/off-budget scopes are supported without reopening/reclassifying them.
-A date/account filter selects an
-anchor; the other leg may lie outside that selection by up to seven days. Names
-and bank hints are evidence, not proof. Refunds can look like transfers: inspect
-both merchants/accounts/dates/amounts. All ambiguous alternatives stay explicit.
-Cross-currency and unequal fee/split movements cannot be paired. Signed eligible
-budget movement uses explicit dated transferFunding, not income or spending.
-Same-month cash pairs net to zero; cross-month legs affect their posting months.
-Stale/unavailable cash cannot create funding. Credit debt uses its
-actual change without inventing cash for overpayment. No bank sync or standing
-future rule is created. Proposals exclude zero-value entries; explicit matching
-can pair two existing zeros without inventing a counterpart, direction or value.
-
-List is read-only. JSON includes complete stable IDs, both public transactions,
-account names, evidence, ambiguity, exact total and next offset. Default limit
-100; use --offset NEXT with identical filters and require the same revision until
-next=null. Over 1,000 candidates fails explicitly: narrow dates/accounts; nothing
-is silently truncated. Amounts are integer minor units; currencies stay separate.
-
-Match/unmatch is an explicit confirmation. --dry-run returns exact before/after,
-revision and fingerprint without a commit. To bind a reviewed preview, copy its
---revision REV and --fingerprint HASH into the confirmation command. Without
-these flags the CLI reads the current exact plan and generates revision/request
-machinery internally. Execution is noninteractive, one atomic native commit,
-durable checkpoint and reversible audit entry. --agent labels the audit actor;
---batch only groups history. Neither command sets reviewed=true: both records
-remain unreviewed for ordinary transaction review. Notes, amounts, merchants
-(including whitespace), dates, accounts and identities stay unchanged. Match
-preserves category attribution and sets reciprocal transferPeerId/isTransfer=true.
-Unmatch removes links, clears any now-orphan Transfer category and its attribution,
-and restores isTransfer from the existing provider hint. Unmatch before changing
-paired amounts/dates/accounts or choosing Expense, Income or Opening Balance.
-A valid pair may assign or clear a Transfer category without unmatching. Current
-budget scope or closed status does not destroy a valid historical pair.
-Provider corrections/removals that invalidate a pair remove both links and leave
-both unreviewed; provider hints remain distinct from a confirmed match.
-
-Verify with trnx list (JSON includes transferPeerId) and history list/show. Undo
-and redo use fingerprint/revision-guarded history commands and refuse to restore
-invalid legacy Transfer labels or invalid reviewed state. Stale
-state is refused. After an uncertain result, inspect the saved pair/history and
-retain BOTH original IDs, action, --revision, --fingerprint and --request-id.
-Exact successful retries return the original durable result after restart. Never
-retry an uncertain write with fresh intent; conflicting request reuse is refused.
-Unsupported backends/authorities fail before mutation. Help works offline.
-''' + '\n\n' + BULK_TRANSFER_HELP + '\n\n' + TRANSFER_AUDIT_HELP
+from .transfer_help import TRANSFER_HELP
+lazy from .account_commands import resolve_account
 
 
 def add_transfer_parsers(commands):

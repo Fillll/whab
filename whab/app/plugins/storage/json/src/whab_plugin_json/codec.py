@@ -231,7 +231,7 @@ def _pack_ledger(state, *, portable=False, complete_associations=True):
 
 def decode(raw):
     value = parse(raw)
-    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2, 3, 4, 5, 6}:
+    if type(value) is not dict or type(value.get("formatVersion")) is not int or value["formatVersion"] not in {1, 2, 3, 4, 5, 6, 7}:
         raise StoreError("This JSON storage schema is newer or unsupported; install a compatible plugin.")
     fields = {"formatVersion", "generation", "operationId", "authorityEpoch", "workspaces"}
     _exact(value, fields | ({"authority"} if value["formatVersion"] >= 2 else set()))
@@ -252,8 +252,10 @@ def decode(raw):
     }}
     if value["formatVersion"] >= 2:
         financial, protected = encode_local_state(document["workspaces"], validate=False)
-        digest = local_state_digest(financial, protected)
-        if any(record["evidence"]["generation"] == value["generation"] and record["evidence"]["state_digest"] != digest
+        version = 2 if value["formatVersion"] >= 7 else 1
+        digest = local_state_digest(financial, protected, version=version)
+        if any(record["evidence"]["generation"] == value["generation"]
+               and (record["evidence"]["state_digest"] != digest or record["evidence"].get("digest_version", 1) != version)
                for record in value["authority"]["receipts"]):
             _invalid()
         if value["formatVersion"] >= 3 and value["authority"]["replica"] is not None:
@@ -262,14 +264,14 @@ def decode(raw):
                 value["authorityEpoch"] != watermark.source_authority_epoch
                 or value["generation"] != watermark.source_generation
                 or value["operationId"] != watermark.source_operation_id
-                or digest != watermark.state_digest
+                or digest != watermark.state_digest or version != watermark.digest_version
             ):
                 _invalid()
             if value["authority"]["role"] == "copy":
                 source = CommitEvidence(
                     value["authority"]["budgetId"], value["authority"]["environment"], watermark.source_instance_id,
                     watermark.source_authority_epoch, watermark.source_generation, watermark.source_operation_id,
-                    "primary", watermark.state_digest,
+                    "primary", watermark.state_digest, watermark.digest_version,
                 )
                 snapshot = LocalTransferSnapshot(source, financial, protected, tuple(
                     read_operation_receipt(record) for record in value["authority"]["receipts"]

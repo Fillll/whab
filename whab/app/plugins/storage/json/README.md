@@ -524,6 +524,19 @@ as part of an edit, creation, preview, retry or audit reversal. Existing annotat
 `edit_transactions` batches and their output shape remain compatible.
 
 
+## Versioned integrity compatibility
+
+JSON 1.23 supports WHAB 2.83's
+[versioned integrity records](../../../../docs/plugins.md#incremental-integrity).
+Existing JSON formats 1–6 retain their canonical SHA-256 evidence; format 5
+is the earlier transfer-semantics fence and format 6 retains tombstone intent. An explicit
+local transfer or copy from a Merkle source retains that source's algorithm in
+native format 7, including receipts, copy watermarks, reopen and promotion.
+Subsequent writes preserve that version and mixed financial audit history.
+Older JSON readers reject format 7 rather than misinterpret its evidence. Update
+the stopped host and storage plugin together; opening a budget alone does not
+advance its financial generation or silently select another backend.
+
 ## Atomic transfer pairs and integrity
 
 The optional public `TransferIntegrity` capability adds read-only

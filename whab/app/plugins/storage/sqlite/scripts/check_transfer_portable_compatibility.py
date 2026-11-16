@@ -78,7 +78,9 @@ def main():
     argparse.ArgumentParser(description=__doc__).parse_args()
     from whab_plugin_json import Store as JSONStore
     from whab_plugin_sqlite import Store as SQLiteStore
+    from whab_plugin_sqlite.portable_journal import read as read_journal
 
+    from whab.budgets.container import decode_container, encode_container
     from whab.budgets.session import BudgetSession, TrackedStorage
     from whab.domain.ledger_state import portable_snapshot
     from whab.plugins import LedgerService
@@ -106,7 +108,16 @@ def main():
                 store.restore_budget('personal', portable_snapshot(fixture()))
                 session.bind(store)
                 ledger = LedgerService(TrackedStorage(store, session), budget_id=session.id)
-                artifacts = [('legacy', session.path.read_bytes(), False)]
+                saved = session.path.read_bytes()
+                artifacts = [('snapshot', saved, backend == 'sqlite')]
+                if backend == 'sqlite':
+                    # Current SQLite always saves a format-4 envelope. Retain a
+                    # genuine legacy raw-image acceptance check separately.
+                    container = decode_container(saved)
+                    base_image, entries = read_journal(container.files['plugins/sqlite/budget.sqlite'])
+                    assert not entries
+                    legacy_files = {**container.files, 'plugins/sqlite/budget.sqlite': base_image}
+                    artifacts.append(('legacy-raw', encode_container(container.manifest, legacy_files), False))
                 pairs = [{'outId': 'out', 'inId': 'in'}]
                 preview = ledger.query('preview_transfer_matches', 'personal', parameters={'pairs': pairs})
                 ledger.command('match_transfers', 'personal', {'pairs': pairs, 'fingerprint': preview['data']['fingerprint']},

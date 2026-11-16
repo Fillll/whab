@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import pytest
 from whab_plugin_sqlite import Store
+from whab_plugin_sqlite.portable_journal import read as read_journal
 from whab_plugin_sqlite.schema import initialize_schema
 
 from whab.domain.errors import StoreError
@@ -15,7 +16,7 @@ def test_portable_archive_flag_rejects_invalid_values_without_mutating_destinati
     store.add_account('personal', {'name':'Fictional CD','type':'deposit','subtype':'cd','balance':123})
     connection = sqlite3.connect(':memory:')
     try:
-        connection.deserialize(store.export_budget_files()['budget.sqlite'])
+        connection.deserialize(read_journal(store.export_budget_files()['budget.sqlite'])[0])
         connection.execute('UPDATE accounts SET closed=?', (value,))
         connection.commit()
         image = connection.serialize()
@@ -114,7 +115,7 @@ def test_legacy_portable_sqlite_image_is_read_as_data_with_inferred_scope(store)
     raw = store.export_budget_files()["budget.sqlite"]
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(raw)
+        connection.deserialize(read_journal(raw)[0])
         connection.execute("ALTER TABLE accounts DROP COLUMN on_budget")
         connection.execute("ALTER TABLE accounts DROP COLUMN subtype")
         connection.commit()
@@ -222,7 +223,7 @@ def test_unrecognized_partial_metadata_schema_is_rejected(store):
     files = store.export_budget_files()
     connection = sqlite3.connect(":memory:")
     try:
-        connection.deserialize(files["budget.sqlite"])
+        connection.deserialize(read_journal(files["budget.sqlite"])[0])
         connection.execute("ALTER TABLE accounts DROP COLUMN subtype")
         connection.commit()
         files = {"budget.sqlite": connection.serialize()}

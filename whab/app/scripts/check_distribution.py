@@ -280,7 +280,9 @@ with TestClient(app, base_url="https://127.0.0.1:5173") as client:
     container = decode_container(client.get("/api/budget/export").content)
     assert container.manifest["name"] == "Installed wheel budget"
     assert container.legacy_ledger is None
-    assert container.files["plugins/sqlite/budget.sqlite"].startswith(b"SQLite format 3")
+    from whab_plugin_sqlite.portable import read_files
+    saved = read_files({"budget.sqlite": container.files["plugins/sqlite/budget.sqlite"]})
+    assert saved["formatVersion"] == 1 and saved["transactions"] == []
     assert client.post("/api/budgets/default/activate", json={}).status_code == 200
 assert (settings.home / "data" / "whab-sandbox.sqlite").is_file()
 json_settings = replace(settings, home=settings.home / "json-reference", storage="json", plugins=())

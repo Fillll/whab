@@ -315,6 +315,9 @@ def test_transfer_preserves_workspace_import_identity_and_excludes_native_contro
         assert destination.execute_operation(request).receipt == result.receipt
         assert destination.import_workspace("personal", "fictional", "0" * 64, imported)["alreadyImported"]
         portable = destination.export_budget_files()["budget.sqlite"]
+        from whab_plugin_sqlite.portable_journal import read
+        portable, entries = read(portable)
+        assert entries == []
         clean = sqlite3.connect(":memory:")
         try:
             clean.deserialize(portable)
