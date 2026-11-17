@@ -1,5 +1,12 @@
 # macOS launcher changelog
 
+## 1.3.1 — 2026-11-16
+
+PR: [#217](https://github.com/Fillll/whab/pull/217)
+
+- Open private logs in a bounded read-only launcher window with explicit log selection, Refresh and Reveal in Finder, instead of relying on the macOS default log application. Handle missing, empty and truncated logs and refuse symbolic links.
+- Distinguish an exited startup child from a verified-HTTPS readiness timeout and name the relevant private log without exposing exception contents or changing TLS verification.
+
 ## 1.3.0 — 2026-11-09
 
 PR: [#177](https://github.com/Fillll/whab/pull/177)

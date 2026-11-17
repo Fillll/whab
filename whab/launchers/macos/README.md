@@ -154,5 +154,16 @@ CLI is documented in [manager/README.md](manager/README.md).
 
 Manager processes run asynchronously with separate argument arrays; no shell
 interprets user paths. URLs opened from manager responses must be HTTPS on a
-loopback host. The app shows short status/errors, and **View logs** in settings opens the
-private local log file without uploading its contents.
+loopback host. The app shows short status/errors. Startup errors distinguish an
+exited child from a verified-HTTPS readiness timeout and name the relevant log;
+neither case changes certificate trust or signals an unrelated process.
+
+**View logs** opens a read-only window inside WHAB, without relying on the macOS
+default `.log` application. Choose **WHAB** for normal startup, **Sandbox startup**
+for update verification, or **Installation** for package preparation. **Refresh**
+reads the latest output; **Reveal in Finder** locates the complete private file.
+The window reads at most the latest 256 KiB, marks truncated output, and handles
+missing or empty logs without starting WHAB. It opens only fixed regular log files
+inside this launcher's log directory and refuses symlinks. Nothing is uploaded;
+review the local contents for private details before sharing. Closing the window
+or pressing Command-W leaves the launcher and server running.

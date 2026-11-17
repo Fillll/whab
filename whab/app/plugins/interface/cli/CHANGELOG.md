@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.25.0 — 2026-11-16
+
+PR: [#217](https://github.com/Fillll/whab/pull/217)
+
+- Add ordinary `whab runtime recover-journal-locks` with explicit runtime/environment, complete offline help, read-only journal preview and fingerprint-guarded recovery through the public host contract. No host connection or financial mutation is required.
+
 ## 2.24.1 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)

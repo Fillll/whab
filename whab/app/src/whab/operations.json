@@ -7050,6 +7050,173 @@
       ],
       "retry": "Read-only and deterministic for the supplied record; safe to repeat. Does not authorize a later write or verify freshness.",
       "availability": "WHAB 2.84+ public Python SDK. Read its documentation offline with whab-cli describe --plugin core --json; it is not a whab api query/command."
+    },
+    {
+      "name": "recover_journal_locks",
+      "kind": "sdk",
+      "summary": "Preview and explicitly recover legacy macOS journal mount identities while the runtime is stopped. Called by ordinary whab runtime recover-journal-locks; never a remote or financial command.",
+      "input": {
+        "type": "object",
+        "description": "Arguments to whab.plugins.recover_journal_locks(home, environment, apply=None).",
+        "properties": {
+          "home": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Explicit existing private runtime directory. Never choose an empty replacement runtime."
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "sandbox",
+              "production"
+            ],
+            "description": "Explicit environment; no default or cross-environment writes."
+          },
+          "apply": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$",
+            "default": null,
+            "description": "Omit/null for read-only journal preview. Supply exact preview fingerprint to back up and apply or resume that recovery."
+          }
+        },
+        "required": [
+          "home",
+          "environment"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Private local plan metadata; never includes journal bodies, credentials or financial records.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "complete"
+            ],
+            "description": "Preview leaves saved journals unchanged; complete verifies every planned identity."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact runtime/environment/paths and before/after bytes fingerprint."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1024,
+            "description": "Number of selected legacy journals."
+          },
+          "journals": {
+            "type": "array",
+            "maxItems": 1024,
+            "description": "Exact affected private relative paths, kinds and proposed action.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Relative path within this runtime; private metadata."
+                },
+                "kind": {
+                  "type": "string",
+                  "description": "Known host journal filename."
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "bind-stable-volume-identity"
+                  ],
+                  "description": "Only the envelope format and native lock identity change."
+                }
+              },
+              "required": [
+                "path",
+                "kind",
+                "action"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "repaired": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Apply-only count changed in this invocation; exact completed retries return zero."
+          },
+          "backup": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Apply-only private immutable before/after plan directory relative to runtime; null for no changes."
+          }
+        },
+        "required": [
+          "status",
+          "fingerprint",
+          "count",
+          "journals"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "home": "/private/fictional-runtime",
+            "environment": "sandbox"
+          },
+          "output": {
+            "status": "preview",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "count": 1,
+            "journals": [
+              {
+                "path": "visual-ui/visual-selection.json",
+                "kind": "visual-selection.json",
+                "action": "bind-stable-volume-identity"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "home": "/private/fictional-runtime",
+            "environment": "sandbox",
+            "apply": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "output": {
+            "status": "complete",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "count": 1,
+            "journals": [
+              {
+                "path": "visual-ui/visual-selection.json",
+                "kind": "visual-selection.json",
+                "action": "bind-stable-volume-identity"
+              }
+            ],
+            "repaired": 1,
+            "backup": "plugin-workers/journal-recovery/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      ],
+      "side_effects": "Preview may initialize the private host ownership lock, but leaves saved journals unchanged. Apply holds all owners, validates the whole set, durably saves private before/after bytes then upgrades only envelope format/lock identity. Journal revision/body, pending requests and result receipts are preserved; no financial, bank, synchronization or replay operation runs.",
+      "permissions": "Explicit local operator authorization, stopped runtime and exclusive host/journal locks. No network transport or remote access. Files must be private regular files and retain matching nonce/inode; copied or replaced locks remain refused.",
+      "scope": "Explicit runtime home and environment across its recognized host journal directories and budgets. No currency arithmetic. Bounded to 1024 journals and 256 MiB source bytes; no silent splitting.",
+      "errors": [
+        "invalid_runtime: choose an existing explicit home/environment.",
+        "busy: stop active owners and CLI jobs.",
+        "invalid_journal: preserve malformed, replaced or unsafe files; recovery cannot repair contents.",
+        "conflict: changed preview or retained state refuses mutation; inspect a fresh preview.",
+        "unsupported: stable local macOS volume UUID is required.",
+        "interrupted: keep the private backup and retry the SAME apply fingerprint."
+      ],
+      "retry": "An immutable saved plan accepts each file only in its exact before or already-upgraded state. Repeating the same successful apply changes no journal again. Partial publication resumes exactly; changed files are never overwritten. Existing pending operations remain pending until normal host recovery reconciles their original receipts.",
+      "availability": "WHAB 2.85+ SDK and CLI 2.25+ ordinary runtime command, offline help and packaged metadata. macOS volume UUID required for legacy rebinding. The host entry point also supports --recover-journal-locks with optional --apply."
     }
   ]
 }

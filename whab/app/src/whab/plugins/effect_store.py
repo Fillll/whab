@@ -18,6 +18,8 @@ from pathlib import Path
 from threading import RLock
 from uuid import uuid4
 
+from .filesystem_identity import filesystem_identity
+
 
 class EffectError(ValueError):
     """Fixed diagnostics deliberately omit namespace, provider and path contents."""
@@ -27,6 +29,8 @@ class EffectError(ValueError):
         "effect_unavailable": "The private plugin effect journal could not be opened. Preserve its files.",
         "effect_busy": "Another writer owns this private plugin effect journal.",
         "effect_changed": "The private plugin effect journal changed outside its writer. Preserve its files.",
+        "effect_identity_recovery_required": "The private journal's legacy mount identity changed. Preserve its files and use the stopped-host journal identity recovery preview.",
+        "effect_identity_unavailable": "A stable local macOS volume identity is required to recover this legacy journal.",
         "effect_closed": "This plugin effect generation has closed.",
         "effect_commit_failed": "The plugin effect was not published; its previous journal remains authoritative.",
         "effect_commit_uncertain": "The plugin effect publication is uncertain. Recover its durable decision before retrying.",
@@ -144,7 +148,8 @@ class EffectStore:
     ``validate`` accepts only the owner's schema; no corruption becomes empty.
     """
 
-    def __init__(self, root, filename, scope, initial, validate, *, limit, fault=None):
+    def __init__(self, root, filename, scope, initial, validate, *, limit, fault=None,
+                 legacy_rebind_digest=None, defer_identity_upgrade=False):
         self.lock = RLock()
         self._descriptor = None
         self._closed = False
@@ -153,6 +158,11 @@ class EffectStore:
         self.fault = fault
         self.validate, self.limit = validate, limit
         try:
+            if type(defer_identity_upgrade) is not bool or defer_identity_upgrade and legacy_rebind_digest is None:
+                invalid()
+            if legacy_rebind_digest is not None and (type(legacy_rebind_digest) is not str
+                    or re.fullmatch(r"[a-f0-9]{64}", legacy_rebind_digest) is None):
+                invalid()
             if type(filename) is not str or filename not in {"namespace-effects.json", "bank-continuations.json", "visual-selection.json", "storage-intents.json", "storage-upgrade.json", "storage-writer.json", "remote-client.json"}:
                 invalid()
             if type(limit) is not int or not 1024 <= limit <= 128 * 1024 * 1024:
@@ -163,6 +173,8 @@ class EffectStore:
             self.scope = decode(encode(scope, 4096), 4096)
             _mkdir(self.root)
             existing = self.path.exists() or self.path.is_symlink()
+            if legacy_rebind_digest is not None and not existing:
+                raise EffectError("effect_conflict")
             self._descriptor = os.open(self.lock_path, os.O_RDWR | os.O_NOFOLLOW | (0 if existing else os.O_CREAT), 0o600)
             self._private(self._descriptor)
             try:
@@ -171,6 +183,7 @@ class EffectStore:
                 raise EffectError("effect_busy") from None
             information = os.fstat(self._descriptor)
             self._lock_identity = information.st_dev, information.st_ino
+            self._volume_identity = filesystem_identity(self._descriptor)
             self._lock_token = None
             self._check_writer()
             token = os.pread(self._descriptor, 65, 0)
@@ -185,10 +198,13 @@ class EffectStore:
             fsync_directory(self.root)
             if self.path.exists() or self.path.is_symlink():
                 self._raw = self._read()
-                self._record = self._validated(self._raw)
+                self._record = self._validated(self._raw, legacy_rebind_digest=legacy_rebind_digest)
+                if self._record["format"] == 1 and self._volume_identity is not None and not defer_identity_upgrade:
+                    self.upgrade_identity()
             else:
                 self._raw = None
-                self._record = {"format": 1, "scope": self.scope, "lock": self._writer_record(), "revision": 0, "body": deepcopy(initial)}
+                self._record = {"format": 2 if self._volume_identity is not None else 1,
+                                "scope": self.scope, "lock": self._writer_record(), "revision": 0, "body": deepcopy(initial)}
                 self.validate(deepcopy(initial))
                 self._publish(encode(self._record, self.limit))
             # An earlier process may have died after replace, before dir fsync.
@@ -221,21 +237,37 @@ class EffectStore:
         finally:
             os.close(descriptor)
 
-    def _validated(self, raw):
+    def _validated(self, raw, *, legacy_rebind_digest=None):
         record = decode(raw, self.limit)
         if (type(record) is not dict or record.keys() != {"format", "scope", "lock", "revision", "body"}
-                or type(record["format"]) is not int or record["format"] != 1 or record["scope"] != self.scope
+                or type(record["format"]) is not int or record["format"] not in {1, 2} or record["scope"] != self.scope
                 or type(record["revision"]) is not int or not 0 <= record["revision"] <= 2**53 - 1):
             invalid()
-        if record["lock"] != self._writer_record():
+        if legacy_rebind_digest is not None and self._volume_identity is None:
+            raise EffectError("effect_identity_unavailable")
+        if legacy_rebind_digest is not None and (record["format"] != 1 or digest(raw) != legacy_rebind_digest):
+            raise EffectError("effect_conflict")
+        writer = record["lock"]
+        if record["format"] == 1:
+            if (type(writer) is not dict or writer.keys() != {"token", "device", "inode"}
+                    or type(writer["device"]) is not str or re.fullmatch(r"[0-9]+", writer["device"]) is None):
+                invalid()
+            if writer["token"] != self._lock_token or writer["inode"] != str(self._lock_identity[1]):
+                raise EffectError("effect_changed")
+            if writer["device"] != str(self._lock_identity[0]) and legacy_rebind_digest is None:
+                raise EffectError("effect_identity_recovery_required")
+        elif self._volume_identity is None or writer != self._writer_record():
             raise EffectError("effect_changed")
         self.validate(deepcopy(record["body"]))
         return record
 
     def _writer_record(self):
-        # Native file identities are decimal strings, not portable JSON numbers.
-        # A copied token on a new inode cannot manufacture a second writer.
+        # Durable identity uses a volume UUID where available; device numbers are
+        # retained only in live handle checks. A copied token on another volume
+        # or a new inode cannot manufacture a second writer.
         device, inode = self._lock_identity
+        if self._volume_identity is not None:
+            return {"token": self._lock_token, "volume": self._volume_identity, "inode": str(inode)}
         return {"token": self._lock_token, "device": str(device), "inode": str(inode)}
 
     def _check_writer(self):
@@ -313,6 +345,26 @@ class EffectStore:
         with self.lock:
             self._check()
             return deepcopy(self._record["body"])
+
+    def upgrade_identity(self):
+        """Publish only durable writer identity under the retained exclusive lock.
+
+        Stopped-host recovery may defer a fully validated legacy open until every
+        affected journal is locked, previewed and privately backed up. This call
+        preserves all body values, receipts, decisions and the original revision.
+        """
+        with self.lock:
+            self._check()
+            if self._record["format"] == 2:
+                return False
+            if self._volume_identity is None:
+                raise EffectError("effect_conflict")
+            candidate = {**self._record, "format": 2, "lock": self._writer_record()}
+            raw = encode(candidate, self.limit)
+            self._validated(raw)
+            self._publish(raw)
+            self._record = candidate
+            return True
 
     def commit(self, body):
         with self.lock:

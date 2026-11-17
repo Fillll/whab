@@ -34,6 +34,7 @@ def test_selected_transaction_help_matches_full_parser(action):
     ['BUDGET', 'Fictional budget', 'category', 'create', '--help'],
     ['BUDGET', 'Fictional budget', 'history', 'list', '--help'],
     ['BUDGET', 'Fictional budget', 'insights', 'summary', '--help'],
+    ['runtime', '--help'], ['runtime', 'recover-journal-locks', '--help'],
 ])
 def test_shallow_or_projected_help_matches_complete_parser(arguments):
     outputs = []
@@ -52,6 +53,10 @@ def test_shallow_or_projected_help_matches_complete_parser(arguments):
                  'whab_plugin_cli.bulk_transfers', 'whab_plugin_cli.transfer_integrity',
                  'whab_plugin_cli.transaction_voids']),
     (['Fictional budget', 'trnx', '--help'], []),
+    (['runtime', 'recover-journal-locks', '--help'], [
+        'whab.journal_recovery', 'whab.plugins.effect_store', 'whab.config',
+        'whab_plugin_cli.account_commands', 'whab_plugin_cli.category_commands',
+    ]),
     (['Fictional budget', 'trnx', 'list', '--help'], [
         'whab_plugin_cli.bulk_commands', 'whab_plugin_cli.record_edits',
         'whab_plugin_cli.transfer_commands', 'whab_plugin_cli.transaction_changes',

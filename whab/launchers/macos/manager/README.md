@@ -61,6 +61,12 @@ contents. Detailed subprocess output goes to private `logs/install.log`,
 `logs/smoke.log`, or `logs/whab.log`. An exclusive per-root operation lock returns
 `busy` during another operation.
 
+An exited startup child and a verified-HTTPS readiness timeout both report
+`startup_failed`, with distinct safe explanations and the matching **View logs**
+selection (**WHAB** or **Sandbox startup**). They do not expose private exception
+text in the JSON reply. The native launcher renders a bounded read-only log tail
+on explicit request; it does not delegate `.log` files to Console or upload them.
+
 ## Installation and trust
 
 The main channel selects the newest of the last ten main commits whose latest

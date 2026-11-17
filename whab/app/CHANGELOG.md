@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.85.0 — 2026-11-16
+
+PR: [#217](https://github.com/Fillll/whab/pull/217)
+
+- Preserve native journal identity across macOS remounts using stable volume UUIDs while retaining live inode, nonce and ownership checks.
+- Add explicit offline preview/apply recovery with durable private backups and exact interrupted-retry handling for legacy mount identities; preserve financial data, revisions, receipts and pending operations.
+- Report sanitized startup journal diagnostics before HTTPS becomes available.
+
 ## 2.84.0 — 2026-11-15
 
 PR: [#216](https://github.com/Fillll/whab/pull/216)

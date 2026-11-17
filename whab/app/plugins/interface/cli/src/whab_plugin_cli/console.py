@@ -27,6 +27,7 @@ from .help import (
     overview,
 )
 from .identifiers import check_identifiers, host_id, plugin_identifiers
+from .runtime_commands import RUNTIME_HELP, add_runtime_parser
 from .transaction_change_help import CHANGE_HELP
 from .transaction_void_help import VOID_HELP
 from .transfer_help import TRANSFER_HELP
@@ -38,6 +39,7 @@ lazy from .category_commands import add_category_parser, category_table, execute
 lazy from .history_commands import add_history_parser, execute_history
 lazy from .record_edits import add_note_parser, execute_note, note_table
 lazy from .review_commands import review_audit_table
+lazy from .runtime_commands import execute_runtime, runtime_table
 lazy from .transaction_changes import add_change_parsers, execute_changes
 lazy from .transaction_commands import add_category_parsers, execute_category
 lazy from .transaction_reads import (
@@ -60,10 +62,11 @@ lazy from .transfer_commands import (
 )
 
 PREFIX = "/api/local/v1"
-ROOT_COMMANDS = {"budget", "plugin", "api", "BUDGET"}
+ROOT_COMMANDS = {"budget", "plugin", "runtime", "api", "BUDGET"}
 _ROOT_HELP = {
     "budget": "Create and list saved budgets",
     "plugin": "Discover installed plugins; enable them under a budget name",
+    "runtime": "Offline runtime maintenance and journal identity recovery",
     "BUDGET": "Address a saved budget by its name or permanent ID",
     "api": "Advanced local operations; use whab api --help",
 }
@@ -80,6 +83,10 @@ class CommandError(ValueError):
 
 
 def parser(options, argv=()):
+    if argv and argv[0] == "runtime":
+        root = CommandParser(prog="whab", parents=[options])
+        add_runtime_parser(root.add_subparsers(dest="scope", required=True))
+        return root
     root_help = len(argv) == 1 and argv[0] in {"-h", "--help"}
     requested = argv[2] if len(argv) > 2 and argv[0] == "BUDGET" else None
     if requested not in {"account", "category", "plugin", "bank", "history", "import", "insights", "transactions", "trnx"}:
@@ -100,7 +107,8 @@ def parser(options, argv=()):
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
         epilog='Transaction corrections: trnx edit TX_ID; manual entry: trnx create; atomic edit-plus-create split: trnx edit-many --file split.json --preserve-balances. Reversible exclusion: trnx void IDS / trnx unvoid IDS. See each command --help for complete examples and recovery.\n\nCategory types: expense, income, transfer, opening_balance. Opening Balance records existing cash/debt separately from income; it never auto-reviews. Use category create/classify --type TYPE. Explicit review: trnx review IDS --reviewed; inspect legacy flags with trnx review-audit. See trnx review --help for classification requirements and atomic recovery.\n\n' + VOID_HELP + "\n\n" + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,BUDGET,api}")
+    root.epilog += "\n\n" + RUNTIME_HELP
+    groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,runtime,BUDGET,api}")
     if root_help:
         for name, description in _ROOT_HELP.items():
             groups.add_parser(name, help=description)
@@ -117,6 +125,7 @@ def parser(options, argv=()):
         epilog="Enable for a budget: whab BUDGET plugin enable PLUGIN\n\n" + overview(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
     plugin.add_argument("action", choices=("list",), nargs="?", default="list", help="List installed plugin documentation offline")
+    add_runtime_parser(groups)
     scoped = groups.add_parser("BUDGET", help=_ROOT_HELP["BUDGET"],
         epilog=VOID_HELP + "\n\n" + TRANSFER_HELP, formatter_class=argparse.RawDescriptionHelpFormatter,
         usage="whab BUDGET {account,category,plugin,bank,history,import,insights,transactions,trnx} ...")
@@ -393,11 +402,15 @@ def main(argv=None):
         if remaining and remaining[0] not in ROOT_COMMANDS and not remaining[0].startswith("-"):
             remaining.insert(0, "BUDGET")
         args = parser(options, remaining).parse_args(remaining, namespace=global_args)
-        if args.scope == "plugin":
+        if args.scope == "runtime":
+            result = execute_runtime(args, CommandError)
+        elif args.scope == "plugin":
             result = describe(installed_catalog())
         else:
             result = execute(args, *configuration(args))
-        if getattr(args, "format", None) == "table":
+        if args.scope == "runtime" and args.format == "table":
+            print(runtime_table(result))
+        elif getattr(args, "format", None) == "table":
             print(void_table(result) if getattr(args, "filter", None) in {"void", "unvoid"} else review_audit_table(result) if getattr(args, "filter", None) == "review-audit" else transfer_table(result) if getattr(args, "filter", None) in {"transfers", "match-transfer", "unmatch-transfer", "match-transfers", "transfer-audit", "repair-transfers"} else bulk_table(result) if "dryRun" in result and args.command != "category" else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
                   else note_table(result) if args.filter == "note" else search_table(result) if args.filter == "list" else transaction_table(result))
         else:

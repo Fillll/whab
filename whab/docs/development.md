@@ -113,3 +113,8 @@ optional `--apply FINGERPRINT`; it runs before normal application construction.
 See both commands' offline `--help`. Stable-volume recovery currently requires a
 local macOS filesystem that supplies its volume UUID. Unsupported filesystems fail
 explicitly, rather than weakening replacement detection.
+
+This is a forward migration: older hosts cannot read upgraded format-2 journals.
+Keep WHAB 2.85 or newer after recovery; do not downgrade or reset those journals.
+Other platforms retain the legacy identity format and do not support explicit
+macOS volume rebinding.
