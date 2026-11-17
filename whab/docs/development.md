@@ -69,3 +69,52 @@ Start with the first diagnostic, then follow the linked supported procedure. Pre
 README files introduce setup and current behavior; `usage.md` owns user workflows, `architecture.md` owns decisions and invariants, and `plugins.md` owns the public SDK contract. Concrete plugin READMEs own their implementation contracts and limitations. AGENTS routes mandatory work; CONTRIBUTING owns validation and contribution policy. Changelogs own release chronology. Plans record their status, delivery PRs and unresolved work and link back to current contracts after delivery.
 
 Update the owning document in the same change instead of copying a new rule into several overviews. The [supported plugin inventory](../app/plugins/README.md#supported-plugins) is checked against package metadata by `scripts/check_docs.py`; use links to that inventory and the version sources instead of repeated counts or a manually maintained current-version banner. `scripts/check.py --docs` validates local documentation links, anchors, fences and the inventory without live network requests.
+
+## Offline journal identity recovery
+
+On macOS, WHAB 2.85 records the stable filesystem volume UUID, lock inode and
+private nonce for native host journals. The kernel's device number is checked
+while a handle is live, but is not a durable identity across reboots. Existing
+same-device journals upgrade their identity metadata on open. A legacy journal
+whose device number changed remains fenced until an operator explicitly reviews
+recovery; WHAB cannot reconstruct its old volume UUID or silently assume a copy
+is the original.
+
+Stop WHAB and other jobs using the runtime. Use the ordinary CLI, with an explicit
+runtime home and environment:
+
+```sh
+whab runtime recover-journal-locks --home /private/fictional-runtime --environment sandbox
+whab runtime recover-journal-locks --home /private/fictional-runtime --environment sandbox --apply FINGERPRINT
+```
+
+The first command returns the exact journal paths and fingerprint without changing
+saved journals. It can create the private host ownership lock needed to exclude a
+concurrent first startup. Review this local output as private runtime metadata.
+Apply requires the same fingerprint, validates the complete selected set and takes
+all journal locks before writing. It flushes a private immutable before/after plan
+under `plugin-workers/journal-recovery/` first, then durably upgrades only envelope
+format and lock identity. Revisions, bodies, provider continuations, pending
+storage intents and original result receipts remain unchanged. No banking request,
+financial command or saved operation is replayed by recovery. Ordinary startup
+retains its existing exact-receipt recovery rules afterward.
+
+Only matching nonces and inodes are eligible; different volumes in current records,
+replaced files, malformed data, changed previews, symlinks and active owners are
+refused. After an interruption, retry the **same** `--apply` fingerprint. The saved
+plan accepts each file only in its exact original or already-upgraded state; it
+never overwrites subsequent changes. Do not delete journals or edit lock metadata
+by hand. The full launcher backup/update lifecycle remains required for upgrades;
+the recovery archive supplements that backup and must remain private.
+
+The host entry point also supports
+`python -m whab --home PATH --environment sandbox --recover-journal-locks`, with
+optional `--apply FINGERPRINT`; it runs before normal application construction.
+See both commands' offline `--help`. Stable-volume recovery currently requires a
+local macOS filesystem that supplies its volume UUID. Unsupported filesystems fail
+explicitly, rather than weakening replacement detection.
+
+This is a forward migration: older hosts cannot read upgraded format-2 journals.
+Keep WHAB 2.85 or newer after recovery; do not downgrade or reset those journals.
+Other platforms retain the legacy identity format and do not support explicit
+macOS volume rebinding.

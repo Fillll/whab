@@ -75,6 +75,51 @@ Operational failures print JSON to stderr and exit 1; argument usage errors exit
 Keep access tokens in the named environment variable, and preserve HTTPS certificate
 verification. Read the sections below for profile precedence and remote access.
 
+## Recover a stopped runtime after reboot
+
+If startup reports `effect_identity_recovery_required`, stop WHAB and its CLI jobs,
+then inspect the legacy journal identities through the ordinary offline console:
+
+```sh
+whab runtime --help
+whab runtime recover-journal-locks --help
+whab runtime recover-journal-locks --home /private/fictional-runtime --environment sandbox
+whab runtime recover-journal-locks --home /private/fictional-runtime --environment sandbox --format table
+# Review every path and the fingerprint, then apply that exact plan:
+whab runtime recover-journal-locks --home /private/fictional-runtime --environment sandbox --apply FINGERPRINT
+```
+
+Both `--home` and `--environment` are required explicitly. Neither profile defaults
+nor environment variables supply them. Global options work before or after the
+command; `--profile` and `--ca` are unused because recovery opens no connection.
+It runs before settings, plugin discovery and host startup, so a broken startup
+does not prevent recovery. `runtime` is reserved; address a budget named runtime
+using the explicit form `whab BUDGET runtime account list`.
+
+Without `--apply`, the JSON response reports `status: "preview"`, a fingerprint,
+the complete count and every relative journal path, kind and proposed action.
+`--format table` retains all those entries. Preview never changes saved journals;
+it may create the private host ownership lock to exclude concurrent startup.
+Responses contain no journal payloads, financial records, credentials or keys.
+
+Apply uses the public SDK `recover_journal_locks`, validates every selected journal,
+and durably saves the before/after plan in the private runtime directory
+`plugin-workers/journal-recovery/FINGERPRINT` before rebinding legacy macOS lock
+identities to a stable volume identity. It returns `status: "complete"`, `repaired`
+and the relative `backup` path. `count` is the full plan size; `repaired` counts
+journal rewrites in this invocation. A new empty plan has `repaired: 0` and `backup: null`.
+Existing lock tokens and inodes must match; invalid contents, an active owner,
+unsupported platforms and changed previews are refused with actionable errors.
+
+Saved payloads, budget/environment scopes, revisions, pending/uncertain operations
+and receipts remain intact. This is identity recovery, not a ledger repair or a
+retry of financial operations. Never reset or delete journals to regain access.
+If interrupted, retain the private backup and retry the **same** `--apply`
+fingerprint. A completed exact retry keeps the same fingerprint, count, paths and
+backup with `repaired: 0`, proving no journal was rewritten. Then start WHAB
+normally and verify `whab budget list` and a read in the
+addressed budget. Requires CLI 2.25 / WHAB 2.85; no storage plugin change is needed.
+
 ## Rename categories and append memos
 
 ```sh

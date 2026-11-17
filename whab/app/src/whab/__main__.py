@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import json
 import os
 import ssl
 
@@ -13,7 +14,17 @@ from .tls import validate_tls
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run WHAB on this computer.")
+    parser = argparse.ArgumentParser(description="Run WHAB on this computer.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Offline journal identity recovery (macOS, stopped runtime only):\n"
+        "  python -m whab --home /private/fictional-runtime --environment sandbox --recover-journal-locks\n"
+        "Review the returned fingerprint and journal paths, then repeat with --apply FINGERPRINT.\n"
+        "Ordinary CLI equivalent: whab runtime recover-journal-locks --home PATH --environment sandbox.\n"
+        "Recovery backs up every selected journal before changing only its native lock identity.\n"
+        "It preserves revisions, saved decisions, pending operations and financial data. All owners\n"
+        "must be stopped. Changed tokens, inodes, payloads, scopes or previews are refused. After\n"
+        "an interruption retry the SAME --apply fingerprint; completed records are not repeated.\n"
+        "Backups are private and remain in the runtime. Never delete or reset journals to start WHAB.")
     parser.add_argument("--version", action="version", version=f"WHAB {__version__}")
     parser.add_argument("--home", help="Private runtime home (also WHAB_HOME)")
     parser.add_argument("--environment", choices=("sandbox", "production"), help="Explicit runtime environment")
@@ -26,10 +37,24 @@ def main():
     parser.add_argument("--create", metavar="NAME", help="Create the --budget file with this budget name")
     parser.add_argument("--copy", action="append", default=[], metavar="FILE", help="Also save the opened budget to this unused file location")
     parser.add_argument("--recover-plugins", action="store_true", help="Start minimal local plugin recovery without opening plugin factories")
+    parser.add_argument("--recover-journal-locks", action="store_true", help="Offline read-only preview of legacy journal lock recovery; requires explicit --home and --environment")
+    parser.add_argument("--apply", metavar="FINGERPRINT", help="With --recover-journal-locks only: back up and apply or resume the exact reviewed recovery fingerprint")
     parser.add_argument(
         "--reload", action="store_true", help="Reload Python files during development"
     )
     args = parser.parse_args()
+    if args.recover_journal_locks or args.apply is not None:
+        if (not args.recover_journal_locks or not args.home or not args.environment
+                or args.transient or args.serve or args.run_jobs or args.port is not None
+                or args.budget or args.budget_password_env or args.create is not None
+                or args.copy or args.recover_plugins or args.reload):
+            parser.error("Use --recover-journal-locks with explicit --home and --environment, optionally --apply FINGERPRINT; do not combine it with startup or budget actions.")
+        from whab.journal_recovery import JournalRecoveryError, recover_journal_locks
+        try:
+            print(json.dumps(recover_journal_locks(args.home, args.environment, apply=args.apply), ensure_ascii=False))
+        except JournalRecoveryError as error:
+            parser.error(f"{error.code}: {error}")
+        return
     if args.home:
         os.environ["WHAB_HOME"] = args.home
     if args.environment:
@@ -91,8 +116,12 @@ def main():
         parser.error(str(error))
     if not args.reload and not args.recover_plugins:
         from whab.hosting import run_host
+        from whab.plugins.effect_store import EffectError
         try:
             run_host(settings, transient=args.transient, persistent=args.serve or not args.transient)
+        except EffectError as error:
+            hint = " Stop WHAB, then inspect --recover-journal-locks --help." if error.code == "effect_identity_recovery_required" else ""
+            parser.error(f"{error.code}: {error}{hint}")
         except (OSError, ValueError):
             parser.error("WHAB could not acquire its runtime or HTTPS listener. Reuse the running host or inspect its status.")
         return

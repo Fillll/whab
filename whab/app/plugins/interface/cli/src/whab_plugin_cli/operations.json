@@ -84,6 +84,176 @@
       "availability": "GET /api/plugin-settings/cli"
     },
     {
+      "name": "runtime-recover-journal-locks",
+      "kind": "local",
+      "summary": "Offline preview or backed-up recovery of legacy macOS journal lock identities through the public recover_journal_locks SDK; no host connection.",
+      "input": {
+        "type": "object",
+        "description": "Explicit ordinary console arguments; profiles and environment variables do not supply runtime scope.",
+        "properties": {
+          "home": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Existing private runtime home, explicitly supplied with --home."
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "sandbox",
+              "production"
+            ],
+            "description": "Explicit --environment; no default for recovery."
+          },
+          "apply": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact reviewed fingerprint. Omit for preview; preserve it for an interrupted or completed exact retry."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json",
+            "description": "Complete JSON or readable complete journal table."
+          }
+        },
+        "required": [
+          "home",
+          "environment"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "description": "Complete safe metadata only; no journal payloads, financial records or secrets.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "complete"
+            ],
+            "description": "Preview only or fully completed identity recovery."
+          },
+          "fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Exact immutable plan fingerprint used by --apply."
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Complete number of selected journals in the plan."
+          },
+          "journals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "Journal path relative to the explicit home."
+                },
+                "kind": {
+                  "type": "string",
+                  "description": "Allowlisted journal filename."
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "bind-stable-volume-identity"
+                  ],
+                  "description": "Only supported action; preserves all saved journal contents."
+                }
+              },
+              "required": [
+                "path",
+                "kind",
+                "action"
+              ],
+              "additionalProperties": false,
+              "description": "Safe identity-recovery metadata for one journal."
+            },
+            "description": "Complete list of relative journal paths and proposed identity-only actions."
+          },
+          "repaired": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Present for complete; journal rewrites in this invocation. A completed exact retry reports zero while count retains the full plan size."
+          },
+          "backup": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Present for complete; private before/after backup path relative to home, or null for a no-op."
+          }
+        },
+        "required": [
+          "status",
+          "fingerprint",
+          "count",
+          "journals"
+        ],
+        "additionalProperties": false
+      },
+      "examples": [
+        {
+          "input": {
+            "home": "/private/fictional-runtime",
+            "environment": "sandbox"
+          },
+          "output": {
+            "status": "preview",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "count": 1,
+            "journals": [
+              {
+                "path": "visual-ui/fictional/visual-selection.json",
+                "kind": "visual-selection.json",
+                "action": "bind-stable-volume-identity"
+              }
+            ]
+          }
+        },
+        {
+          "input": {
+            "home": "/private/fictional-runtime",
+            "environment": "sandbox",
+            "apply": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "output": {
+            "status": "complete",
+            "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "count": 1,
+            "journals": [
+              {
+                "path": "visual-ui/fictional/visual-selection.json",
+                "kind": "visual-selection.json",
+                "action": "bind-stable-volume-identity"
+              }
+            ],
+            "repaired": 1,
+            "backup": "plugin-workers/journal-recovery/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      ],
+      "side_effects": "Preview preserves all saved journals but may initialize the private host ownership lock. Apply validates every selected journal, durably backs up its exact before/after plan, then changes only legacy lock identity metadata. Financial data, journal payloads, revisions, scopes, pending decisions and receipts stay unchanged. No host, plugin factory or bank operation starts.",
+      "permissions": "Local filesystem owner only, stopped runtime and stopped CLI jobs. Requires explicit home/environment. No remote API or HTTPS connection; ordinary HTTPS verification remains unchanged.",
+      "scope": "Selected runtime home and explicit environment. The validated plan may span its budgets but never another environment. Journal paths and lock identities are checked; no ledger changes are authorized.",
+      "errors": [
+        "Explicit --home and --environment are mandatory; profile and WHAB_HOME defaults cannot authorize recovery.",
+        "invalid_runtime: choose an existing private home and explicit environment. busy: stop every runtime owner before retrying.",
+        "invalid_journal: preserve the invalid journal/backup; identity recovery cannot repair contents. unsupported: stable local macOS volume identity is required for legacy rebind.",
+        "conflict: fingerprint, token, inode, scope or saved state no longer agrees; inspect a fresh preview without overwriting changed state.",
+        "interrupted: preserve the backup and retry the same apply fingerprint; never reset journals or replay pending financial effects."
+      ],
+      "retry": "Preview is repeatable. Apply or resume only the same reviewed fingerprint. Its immutable plan accepts exactly original or completed journal bytes and survives interruption. A completed exact retry retains the same fingerprint, count, paths and backup with repaired: 0, proving no journal was rewritten. Changed plans fail closed.",
+      "availability": "CLI 2.25 / WHAB 2.85: whab runtime recover-journal-locks --home PATH --environment sandbox|production [--apply FINGERPRINT] [--format json|table]. Public SDK whab.plugins.recover_journal_locks. Help is offline before settings/plugin discovery."
+    },
+    {
       "name": "plugins",
       "kind": "local",
       "summary": "List/status or enable/disable installed plugins through the authenticated local host.",

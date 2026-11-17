@@ -364,6 +364,36 @@ class IsolatedManagerTest(unittest.TestCase):
         child.wait.assert_called_once_with(timeout=15)
         self.assertFalse((self.root / "process.json").exists())
 
+    def test_startup_failure_explains_exited_child_and_selects_private_log(self):
+        self.config()
+        child = Mock(pid=123)
+        child.poll.return_value = 1
+        identity = {"started": "one", "command": "python server.py --instance fictional-instance"}
+        with patch.object(self.manager, "verify_python", return_value=sys.executable), patch.object(self.manager, "setup"), patch.object(launcher.uuid, "uuid4", return_value="fictional-instance"), patch.object(launcher, "process_identity", return_value=identity), patch.object(subprocess, "Popen", return_value=child), patch.object(self.manager, "terminate") as terminate:
+            with self.assertRaises(launcher.LauncherError) as failure:
+                self.manager.launch(self.installation(), self.home, 6412)
+        self.assertEqual(failure.exception.code, "startup_failed")
+        self.assertIn("exited during startup", str(failure.exception))
+        self.assertIn("View logs → WHAB", str(failure.exception))
+        self.assertIn("Preserve the runtime and its keys", str(failure.exception))
+        terminate.assert_called_once()
+        self.assertFalse((self.root / "process.json").exists())
+
+    def test_unhealthy_smoke_child_keeps_verified_https_and_points_to_smoke_log(self):
+        self.config()
+        child = Mock(pid=123)
+        child.poll.return_value = None
+        identity = {"started": "one", "command": "python server.py --instance fictional-instance"}
+        with patch.object(self.manager, "verify_python", return_value=sys.executable), patch.object(self.manager, "setup"), patch.object(launcher.uuid, "uuid4", return_value="fictional-instance"), patch.object(launcher, "process_identity", return_value=identity), patch.object(subprocess, "Popen", return_value=child), patch.object(self.manager, "health", return_value=False) as health, patch.object(self.manager, "terminate") as terminate, patch.object(launcher.time, "sleep"):
+            with self.assertRaises(launcher.LauncherError) as failure:
+                self.manager.launch(self.installation(), self.home, 6412, smoke=True)
+        self.assertEqual(failure.exception.code, "startup_failed")
+        self.assertIn("did not become healthy over verified HTTPS", str(failure.exception))
+        self.assertIn("View logs → Sandbox startup", str(failure.exception))
+        self.assertEqual(health.call_count, 100)
+        terminate.assert_called_once()
+        self.assertFalse((self.root / "process.json").exists())
+
     def test_first_setup_does_not_rewrite_existing_configuration(self):
         self.config("PORT=6412\nTOKEN_ENCRYPTION_KEY=preserve\n")
         with patch.object(self.manager, "run") as run:

@@ -21,6 +21,7 @@ lazy from whab.domain.money import SUPPORTED_CURRENCIES, currency_code, currency
 lazy from whab.domain.receipts import MAX_RECEIPT_BYTES, validate_receipt_selection
 lazy from whab.domain.transaction_changes import validate_transaction_changes
 lazy from whab.domain.transactions import UNSET, validate_category_agent, validate_review_batch
+lazy from whab.journal_recovery import JournalRecoveryError, recover_journal_locks
 lazy from whab.receipts import receipt_media_type
 lazy from whab.services.ledger import LedgerService, RequestConflict, RevisionConflict
 
@@ -254,6 +255,8 @@ __all__ = [
     "load_descriptors",
     "receipt_media_type",
     "bank_website",
+    "JournalRecoveryError",
+    "recover_journal_locks",
 ]
 
 from whab.domain.review import review_status as review_status

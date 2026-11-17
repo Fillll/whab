@@ -1726,3 +1726,20 @@ match its verified audit state after that projection; names, balances, manual
 account flags and every other field remain strict. Replay validates the original
 financial state and audit chain before marking provider accounts stale in the
 returned snapshot. The original audit records and hashes are preserved.
+
+### Offline journal identity maintenance (WHAB 2.85+)
+
+The public `recover_journal_locks(home, environment, *, apply=None)` host function
+performs the [offline recovery workflow](development.md#offline-journal-identity-recovery)
+without loading concrete plugin factories or opening financial stores. It is
+exported from `whab.plugins` with `JournalRecoveryError` for the CLI adapter. Its
+preview returns `status`, `fingerprint`, `count` and the exact `journals` list;
+apply additionally returns `repaired` and its private relative `backup` path.
+Failures expose fixed diagnostic codes, never journal bodies, credentials or paths
+from exceptions. This local maintenance function is not a remote ledger command.
+
+The host owns stable filesystem identity, retained journal schemas, exclusive
+ownership, before/after backup and resumable publication. CLI owns argument
+handling, explicit scope, help and presentation. The macOS launcher owns local
+process diagnostics and the bounded native log viewer. Financial-domain and
+concrete storage/provider behavior are unchanged.

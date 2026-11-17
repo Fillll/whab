@@ -881,10 +881,14 @@ class Manager:
             if self.health(record, home):
                 return record
             time.sleep(0.15)
+        exited = process.poll() is not None
         self.terminate(record)
         if not smoke:
             (self.root / "process.json").unlink(missing_ok=True)
-        raise LauncherError("startup_failed", "WHAB did not become healthy over verified HTTPS. The private log contains startup details; no other process was stopped.")
+        reason = ("WHAB exited during startup before verified HTTPS became ready." if exited
+                  else "WHAB did not become healthy over verified HTTPS.")
+        selected_log = "Sandbox startup" if smoke else "WHAB"
+        raise LauncherError("startup_failed", f"{reason} Choose View logs → {selected_log} for private startup details. Preserve the runtime and its keys; no unrelated process was stopped.")
 
     def terminate(self, record):
         if not owned_process(record):

@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let login = NSButton(checkboxWithTitle: "Open launcher at login", target: nil, action: nil)
     private var actionButtons: [NSButton] = []
     private var startButton: NSButton!
+    private var logWindow: LauncherLogWindowController?
     private let root = launcherRoot()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -203,7 +204,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    @objc private func closeWindow() { window.performClose(nil) }
+    @objc private func closeWindow() { (NSApp.keyWindow ?? window).performClose(nil) }
 
     private var menuState: LauncherMenuState {
         LauncherMenuState(reply: reply, activity: menuActivity, needsAttention: needsAttention)
@@ -352,22 +353,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func openLogs() {
-        let candidates: [String?] = [reply?.logFile,
-                          root.appendingPathComponent("logs/install.log").path,
-                          root.appendingPathComponent("logs/smoke.log").path,
-                          root.appendingPathComponent("logs/manager.log").path]
-        let existing = candidates.compactMap { $0 }.filter { FileManager.default.fileExists(atPath: $0) }
-        let newest = existing.max { left, right in
-            let leftDate = (try? FileManager.default.attributesOfItem(atPath: left)[.modificationDate]) as? Date ?? .distantPast
-            let rightDate = (try? FileManager.default.attributesOfItem(atPath: right)[.modificationDate]) as? Date ?? .distantPast
-            return leftDate < rightDate
-        }
-        guard let path = newest else {
-            messageLabel.stringValue = "Logs appear after WHAB begins preparing or starting an installation."
-            showWindow()
-            return
-        }
-        NSWorkspace.shared.open(URL(fileURLWithPath: path))
+        if logWindow == nil { logWindow = LauncherLogWindowController(root: root) }
+        logWindow?.open()
     }
 
     @objc private func openCertificate() {
