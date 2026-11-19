@@ -239,6 +239,21 @@ See the [budget history workflow](../../../../docs/usage.md#budget-history).
 This version requires WHAB 2.62+. History is saved atomically with financial
 changes and retained across reopen and exports. Earlier changes are not backfilled.
 
+## Empty manual account registers
+
+With WHAB 2.86+, optional `supports_manual_account_creation()` advertises the
+shared `add_account` fields `balanceUnknown` and `uniqueName`. Unknown balances
+require an initial zero activity accumulator; historical entries retain the
+unknown opening/current balance. No opening transaction or bank connection is
+created. The optional unique-name guard rejects stripped, Unicode-casefolded
+duplicates atomically within the workspace. Exact durable retries return the
+original stable ID without another account or history entry, including after
+restart in the same runtime. Native and portable restoration retain uncertainty
+and recorded activity. A new runtime restored from a portable file does not
+inherit the original runtime's request receipt mapping; inspect the stable ID
+instead of replaying creation there.
+See [the shared contract](../../../../docs/plugins.md#empty-manual-account-creation-optional-whab-286).
+
 ## Durable archived accounts
 
 With WHAB 2.64+, `supports_account_lifecycle()` advertises persistent account

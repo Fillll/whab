@@ -47,7 +47,7 @@
     {
       "name": "StorageBackend.accounts",
       "kind": "sdk",
-      "summary": "StorageBackend.accounts public SDK callback.",
+      "summary": "Read public account records; unknown manual accounts include transient signed recordedActivity from all nondeleted transactions, including pending.",
       "input": {
         "type": "object",
         "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
@@ -243,7 +243,7 @@
     {
       "name": "StorageBackend.add_account",
       "kind": "sdk",
-      "summary": "StorageBackend.add_account public SDK callback.",
+      "summary": "Create a manual account through the shared add_account contract, with optional unknown balance and atomic unique-name guard.",
       "input": {
         "type": "object",
         "description": "Typed in-process SDK arguments. JSON examples are representations, not an executable remote call.",
@@ -282,7 +282,7 @@
           "output": null
         }
       ],
-      "side_effects": "Explicitly persist the scoped change described by this SDK method. The host owns validation, atomic commit and permitted provider identity access.",
+      "side_effects": "Adds only the account record with its stable ID and audit history. No opening transaction or bank connection. balanceUnknown:true requires balance:0 and preserves uncertainty after activity; uniqueName:true rejects stripped/casefolded duplicate names atomically.",
       "permissions": "Host-scoped SDK access; this callback is not remotely callable.",
       "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
       "errors": [
@@ -4909,6 +4909,36 @@
         }
       ],
       "side_effects": "Read only capability declaration."
+    },
+    {
+      "name": "Storage.supports_manual_account_creation",
+      "kind": "sdk",
+      "summary": "Advertise unknown-balance manual registers and atomic unique-name creation.",
+      "input": {
+        "type": "object",
+        "description": "No arguments; optional host-only storage capability.",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "boolean",
+        "description": "True promises add_account balanceUnknown/uniqueName validation, unknown activity semantics and persistence across history, durable retries and restore. Public accounts() also returns recordedActivity for unknown manual rows as signed sum(-amount) over all nondeleted transactions, including pending; transient only, independent of classification."
+      },
+      "examples": [
+        {
+          "input": {},
+          "output": true
+        }
+      ],
+      "side_effects": "Read-only capability discovery; no accounts, opening transactions or bank connections are created.",
+      "permissions": "Host storage SDK access; not a standalone remote operation.",
+      "scope": "The selected backend; creation and duplicate-name guards remain workspace isolated.",
+      "errors": [
+        "Missing/false capability rejects requested unknown-balance or unique-name creation before mutation."
+      ],
+      "retry": "Read-only; repeat safely.",
+      "availability": "Optional ManualAccountCreationStorage SDK contract in WHAB 2.86+. Existing known-balance creation remains compatible."
     }
   ]
 }

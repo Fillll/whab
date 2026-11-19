@@ -12,7 +12,7 @@ from threading import RLock
 from uuid import uuid4
 
 from whab.domain import commands
-from whab.domain.accounts import normalize_account
+from whab.domain.accounts import normalize_account, recorded_account_activity
 from whab.domain.bank_setup import configure_sync
 from whab.domain.bank_sync import merge_sync
 from whab.domain.budget import calculate_workspace, calculate_workspace_periods
@@ -268,8 +268,11 @@ class Store(Authority):
             return result
 
     def accounts(self, workspace):
-        return [normalize_account({"balanceUnknown": False, "stale": False, **record})
-                for record in self._read(workspace)["accounts"].values()]
+        state = self._read(workspace)
+        activity = recorded_account_activity(state["accounts"].values(), state["transactions"].values())
+        return [normalize_account({"balanceUnknown": False, "stale": False, **record,
+                **({'recordedActivity': activity[record['id']]} if record['id'] in activity else {})})
+                for record in state["accounts"].values()]
 
     def category_tree(self, workspace):
         state = self._read(workspace)
@@ -443,6 +446,9 @@ class Store(Authority):
         return self._mutate(workspace, lambda state: commands.add_transaction(state, identifier, transaction, source))
 
     def supports_account_lifecycle(self):
+        return True
+
+    def supports_manual_account_creation(self):
         return True
 
     def supports_category_agent(self):

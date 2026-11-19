@@ -923,6 +923,47 @@ without embedding credentials or financial records. Other platforms may schedule
 `python -m whab --home DIRECTORY --environment sandbox --run-jobs` themselves.
 
 
+## Empty manual account creation (optional, WHAB 2.86+)
+
+`from whab.plugins import normalize_manual_account, ManualAccountCreationStorage`
+exposes a pure creation validator and the optional
+`supports_manual_account_creation() -> bool` storage capability. The existing
+guarded `add_account` operation accepts additive `balanceUnknown` and `uniqueName`
+booleans. Earlier known-balance callers keep their behavior. A host rejects the
+new requested guarantees before mutation when its backend lacks the capability;
+the storage worker transports it and a remote authority enforces it independently.
+
+`normalize_manual_account(account, existing_accounts=())` returns a normalized
+creation payload without assigning an ID or changing a ledger. It applies the
+existing name, currency, type, subtype and budget-scope rules. The domain repeats
+validation inside native creation. `uniqueName: true` rejects any account with the
+same stripped, Unicode-casefolded name in the addressed workspace, including
+archived accounts; the error identifies existing IDs. This control is not saved
+as account metadata and does not prohibit legacy imports from containing duplicates.
+
+`balanceUnknown: true` requires `balance: 0`. That zero initializes recorded
+activity, not a verified opening/current balance. Historical manual entries
+change the accumulator and retain the unknown flag. Public `accounts()` projects
+`recordedActivity` as the signed sum of `-amount` across all nondeleted transactions
+for unknown manual accounts, including pending entries, all dates and sources.
+Inflows are positive. This remains correct after asset/liability reclassification
+and later edits; never infer activity from the current type and raw balance.
+The projection is read-only and never enters storage, portable exports or audit
+hashes. Display it separately from the unavailable current balance. The existing public `account_balance_position`
+excludes it from known balance totals. No opening transaction, bank association,
+or synchronization is created. SQLite and JSON already retain the unknown flag
+through native storage, portable files and history; no new persistent field or
+balance reconciliation operation is introduced.
+
+Creation uses the ordinary guarded command revision, request ID and actor/batch
+history metadata. Exact durable retries return the original account ID across
+restart in the same runtime without another account, audit entry or save. Keep the full original
+request after an uncertain response; a current-state duplicate-name check must
+not block replaying that original request. Portable restoration into a different
+runtime preserves account identity, activity and history but does not transfer
+the original runtime's request-to-receipt mapping. An old revision is refused
+there; inspect the restored account rather than submit a new creation intent.
+
 ## Account lifecycle storage (optional, WHAB 2.64+)
 
 `from whab.plugins import AccountLifecycleStorage` exposes

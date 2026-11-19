@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.86.0 — 2026-11-18
+
+PR: [#218](https://github.com/Fillll/whab/pull/218)
+
+- Extend guarded manual account creation with unknown-balance registers and an atomic unique-name guard, preserving stable IDs, audit history and exact durable retries.
+- Keep recorded activity separate from verified balances and reuse existing transaction/transfer operations without creating an opening transaction or bank connection.
+- Project recorded activity from nondeleted transactions so account reclassification cannot reverse its sign; retain exact raw balances and saved financial history.
+
 ## 2.85.0 — 2026-11-16
 
 PR: [#217](https://github.com/Fillll/whab/pull/217)

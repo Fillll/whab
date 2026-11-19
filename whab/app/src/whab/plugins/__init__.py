@@ -10,6 +10,7 @@ lazy from whab.domain.accounts import (
     is_liability,
     is_on_budget,
     normalize_account,
+    normalize_manual_account,
 )
 lazy from whab.domain.bulk import validate_edits as validate_bulk_edits
 lazy from whab.domain.errors import StoreError
@@ -83,6 +84,7 @@ lazy from .sdk import (
     LocalTransferSnapshot,
     LocalTransferStorage,
     LogoImage,
+    ManualAccountCreationStorage,
     MerchantLogos,
     MonthlyRollover,
     NextMonthFunding,
@@ -161,6 +163,8 @@ __all__ = [
     "account_balance_position",
     "is_on_budget",
     "normalize_account",
+    "normalize_manual_account",
+    "ManualAccountCreationStorage",
     "SUPPORTED_CURRENCIES",
     "currency_code",
     "currency_minor_units",

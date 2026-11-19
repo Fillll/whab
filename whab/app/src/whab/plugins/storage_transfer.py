@@ -54,7 +54,7 @@ _OPERATION_FIELDS = {
     "classify_accounts": ({"edits"}, set()),
     "recorded_command": ({"operation", "parameters", "context"}, set()),
     "history_apply": ({"action", "target", "fingerprint"}, set()),
-    "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype", "closed"}),
+    "add_account": ({"name", "type", "balance"}, {"currency", "onBudget", "subtype", "closed", "balanceUnknown", "uniqueName"}),
     "update_account": ({"accountId"}, {"type", "onBudget", "subtype", "name", "bankWebsite", "currency", "closed"}),
     "add_category": ({"name", "target"}, {"group", "parentId", "currency", "kind"}),
     "add_category_group": ({"name"}, set()),

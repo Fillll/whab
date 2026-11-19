@@ -43,6 +43,7 @@ def add_account(backend):
 
 
 def test_durable_result_retry_conflict_generation_and_reopen(authority_store):
+    assert authority_store.supports_manual_account_creation() is True
     original = authority_store.commit_evidence()
     assert type(original) is CommitEvidence and original.role == "primary"
     request = add_account(authority_store)
@@ -70,6 +71,21 @@ def test_durable_result_retry_conflict_generation_and_reopen(authority_store):
         assert reopened.commit_evidence() == result.receipt.evidence
     finally:
         reopened.close()
+
+
+def test_unknown_manual_activity_is_projected_without_changing_native_state(authority_store):
+    unknown = authority_store.add_account("personal", {"name": "Fictional history", "type": "depository",
+        "balance": 0, "onBudget": False, "balanceUnknown": True, "uniqueName": True})
+    known = authority_store.add_account("personal", {"name": "Fictional known", "type": "depository", "balance": 20})
+    authority_store.add_transaction("personal", {"accountId": unknown, "date": "2002-01-01", "merchant": "Historical inflow", "amount": -1000})
+    authority_store.update_account("personal", unknown, {"type": "credit"})
+    authority_store.add_transaction("personal", {"accountId": unknown, "date": "2002-01-02", "merchant": "Later outflow", "amount": 125})
+    before = authority_store.export_budget_files()
+    rows = {row['id']: row for row in authority_store.accounts("personal")}
+    assert rows[unknown]['recordedActivity'] == 875 and rows[unknown]['balance'] == 1125
+    assert 'recordedActivity' not in rows[known]
+    assert authority_store.export_budget_files() == before
+    assert 'recordedActivity' not in str(authority_store.export_budget())
 
 
 @pytest.mark.parametrize("failure", ["invalid-money", "receipt-insert", "authority-update", "transaction-rollback"])

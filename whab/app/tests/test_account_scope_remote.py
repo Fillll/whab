@@ -3,11 +3,13 @@
 from types import SimpleNamespace
 
 import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from whab_plugin_client.plugin import RemoteStore
 from whab_plugin_server.plugin import plugin as server_plugin
 
+from whab.plugins import StoreError
 from whab.services.ledger import LedgerService
 from whab.web.interface_adapter import BoundRemoteInterface, create_remote_router
 
@@ -44,6 +46,20 @@ def test_remote_scope_changes_preserve_budget_and_portable_semantics(store):
             with_remote.update_account("personal", account, {"closed": True})
             assert with_remote.accounts("personal")[0]["closed"]
             assert with_remote.supports_account_lifecycle() is True
+            assert with_remote.supports_manual_account_creation() is True
+            unknown = with_remote.add_account("personal", {
+                "name": "Fictional 🏡 貯蓄", "type": "depository", "subtype": "savings",
+                "onBudget": False, "currency": "EUR", "balance": 0,
+                "balanceUnknown": True, "uniqueName": True,
+            })
+            saved = next(row for row in with_remote.accounts("personal") if row["id"] == unknown)
+            assert saved["balanceUnknown"] and saved["balance"] == 0 and saved["source"] == "manual"
+            before = store.commit_evidence()
+            store.supports_manual_account_creation = lambda: False
+            with pytest.raises(StoreError, match="Remote budget request rejected"):
+                with_remote.add_account("personal", {"name": "Unsupported new register",
+                    "type": "depository", "balance": 0, "balanceUnknown": True, "uniqueName": True})
+            assert store.commit_evidence() == before
             with_remote.update_account("personal", account, {"closed": False})
             assert not with_remote.accounts("personal")[0].get("closed", False)
             portable = with_remote.export_budget()

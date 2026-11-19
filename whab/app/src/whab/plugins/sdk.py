@@ -374,6 +374,21 @@ class CategoryDeletion(Protocol):
     def delete_category_group(self, workspace: str, parent_id: str) -> None: ...
 
 
+class ManualAccountCreationStorage(Protocol):
+    """Optional unknown-balance creation with an atomic workspace name guard.
+
+    add_account accepts balanceUnknown and uniqueName booleans. Unknown balance
+    requires initial balance zero; later activity must never verify that balance.
+    Reject duplicate stripped, casefolded names atomically when uniqueName is true.
+    Preserve the flag and creation history through durable retries and restoration.
+    accounts() projects recordedActivity for unknown manual rows as the signed
+    sum of -amount over all nondeleted transactions, including pending records.
+    This read-only field must not enter saved state, exports or audit hashes.
+    """
+
+    def supports_manual_account_creation(self) -> bool: ...
+
+
 class AccountLifecycleStorage(Protocol):
     """Optional durable archive state, including paused account synchronization."""
 

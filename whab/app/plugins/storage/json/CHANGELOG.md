@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.24.0 — 2026-11-18
+
+PR: [#218](https://github.com/Fillll/whab/pull/218)
+
+- Advertise guarded manual account creation with unknown balances and optional atomic unique-name validation. Preserve permanent account IDs, durable request receipts and recorded historical activity without inventing a verified balance.
+- Return signed recorded activity for unknown manual registers from transaction history, without persisting derived values or changing exports and audit history.
+
 ## 1.23.0 — 2026-11-15
 
 PR: [#211](https://github.com/Fillll/whab/pull/211)

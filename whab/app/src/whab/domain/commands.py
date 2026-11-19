@@ -11,6 +11,7 @@ from .accounts import (
     is_liability,
     is_on_budget,
     normalize_account,
+    normalize_manual_account,
 )
 from .budget import (
     ROLLOVER_MODES,
@@ -30,20 +31,15 @@ from .validation import validate_date, validate_label, validate_month
 
 def add_account(state: dict, account_id: str, account: dict) -> str:
     """Add a manual budget or tracking account using an adapter-supplied identifier."""
-    name = validate_label(account["name"])
-    kind, balance = account["type"], cents(account["balance"])
-    currency = currency_code(account.get("currency", "USD"))
-    state["accounts"][account_id] = normalize_account({
+    normalized = normalize_manual_account(account, state["accounts"].values())
+    normalized.pop("uniqueName", None)
+    state["accounts"][account_id] = {
+        **normalized,
         "id": account_id,
-        "name": name,
         "institution": "Manual account",
-        "type": kind,
-        **{key: account[key] for key in ("onBudget", "subtype", "closed") if key in account},
-        "balance": balance,
-        "currency": currency,
         "source": "manual",
         "stale": False,
-    })
+    }
     return account_id
 
 

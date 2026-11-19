@@ -494,6 +494,10 @@ class RemoteStore:
         """The addressed authority validates durable lifecycle support."""
         return True
 
+    def supports_manual_account_creation(self):
+        """The authority validates the new fields and its native capability."""
+        return True
+
     def supports_category_agent(self):
         """Forward explicitly attributed edits; older authorities reject the field."""
         return True

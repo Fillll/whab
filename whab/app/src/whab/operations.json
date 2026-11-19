@@ -88,6 +88,10 @@
               "type": "boolean",
               "default": false,
               "description": "True for an archived account, independent of onBudget. Compatible older records default false. Closing does not zero/verify balances, settle debt or rewrite historical financial treatment."
+            },
+            "recordedActivity": {
+              "type": "integer",
+              "description": "Read-only signed net activity in currency minor units for unknown manual accounts: sum of -amount across all nondeleted transactions, including pending, all dates and sources. Inflows positive; independent of current account classification. Never a verified opening/current balance, and never persisted in exports or audit state."
             }
           },
           "additionalProperties": true
@@ -997,7 +1001,7 @@
     {
       "name": "add_account",
       "kind": "command",
-      "summary": "Create a manual account; on-budget cash/credit participates in envelopes.",
+      "summary": "Create one manual account, including an empty register with unknown opening/current balance.",
       "input": {
         "type": "object",
         "description": "Operation parameters.",
@@ -1024,7 +1028,7 @@
           },
           "balance": {
             "type": "integer",
-            "description": "Initial balance in integer currency minor units (USD cents). Assets carry signed value; credit/loan liabilities carry a positive amount owed."
+            "description": "Initial balance in integer currency minor units (USD cents). Assets carry signed value; liabilities positive amount owed. Must be 0 when balanceUnknown is true: this initializes the activity accumulator and does not assert a zero opening/current balance."
           },
           "currency": {
             "type": "string",
@@ -1037,12 +1041,23 @@
             "description": "Whether the account participates in monthly envelopes. Only depository and credit allow true; defaults to true for these types and false for tracking types. Credit remains debt when on budget."
           },
           "subtype": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Domain-specific detail or null. A certificate of deposit is type=deposit, subtype=cd, always off budget; other type/subtype combinations use the domain inventory."
           },
           "closed": {
             "type": "boolean",
             "description": "Archive lifecycle, separate from type/subtype and budget scope. Default false. Closed accounts retain balances/history but reject new manual entries and skip bank sync updates; reopening resumes the original configured bank history cursor without initiating sync."
+          },
+          "balanceUnknown": {
+            "type": "boolean",
+            "description": "Default false preserves known-balance creation. True creates an empty zero-origin activity register with unknown opening/current balance, excluded from current balance totals. Later entries change recorded activity without verifying the balance. No opening transaction or bank connection is created. Requires supporting storage."
+          },
+          "uniqueName": {
+            "type": "boolean",
+            "description": "Default false preserves existing API behavior. True atomically rejects any existing account with the same stripped, Unicode-casefolded name in this workspace, including archived accounts. This guard is not saved as account metadata. Requires supporting storage."
           }
         },
         "required": [
@@ -1053,11 +1068,8 @@
         "additionalProperties": false
       },
       "output": {
-        "type": [
-          "string",
-          "null"
-        ],
-        "description": "Created stable identifier or null for a completed edit."
+        "type": "string",
+        "description": "Stable identifier of the created manual account; exact successful retries return the same identifier."
       },
       "examples": [
         {
@@ -1066,7 +1078,7 @@
             "type": "depository",
             "balance": 10000
           },
-          "output": null
+          "output": "fictional-account-1"
         },
         {
           "input": {
@@ -1075,17 +1087,31 @@
             "onBudget": true,
             "balance": 2500
           },
-          "output": null
+          "output": "fictional-account-2"
+        },
+        {
+          "input": {
+            "name": "Fictional historical savings",
+            "type": "depository",
+            "subtype": "savings",
+            "currency": "USD",
+            "onBudget": false,
+            "balance": 0,
+            "balanceUnknown": true,
+            "uniqueName": true
+          },
+          "output": "fictional-stable-account-id"
         }
       ],
-      "side_effects": "Applies the explicit mutation; does not grant review or inference permission implicitly.",
+      "side_effects": "Creates exactly one stable account and its audit history in one guarded operation. No opening transaction, bank connection or synchronization. Unknown manual balances remain unverified after recording activity.",
       "permissions": "Authenticated server access to this selected budget over verified HTTPS.",
       "scope": "Explicit budget and personal/demo workspace; currencies are never combined.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
-        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict.",
+        "uniqueName rejects duplicate normalized names with existing IDs; invalid subtype/scope/currency and unknown-balance nonzero initialization fail before mutation. Unsupported storage must be upgraded."
       ],
-      "retry": "Keep the exact request ID, original revision and parameters for an uncertain write; receipts are bounded and restart requires reconciliation.",
+      "retry": "Retain the exact request ID, original revision, payload and history after uncertain writes. Exact durable receipt retries return the original account ID without another account, audit entry or save, including after restarting the same runtime. Portable restoration into a different runtime preserves data/history but not the original runtime request mapping; an old revision is refused there. Inspect the saved stable account ID before any new intent. Conflicting request-ID reuse is rejected.",
       "availability": "Public ledger API and CLI."
     },
     {
