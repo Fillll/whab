@@ -37,6 +37,7 @@ def schema_one(value):
 
 
 def test_durable_result_identity_replay_conflict_and_unknown_stale_retry(json_store):
+    assert json_store.supports_manual_account_creation() is True
     original = json_store.commit_evidence()
     assert type(original) is CommitEvidence
     request = operation(json_store, "add_account", {"name": "Fictional", "type": "depository", "balance": 10000})
@@ -76,6 +77,20 @@ def test_rejected_operation_and_partial_batch_leave_no_receipt_or_generation(jso
     assert json_store._pending is None
     valid = operation(json_store, "add_account", {"name": "Fictional", "type": "depository", "balance": 10000})
     assert not json_store.execute_operation(valid).replayed
+
+
+def test_unknown_manual_activity_is_projected_without_changing_native_state(json_store):
+    unknown = json_store.add_account("personal", {"name": "Fictional history", "type": "depository",
+        "balance": 0, "onBudget": False, "balanceUnknown": True, "uniqueName": True})
+    known = json_store.add_account("personal", {"name": "Fictional known", "type": "depository", "balance": 20})
+    json_store.add_transaction("personal", {"accountId": unknown, "date": "2002-01-01", "merchant": "Historical inflow", "amount": -1000})
+    json_store.update_account("personal", unknown, {"type": "credit"})
+    json_store.add_transaction("personal", {"accountId": unknown, "date": "2002-01-02", "merchant": "Later outflow", "amount": 125})
+    before = json_store.path.read_bytes()
+    rows = {row['id']: row for row in json_store.accounts("personal")}
+    assert rows[unknown]['recordedActivity'] == 875 and rows[unknown]['balance'] == 1125
+    assert 'recordedActivity' not in rows[known]
+    assert json_store.path.read_bytes() == before and b'recordedActivity' not in before
 
 
 @pytest.mark.parametrize("boundary", ["temporary_flushed", "before_replace", "replaced", "directory_flushed", "published"])

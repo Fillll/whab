@@ -11,6 +11,7 @@ Detailed operating guidance for WHAB. Start with the [quick start](../app/README
 - [Settings and plugin manager](#settings-and-plugin-manager)
 - [Connect Plaid Sandbox](#connect-plaid-sandbox)
 - [Importing and data handling](#importing-and-data-handling)
+- [Manual historical registers](#manual-historical-registers)
 - [Budget scope](#budget-scope)
 - [Local access and private files](#local-access-and-private-files)
 - [Official references](#official-references)
@@ -182,6 +183,31 @@ This prototype requests **Transactions**. Investments import is the next separat
 - **Manage** uses Link update mode for existing healthy connections; **Reconnect** repairs expired authorization. The frontend checks institution/account name/mask before exchanging a likely duplicate connection. This is a practical safeguard, not complete joint-account deduplication across different logins.
 - Core supports multiple currencies with separate totals and no conversion; the bundled Plaid and YNAB importers currently accept USD only. CSV exports retain `amount_cents` for compatibility, containing integer currency minor units, and append a `currency` column. Text cells are protected against spreadsheet formula injection.
 
+## Manual historical registers
+
+Use an empty manual register when an old account is absent from an import and its
+opening balance is unknown. No bank connection or opening transaction is created:
+
+```sh
+whab "My budget" account create "Example Savings" --type depository --subtype savings --off-budget --currency USD --agent Codex --dry-run
+whab "My budget" account create "Example Savings" --type depository --subtype savings --off-budget --currency USD --agent Codex
+whab "My budget" account show "Example Savings"
+```
+
+Savings uses `depository`; `deposit` means a fixed-term deposit such as a CD.
+Account names, including spaces and Unicode, are checked for conflicts. The
+created account has a stable ID and an explicit currency. Its recorded activity
+starts at zero; that is not a verified opening or current balance. Manual debits
+and credits accumulate activity while the balance remains unknown and excluded
+from known account totals.
+
+Use `trnx create --help` to record a historical counterpart, then
+`trnx match-transfers --help` to preview and explicitly link the two transaction
+IDs. Review remains an explicit decision. Keep the original transaction's
+financial fields intact. See `account create --help` for saved-result
+verification and exact-request recovery after an uncertain response; never retry
+an uncertain write with a fresh request ID.
+
 ## Budget scope
 
 Choose an individual account in the sidebar to open its transaction register. The account picker shows available bank logos and lets you search names and choose several accounts before Apply. **Select all** selects every available account, including accounts hidden by the search; **Select none** clears the draft for a new selection. The picker shows the selected count and requires at least one account before Apply. The period picker offers **All** for full history, month/year presets, and **Custom dates** with inclusive start/end dates; leave a custom bound blank to keep it open. Legacy All dates bookmarks select All. The top **R** filter cycles **Needs review → Reviewed → All**. Account, period and review choices stay in the address; switching currency clears the account selection. The main **Accounts** navigation manages account classifications; bank connections are managed in the provider plugin’s settings.
@@ -192,7 +218,7 @@ Choose **Accounts → Add manual account**, select the budget scope, then the ac
 
 Use **Edit classification** beside any existing account to change scope, type or detail. This applies to its whole transaction history and may leave existing allocations unfunded when money moves off budget; check Ready to assign afterward. Classification does not change balances, transactions or categories, and bank refreshes retain the saved classification. Existing cash and credit accounts keep their on-budget scope; legacy loan, investment and unclassified accounts default off budget. YNAB exports omit account types and balances, so imported accounts remain unclassified off budget with unavailable balances until classified; classification alone does not recover an authoritative balance.
 
-Transfers retain the existing inferred-transfer behavior. When funding an off-budget account from a budget account, categorize the on-budget outflow to spend the appropriate envelope; categorization overrides an inferred transfer exclusion. Transfer-pair suggestions require explicit confirmation; cross-scope pairing and investment holdings imports remain outside the current model.
+Transfer-pair suggestions require explicit confirmation. Existing transaction commands can match equal and opposite posted entries between accounts with different current budget scopes; review remains explicit. Confirmed pairs retain their financial fields and expose eligible dated transfer funding separately from income and spending. Unknown or stale cash balances do not create funding. Investment holdings imports remain outside the current model.
 
 Amounts are stored as integer currency minor units (USD cents). Choose the budget default currency in **Settings → Budgets**. Accounts lists every account in its own currency, and selecting an account opens its register in that currency. Each manual account declares its currency; new categories use the selected currency. A transaction inherits its account currency and can use only a matching child category. Cash, credit debt, rollover, trends and ready-to-assign totals are calculated separately for each currency, without exchange rates or conversion.
 

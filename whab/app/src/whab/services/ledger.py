@@ -15,7 +15,12 @@ from json import dumps
 from threading import RLock
 from uuid import uuid4
 
-from whab.domain.accounts import account_summary, bank_website_entry, normalize_account
+from whab.domain.accounts import (
+    account_summary,
+    bank_website_entry,
+    normalize_account,
+    normalize_manual_account,
+)
 from whab.domain.categories import category_tree
 from whab.domain.dates import shift_month
 from whab.domain.errors import StoreError
@@ -531,7 +536,7 @@ class LedgerService:
         if "note" in payload and (type(payload["note"]) is not str or len(payload["note"]) > 1000):
             raise StoreError("Invalid note.")
         if operation == "add_account":
-            normalize_account(payload)
+            normalize_manual_account(payload)
         if operation == "set_rollover_mode" and (
             type(payload["mode"]) is not str or payload["mode"] not in {"category", "balance"}
         ):
@@ -763,6 +768,10 @@ class LedgerService:
             supported = getattr(self._store, 'supports_account_lifecycle', None)
             if not callable(supported) or supported() is not True:
                 raise StoreError('Update the storage plugin to save account lifecycle state.')
+        if operation == 'add_account' and (payload.get('balanceUnknown') or payload.get('uniqueName')):
+            supported = getattr(self._store, 'supports_manual_account_creation', None)
+            if not callable(supported) or supported() is not True:
+                raise StoreError('Update the storage plugin/authority to create unknown-balance manual accounts with atomic unique-name validation. No account was created.')
         from whab.domain.history import context
         if history is not None and (type(history) is not dict or history.keys() - {'actor', 'actorKind', 'batchId'}):
             raise StoreError('Invalid history context fields.')

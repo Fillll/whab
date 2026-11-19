@@ -35,6 +35,15 @@ does not fetch the ledger. Reads and changes go to the live server; its data can
 advance independently of the connection file. Explicit legacy snapshot exports
 remain available through `export_budget()`.
 
+With WHAB 2.86+, manual creation forwards the shared `balanceUnknown` and
+`uniqueName` fields through guarded `add_account`. The addressed authority must
+support `ManualAccountCreationStorage`; older authorities reject unsupported
+fields or capabilities before mutation. Unknown registers use an initial zero
+activity accumulator, retain unknown opening/current balances, and create no
+opening transaction or bank connection. Exact retries keep the original request
+ID, revision, payload and history; the authority owns durable replay. The client
+does not silently emulate the guarantee or retry with a new intent.
+
 Account creation and `update_account()` forward core on-budget/off-budget scope,
 account types and optional subtypes to WHAB 2.1 or newer. Classification changes
 use the same revision checks and retry identity as other ledger commands; the

@@ -58,6 +58,7 @@ METHODS = {
     "history_preview": (("workspace", "action"), {"target": None}),
     "supports_category_agent": ((), {}),
     "supports_account_lifecycle": ((), {}),
+    "supports_manual_account_creation": ((), {}),
     "supports_category_deletion": ((), {}),
     "supports_category_renaming": ((), {}),
     "supports_category_classification": ((), {}),

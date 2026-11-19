@@ -41,6 +41,7 @@ from whab.domain.imports import (
     sync_annotations,
     validate_imported_transaction,
 )
+from whab.domain.money import cents
 from whab.domain.portable import validate_portable_budget
 from whab.domain.transactions import (
     UNSET,
@@ -533,7 +534,19 @@ class Store(Authority):
     def accounts(self, workspace: str) -> list[dict]:
         with self._snapshot():
             self._require_workspace(workspace)
-            return self._read_accounts(workspace)
+            accounts = self._read_accounts(workspace)
+            if any(row.get('source') == 'manual' and row.get('balanceUnknown') for row in accounts):
+                # Match the core recorded_account_activity projection in one
+                # indexed grouped read; never add this field to raw saved state.
+                activity = {row[0]: cents(row[1]) for row in self.db.execute(
+                    "SELECT a.id,COALESCE(SUM(-t.amount),0) FROM accounts a "
+                    "LEFT JOIN transactions t ON t.workspace=a.workspace AND t.account_id=a.id AND t.deleted=0 "
+                    "WHERE a.workspace=? AND a.source='manual' AND a.balance_unknown=1 GROUP BY a.id",
+                    (workspace,))}
+                for row in accounts:
+                    if row['id'] in activity:
+                        row['recordedActivity'] = activity[row['id']]
+            return accounts
 
     def account_overview(self, workspace: str, month: str, currency: str) -> dict:
         from .account_reads import account_overview
@@ -982,6 +995,9 @@ class Store(Authority):
         )
 
     def supports_account_lifecycle(self):
+        return True
+
+    def supports_manual_account_creation(self):
         return True
 
     def supports_category_agent(self):

@@ -639,6 +639,105 @@ reopening and portable saves retain the marker. Older transactions stay unlabell
 A storage adapter must explicitly advertise durable support; an unsupported
 adapter rejects the labelled write instead of silently discarding the marker.
 
+## Empty manual accounts with unknown opening balances
+
+CLI 2.26 / WHAB 2.86 adds `account create`. It creates one empty manual register
+through the public guarded `add_account` operation, with shared financial
+validation. Budget names/IDs follow the ordinary resolution rules. No bank
+connection, synchronization or opening transaction is created.
+
+```sh
+whab "My budget" account create --help
+whab "My budget" account create "Épargne 旅行" --type depository --subtype savings --off-budget --currency USD --agent Codex --dry-run
+whab "My budget" account create "Épargne 旅行" --type depository --subtype savings --off-budget --currency USD --agent Codex
+whab "My budget" account show "Épargne 旅行" --format table
+whab "My budget" account list --format table
+```
+
+`--type`, `--currency`, and exactly one of `--on-budget`/`--off-budget` are required.
+Currency is a supported **uppercase** ISO code. Subtype is optional and uses the
+existing public classification contract. Ordinary savings is
+`--type depository --subtype savings`; `deposit` means a fixed-term deposit/CD
+(`--type deposit --subtype cd --off-budget`). `deposit/savings` is invalid.
+Only depository and credit support on-budget scope. Names support Unicode and
+are trimmed; duplicate names, ignoring case and outer whitespace, are refused
+with the conflicting stable IDs, including closed accounts. There is no fuzzy
+matching, merge, bank linking, initial-balance argument or inferred zero balance.
+
+The new account has `source: "manual"`, `balanceUnknown: true`, and `balance: 0`.
+That zero is an **activity accumulator**, not evidence of a zero opening/current
+balance. JSON create/show/list adds `balanceStatus: "unknown"` and
+`recordedActivity` for unknown manual accounts: signed integer currency minor
+units with inflows positive and outflows negative, summed from all nondeleted
+transactions (including pending) independently of account classification. It is
+an authoritative public account projection, not inferred from the raw balance;
+older backends without that projection show `null`/unavailable. Table output
+labels this activity separately from the unknown
+opening/current balance. Unknown balances remain excluded from known account
+assets/debts and balance-derived Ready to Assign; creation itself adds no monthly
+funding. Existing transaction rules still control historical spending/funding.
+
+Enter historical debits/credits using existing commands. Transaction input uses
+WHAB's spending-positive convention: USD `2500` is a 25-dollar outflow and USD
+`-2500` is an inflow. Do not confuse it with the owned-positive `recordedActivity`
+projection. The following fictional workflow assumes the named categories exist:
+
+```sh
+whab "My budget" trnx create --account "Épargne 旅行" --date 2026-08-01 --amount -2500 --currency USD --payee "Fictional contribution" --category "Income / Other" --agent Codex --dry-run
+whab "My budget" trnx create --account "Épargne 旅行" --date 2026-08-01 --amount -2500 --currency USD --payee "Fictional contribution" --category "Income / Other" --agent Codex
+whab "My budget" trnx create --account "Épargne 旅行" --date 2026-08-02 --amount 500 --currency USD --payee "Fictional fee" --category "Finance / Fees" --agent Codex
+whab "My budget" trnx list --account "Épargne 旅行" --format table
+whab "My budget" account show "Épargne 旅行" --format table
+whab "My budget" trnx match-transfer OUT_ID IN_ID --dry-run
+whab "My budget" trnx match-transfer OUT_ID IN_ID --agent Codex
+whab "My budget" trnx categorize OUT_ID IN_ID --category "Finance / Transfers" --agent Codex
+whab "My budget" trnx review OUT_ID IN_ID --reviewed --dry-run --agent Codex
+whab "My budget" trnx review OUT_ID IN_ID --reviewed --agent Codex
+```
+
+Replace IDs with the inspected saved transaction IDs. Matching requires explicit
+valid reciprocal legs and confirmation; creation never infers a transfer or
+marks entries reviewed. An off-budget manual register stays off-budget. Adding
+history updates recorded activity and retains the unknown balance marker; this
+command does not verify or reconcile an opening/current balance.
+
+`--dry-run` reads the current accounts/revision and runs the shared pure validator.
+It returns the proposed account (`id: null`) and exact `intent`, `requestId` and
+`expectedRevision` without mutation, history or durable save. It reserves neither
+name nor ID. Remove `--dry-run` for a fresh normal save, or use its original guards
+to submit that precise observed intent:
+
+```sh
+whab "My budget" account create "Épargne 旅行" --type depository --subtype savings --off-budget --currency USD --agent Codex --revision ORIGINAL_REVISION --request-id ORIGINAL_REQUEST_ID
+whab api describe --offline --plugin cli --operation account.create --json
+```
+
+`--revision` and `--request-id` must be supplied together or both omitted. Ordinary
+execution obtains a revision and generates a UUID automatically. One native
+atomic operation, revision advance and durable checkpoint save the new identity
+and permanent audit history. Optional `--agent` and `--batch` label that history;
+`--batch` does not combine separate commands. Duplicate names are checked again
+inside the atomic write. Stale revisions and conflicting request-ID reuse reject
+the whole operation. Unknown/unique creation requires a supporting storage
+adapter (SQLite and JSON implement the public capability); older adapters fail
+before mutation.
+
+After an uncertain response, inspect account list/show and history, and retain
+the complete original intent printed in the error. **Never retry with a new
+request ID or refreshed revision.** An exact retry uses the same guards and all
+original name/classification/currency/agent/batch values. While its durable receipt
+exists, it returns the original stable account ID without another creation, audit
+entry, revision or save, including after a restart of the same runtime. Revision
+and receipt records belong to that runtime. A portable budget restored into a new
+runtime preserves the saved account and audit history, but rejects the old
+runtime's revision/request retry as stale; inspect the restored account by ID.
+Successful output verifies the
+saved identity by reading accounts again. For an exact replay, `savedRevision`
+identifies the original creation, while `revision` and `data` show the verified
+current account (including later recorded activity); `replayed` is true. An old
+request whose receipt has expired fails the stale-revision guard. Help and
+packaged schemas/examples work offline.
+
 ## Simple account classification
 
 CLI 2.9 adds `account list`, `account show` and `account classify` under the

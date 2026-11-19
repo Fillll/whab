@@ -9,7 +9,8 @@ import re
 from urllib.parse import urlsplit
 
 from .errors import StoreError
-from .money import MAX_SAFE_INTEGER
+from .money import MAX_SAFE_INTEGER, cents, currency_code
+from .validation import validate_label
 
 ACCOUNT_TYPES = {
     "depository": "Cash / checking / savings",
@@ -141,6 +142,36 @@ def normalize_account(account: dict) -> dict:
     return result
 
 
+def normalize_manual_account(account: dict, existing_accounts=()) -> dict:
+    """Validate a creation payload without assigning an ID or changing a ledger.
+
+    Unknown balances start a zero-origin activity register, not a verified zero
+    balance. Optional uniqueName is a creation guard, never persisted metadata.
+    Native creation repeats this validation against its atomic workspace state.
+    """
+    required = {"name", "type", "balance"}
+    optional = {"currency", "onBudget", "subtype", "closed", "balanceUnknown", "uniqueName"}
+    if type(account) is not dict or not required <= account.keys() or account.keys() - required - optional:
+        raise StoreError("Invalid manual account creation fields; name, type and balance are required.")
+    result = normalize_account({
+        **account, "name": validate_label(account["name"]),
+        "balance": cents(account["balance"]),
+        "currency": currency_code(account.get("currency", "USD")),
+    })
+    for field in ("balanceUnknown", "uniqueName"):
+        if field in account and type(account[field]) is not bool:
+            raise StoreError(f"{field} must be true or false.")
+    if result.get("balanceUnknown") and result["balance"] != 0:
+        raise StoreError("An unknown opening balance requires balance 0 as the empty activity register, not an opening balance estimate.")
+    if result.get("uniqueName"):
+        matches = [row for row in existing_accounts
+                   if row["name"].strip().casefold() == result["name"].casefold()]
+        if matches:
+            candidates = ", ".join(f"{row['name']} ({row['id']})" for row in matches)
+            raise StoreError(f"An account with this name already exists: {candidates}. Choose another name or use the existing account ID.")
+    return result
+
+
 def account_balance_position(account: dict) -> dict:
     """Return owned-positive/owed-negative display money and its evidence status.
 
@@ -158,6 +189,22 @@ def account_balance_position(account: dict) -> dict:
         return {'value': None, 'status': 'unavailable'}
     return {'value': -balance if is_liability(account) else balance,
             'status': 'stale' if account.get('stale') else 'current'}
+
+
+def recorded_account_activity(accounts, transactions) -> dict:
+    """Signed inflows less outflows for unknown manual registers, never balances.
+
+    Include all dates, sources and pending records; exclude deleted/voided rows.
+    Classification does not rewrite ledger amounts, so this projection is stable
+    across asset/liability changes even when the raw balance accumulator is not.
+    """
+    totals = {row['id']: 0 for row in accounts
+              if row.get('source') == 'manual' and row.get('balanceUnknown')}
+    if totals:
+        for row in transactions:
+            if row['accountId'] in totals and not row.get('deleted'):
+                totals[row['accountId']] -= row['amount']
+    return {identifier: cents(value) for identifier, value in totals.items()}
 
 
 def account_summary(accounts) -> dict:

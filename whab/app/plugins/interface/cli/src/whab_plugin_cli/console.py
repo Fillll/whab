@@ -33,6 +33,8 @@ from .transaction_void_help import VOID_HELP
 from .transfer_help import TRANSFER_HELP
 lazy from . import client
 lazy from .account_commands import account_table, add_account_parser, execute_account
+lazy from .account_creation import execute_create
+lazy from .account_help import CREATE_HELP
 lazy from .bank_commands import add_bank_parser, bank_error, bank_request
 lazy from .bulk_commands import add_edit_many, bulk_table, execute_accounts, execute_transactions
 lazy from .category_commands import add_category_parser, category_table, execute_categories
@@ -107,7 +109,7 @@ def parser(options, argv=()):
         description="Budget from the command line. Production is the default; choose --environment sandbox for tests.",
         epilog='Transaction corrections: trnx edit TX_ID; manual entry: trnx create; atomic edit-plus-create split: trnx edit-many --file split.json --preserve-balances. Reversible exclusion: trnx void IDS / trnx unvoid IDS. See each command --help for complete examples and recovery.\n\nCategory types: expense, income, transfer, opening_balance. Opening Balance records existing cash/debt separately from income; it never auto-reviews. Use category create/classify --type TYPE. Explicit review: trnx review IDS --reviewed; inspect legacy flags with trnx review-audit. See trnx review --help for classification requirements and atomic recovery.\n\n' + VOID_HELP + "\n\n" + TRANSFER_HELP + "\n\n" + BULK_HELP + "\n\n" + AGENT_WORKFLOW + "\n\nEvery command supports --help. Quote names containing spaces.\n\n" + account_classification(catalog),
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    root.epilog += "\n\n" + RUNTIME_HELP
+    root.epilog += "\n\n" + CREATE_HELP + "\n\n" + RUNTIME_HELP
     groups = root.add_subparsers(dest="scope", required=True, metavar="{budget,plugin,runtime,BUDGET,api}")
     if root_help:
         for name, description in _ROOT_HELP.items():
@@ -348,6 +350,8 @@ def execute(args, home, environment, ca):
         if args.command == "category":
             return execute_categories(connection, identifier, prefix, args, exchange, CommandError)
         if args.command == "account":
+            if args.account_action == 'create':
+                return execute_create(connection, identifier, prefix, args, exchange, CommandError)
             if args.account_action == 'classify':
                 if len(args.account) > 1 or args.dry_run or args.atomic:
                     return execute_accounts(connection, identifier, prefix, args, exchange, CommandError)
@@ -411,7 +415,7 @@ def main(argv=None):
         if args.scope == "runtime" and args.format == "table":
             print(runtime_table(result))
         elif getattr(args, "format", None) == "table":
-            print(void_table(result) if getattr(args, "filter", None) in {"void", "unvoid"} else review_audit_table(result) if getattr(args, "filter", None) == "review-audit" else transfer_table(result) if getattr(args, "filter", None) in {"transfers", "match-transfer", "unmatch-transfer", "match-transfers", "transfer-audit", "repair-transfers"} else bulk_table(result) if "dryRun" in result and args.command != "category" else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
+            print(void_table(result) if getattr(args, "filter", None) in {"void", "unvoid"} else review_audit_table(result) if getattr(args, "filter", None) == "review-audit" else transfer_table(result) if getattr(args, "filter", None) in {"transfers", "match-transfer", "unmatch-transfer", "match-transfers", "transfer-audit", "repair-transfers"} else account_table(result) if args.command == "account" and args.account_action == "create" else bulk_table(result) if "dryRun" in result and args.command != "category" else account_table(result) if args.command == "account" else category_table(result) if args.command == "category"
                   else note_table(result) if args.filter == "note" else search_table(result) if args.filter == "list" else transaction_table(result))
         else:
             print(json.dumps(result, allow_nan=False))

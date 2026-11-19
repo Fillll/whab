@@ -50,6 +50,39 @@ def test_backend_is_owned_by_child_and_reopens_same_authority(proxy):
     assert proxy.accounts("personal")[0]["balance"] == 12345
 
 
+def test_unknown_manual_creation_crosses_worker_with_atomic_name_guard(proxy, tmp_path):
+    assert proxy.supports_manual_account_creation() is True
+    service = LedgerService(proxy)
+    payload = {"name": "Fictional 🏡 貯蓄", "type": "depository", "subtype": "savings",
+               "onBudget": False, "currency": "EUR", "balance": 0,
+               "balanceUnknown": True, "uniqueName": True}
+    revision = service.revision
+    response = service.command("add_account", "personal", payload,
+        request_id="fictional-empty-register", expected_revision=revision)
+    assert service.command("add_account", "personal", payload,
+        request_id="fictional-empty-register", expected_revision=revision) == response
+    before = proxy.commit_evidence()
+    with pytest.raises(StoreError, match="already exists"):
+        service.add_account("personal", payload)
+    assert proxy.commit_evidence() == before
+    row = proxy.accounts("personal")[0]
+    assert row["id"] == response["data"] and row["balanceUnknown"] and row["balance"] == 0
+    assert proxy.recover() == {"outcome": "unchanged"}
+    assert proxy.accounts("personal") == [row] and proxy.transactions("personal") == []
+    kind = proxy.worker.plugin_id
+    proxy.close()
+    replacement = StorageWorkerProxy(StorageWorker(kind), proxy.context, tmp_path / "intents")
+    try:
+        restarted = LedgerService(replacement)
+        assert restarted.command("add_account", "personal", payload,
+            request_id="fictional-empty-register", expected_revision=revision) == response
+        assert replacement.accounts("personal") == [row]
+        assert replacement.commit_evidence() == before
+        assert len(replacement.budget_history("personal")["entries"]) == 1
+    finally:
+        replacement.close()
+
+
 def test_retained_child_owns_sole_writer_before_absent_receipt_can_prove_noncommit(proxy, tmp_path):
     before = proxy.commit_evidence()
     operation = StorageOperation("not-yet-dispatched", before.authority_epoch, before.generation, "personal", "add_account",
@@ -191,10 +224,14 @@ def test_durable_ledger_replay_survives_host_restart_and_later_writes(proxy, tmp
         replacement.close()
 
 
-def test_lost_mutating_reply_fences_and_explicit_recovery_returns_original(proxy, monkeypatch):
+@pytest.mark.parametrize("unknown", [False, True])
+def test_lost_mutating_reply_fences_and_explicit_recovery_returns_original(proxy, monkeypatch, unknown):
     ledger = LedgerService(proxy)
     revision = ledger.revision
     call = proxy.worker.call
+    payload = {"name": "Fictional", "type": "depository", "balance": 0 if unknown else 10}
+    if unknown:
+        payload.update(balanceUnknown=True, uniqueName=True)
 
     def lose(method, *args, **kwargs):
         result = call(method, *args, **kwargs)
@@ -204,16 +241,17 @@ def test_lost_mutating_reply_fences_and_explicit_recovery_returns_original(proxy
 
     monkeypatch.setattr(proxy.worker, "call", lose)
     with pytest.raises(ValueError, match="unknown"):
-        ledger.command("add_account", "personal", {"name": "Fictional", "type": "depository", "balance": 10},
+        ledger.command("add_account", "personal", payload,
                        request_id="lost", expected_revision=revision)
     assert proxy.uncertain
     with pytest.raises(ValueError):
         proxy.add_category("personal", {"name": "Must wait", "target": 0})
     assert proxy.recover() == {"outcome": "committed"}
-    response = ledger.command("add_account", "personal", {"name": "Fictional", "type": "depository", "balance": 10},
+    response = ledger.command("add_account", "personal", payload,
                               request_id="lost", expected_revision=revision)
     assert response["data"] == proxy.accounts("personal")[0]["id"]
     assert len(proxy.accounts("personal")) == 1
+    assert proxy.accounts("personal")[0].get("balanceUnknown", False) is unknown
 
 
 def test_pre_execution_lost_reply_requires_explicit_proof_without_repeating(proxy, monkeypatch):

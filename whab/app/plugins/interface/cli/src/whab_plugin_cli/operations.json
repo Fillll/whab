@@ -3708,7 +3708,7 @@
       },
       "output": {
         "type": "object",
-        "description": "JSON success envelope; --format table presents the same classification for humans.",
+        "description": "JSON success envelope; --format table presents the same classification for humans. Unknown manual registers additionally expose balanceStatus=unknown and recordedActivity (public sum of all nondeleted transactions including pending, signed integer minor units, inflows positive and independent of type; null/unavailable on older backends). Activity is not a verified opening/current balance.",
         "properties": {
           "budgetId": {
             "type": "string",
@@ -3842,7 +3842,7 @@
       },
       "output": {
         "type": "object",
-        "description": "JSON success envelope; --format table presents the same classification for humans.",
+        "description": "JSON success envelope; --format table presents the same classification for humans. Unknown manual registers additionally expose balanceStatus=unknown and recordedActivity (public sum of all nondeleted transactions including pending, signed integer minor units, inflows positive and independent of type; null/unavailable on older backends). Activity is not a verified opening/current balance.",
         "properties": {
           "budgetId": {
             "type": "string",
@@ -3941,6 +3941,354 @@
       ],
       "retry": "Reads may be repeated. For uncertain classification, inspect account show and history; do not rerun classify as a retry. Retain the complete original budget ID/intent payload/revision/request ID printed in the error for reconciliation or an exact advanced retry while its receipt exists.",
       "availability": "CLI 2.9+; whab BUDGET account show --help. Packaged documentation: whab api describe --offline --plugin cli --operation account.show --json. Delegates to core accounts/update_account; no new shared API. CLI 2.10+ / WHAB 2.64 supports deposit/cd and independent closed lifecycle with account close/reopen. SQLite 1.17+ or JSON 1.9+ is required for durable lifecycle writes."
+    },
+    {
+      "name": "account.create",
+      "kind": "local",
+      "summary": "Create one empty manual account with an unknown opening/current balance, shared validation, guarded durable save and verified stable identity.\n\nManual account creation (fictional budget):\n  whab \"My budget\" account create \"Épargne 旅行\" --type depository --subtype savings --off-budget --currency USD --agent Codex --dry-run\n  whab \"My budget\" account create \"Épargne 旅行\" --type depository --subtype savings --off-budget --currency USD --agent Codex\n  whab \"My budget\" account show \"Épargne 旅行\" --format table\n\nCreates an empty manual register with an UNKNOWN opening/current balance, no\nopening transaction and no bank connection or sync. Currency, type and exactly\none of --on-budget/--off-budget are required. Savings is depository/savings;\ndeposit means a certificate/fixed-term deposit (for example deposit/cd).\nNames are trimmed; duplicates ignoring case/outer whitespace are refused with\nconflicting IDs. Quote spaces, emoji and non-Latin names. No fuzzy matching.\n\nUse trnx create for dated debit/credit history; amounts are signed integer minor\nunits (USD 2500 means a 25-dollar outflow; USD -2500 means an inflow). recordedActivity\nis the signed sum of all nondeleted transactions (including pending), NOT a\nverified balance. It is read from the public account snapshot, independent of\naccount type; an older backend without this projection reports it unavailable.\nThe raw balance\nis an internal accumulator starting at zero, not evidence of zero opening funds.\nUnknown balances stay excluded from known assets, debts and cash snapshots.\nLater eligible posted transactions affect monthly funding under existing rules;\ncreation itself adds no funding. Match explicit transfer legs with trnx match-transfer\nand then classify/review under existing rules; nothing is automatically reviewed.\n\n--dry-run validates the exact proposed account and observed names without writing,\nhistory, checkpoint, bank connection or sync. It does not reserve a name or ID.\nJSON includes the complete intent, expectedRevision and requestId; --format table\nshows the same proposal readably. Remove --dry-run for normal noninteractive save.\nOne guarded add_account commit/save creates the account and permanent audit entry.\n--agent labels audit history; --batch groups history, not separate commits.\n\nRevision and request ID are normally automatic. For an EXACT recovery retry,\nsupply BOTH --revision ORIGINAL_REVISION and --request-id ORIGINAL_REQUEST_ID,\nwith the same name/classification/currency/agent/batch. A durable successful receipt\nreturns the original stable ID after a same-runtime restart without another account.\nReceipts/revisions are runtime-local: restoring a portable budget into a NEW runtime\npreserves account/history, but the old runtime's retry is refused as stale.\nStale revisions, conflicting request-ID reuse and duplicate names fail safely.\nNo automatic retry. If a response is uncertain, inspect account list/show and\nhistory and retain the reported full original intent; never retry with a new ID\nor refreshed revision. Unsupported hosts/backends fail before mutation.\n",
+      "input": {
+        "type": "object",
+        "description": "Arguments to whab BUDGET account create NAME. Budget uses the existing name/ID resolution; global --home/--environment/--profile/--ca work before or after subcommands.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Trimmed new name; duplicate names ignoring case/outer whitespace are rejected atomically with existing IDs. Unicode is supported; no fuzzy matching."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "depository",
+              "credit",
+              "investment",
+              "retirement",
+              "property",
+              "loan",
+              "deposit",
+              "other_asset",
+              "other_liability",
+              "other"
+            ],
+            "description": "Explicit financial classification. Ordinary savings uses depository, not deposit (fixed-term deposits/CDs)."
+          },
+          "subtype": {
+            "type": "string",
+            "description": "Optional subtype allowed by the shared financial classification rules; depository/savings or deposit/cd are examples."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Required supported uppercase ISO currency code; no conversion or inferred currency."
+          },
+          "onBudget": {
+            "type": "boolean",
+            "description": "Exactly one required --on-budget or --off-budget flag. Only depository/credit support true."
+          },
+          "agent": {
+            "type": "string",
+            "description": "Optional explicit self-declared audit actor; absent means manual User. Does not create categorization rules."
+          },
+          "batch": {
+            "type": "string",
+            "description": "Optional audit history grouping ID, not a multi-command commit."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false,
+            "description": "Pure shared validation against observed accounts; returns proposal with id=null and exact intent without mutation/history/save or name reservation."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Original expected revision for exact recovery; requires requestId. Normally read automatically."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Original intent ID for exact recovery; requires revision. Normally a fresh UUID is generated."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "table"
+            ],
+            "default": "json",
+            "description": "JSON retains full fields/guards; table labels unknown balance and signed recorded activity."
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "currency",
+          "onBudget"
+        ],
+        "additionalProperties": false,
+        "dependentRequired": {
+          "revision": [
+            "requestId"
+          ],
+          "requestId": [
+            "revision"
+          ]
+        }
+      },
+      "output": {
+        "type": "object",
+        "description": "Preview or verified account envelope. Successful exact replay returns the original stable ID with the verified current account, including later recorded activity; savedRevision belongs to the original creation.",
+        "properties": {
+          "budgetId": {
+            "type": "string",
+            "description": "Resolved permanent budget identifier."
+          },
+          "budget": {
+            "type": "string",
+            "description": "Addressed budget name or ID as supplied."
+          },
+          "revision": {
+            "type": "string",
+            "description": "Revision of the verified current account read or preview."
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Exact generated or supplied request identity; retain for recovery."
+          },
+          "expectedRevision": {
+            "type": "string",
+            "description": "Original observed/supplied revision attached to this intent."
+          },
+          "savedRevision": {
+            "type": "string",
+            "description": "Revision recorded in the original successful creation receipt."
+          },
+          "replayed": {
+            "type": "boolean",
+            "description": "True when recovery used an older revision and returned its original saved receipt."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "True for a read-only preview; false for verified normal execution/replay."
+          },
+          "intent": {
+            "type": "object",
+            "description": "Exact public add_account intent: operation/workspace/payload/expected_revision/request_id and optional history. Payload supplies balance=0, balanceUnknown=true and uniqueName=true."
+          },
+          "data": {
+            "type": "object",
+            "description": "Account fields plus unclassified/closed presentation. balance=0 initially is an internal accumulator, not a verified zero opening/current balance. recordedActivity is the public projection of all nondeleted transaction amounts (including pending), with inflows positive, independent of account type; missing legacy projections are unavailable rather than inferred.",
+            "properties": {
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Assigned stable account ID; null until saved."
+              },
+              "name": {
+                "type": "string",
+                "description": "Trimmed account name."
+              },
+              "type": {
+                "type": "string",
+                "description": "Public financial classification."
+              },
+              "subtype": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Optional type-specific detail; null when absent."
+              },
+              "currency": {
+                "type": "string",
+                "description": "Explicit supported uppercase currency code."
+              },
+              "onBudget": {
+                "type": "boolean",
+                "description": "Whether saved classification participates in monthly budgeting under existing rules."
+              },
+              "source": {
+                "type": "string",
+                "description": "Manual on creation; no provider is connected."
+              },
+              "balance": {
+                "type": "integer",
+                "description": "Raw recorded-activity accumulator in integer minor units; not a verified balance when balanceUnknown is true."
+              },
+              "balanceUnknown": {
+                "type": "boolean",
+                "description": "True means opening/current balance remains unknown."
+              },
+              "balanceStatus": {
+                "const": "unknown",
+                "description": "Presentation label for an unknown manual register."
+              },
+              "recordedActivity": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Authoritative public sum of nondeleted transaction activity including pending in integer minor units, inflows positive and independent of account type. Null when an older backend cannot provide it. Not a verified balance."
+              },
+              "closed": {
+                "type": "boolean",
+                "description": "Archived lifecycle status; false on creation."
+              },
+              "unclassified": {
+                "type": "boolean",
+                "description": "True when financial type is other."
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "type",
+              "subtype",
+              "currency",
+              "onBudget",
+              "source",
+              "balance",
+              "balanceUnknown",
+              "closed",
+              "unclassified"
+            ]
+          }
+        },
+        "required": [
+          "budgetId",
+          "budget",
+          "revision",
+          "requestId",
+          "expectedRevision",
+          "dryRun",
+          "intent",
+          "data"
+        ]
+      },
+      "examples": [
+        {
+          "input": {
+            "name": "Épargne 旅行",
+            "type": "depository",
+            "subtype": "savings",
+            "currency": "USD",
+            "onBudget": false,
+            "agent": "Codex",
+            "dryRun": true
+          },
+          "output": {
+            "budgetId": "fictional-budget",
+            "budget": "My budget",
+            "revision": "fictional-before",
+            "requestId": "fictional-request",
+            "expectedRevision": "fictional-before",
+            "dryRun": true,
+            "intent": {
+              "operation": "add_account",
+              "workspace": "personal",
+              "payload": {
+                "name": "Épargne 旅行",
+                "type": "depository",
+                "subtype": "savings",
+                "currency": "USD",
+                "onBudget": false,
+                "balance": 0,
+                "balanceUnknown": true,
+                "uniqueName": true
+              },
+              "expected_revision": "fictional-before",
+              "request_id": "fictional-request",
+              "history": {
+                "actor": "Codex",
+                "actorKind": "agent"
+              }
+            },
+            "data": {
+              "name": "Épargne 旅行",
+              "type": "depository",
+              "subtype": "savings",
+              "currency": "USD",
+              "onBudget": false,
+              "balance": 0,
+              "balanceUnknown": true,
+              "id": null,
+              "institution": "Manual account",
+              "source": "manual",
+              "stale": false,
+              "closed": false,
+              "unclassified": false,
+              "balanceStatus": "unknown",
+              "recordedActivity": 0
+            }
+          }
+        },
+        {
+          "input": {
+            "name": "Épargne 旅行",
+            "type": "depository",
+            "subtype": "savings",
+            "currency": "USD",
+            "onBudget": false,
+            "agent": "Codex",
+            "dryRun": false
+          },
+          "output": {
+            "budgetId": "fictional-budget",
+            "budget": "My budget",
+            "revision": "fictional-saved",
+            "requestId": "fictional-request",
+            "expectedRevision": "fictional-before",
+            "dryRun": false,
+            "intent": {
+              "operation": "add_account",
+              "workspace": "personal",
+              "payload": {
+                "name": "Épargne 旅行",
+                "type": "depository",
+                "subtype": "savings",
+                "currency": "USD",
+                "onBudget": false,
+                "balance": 0,
+                "balanceUnknown": true,
+                "uniqueName": true
+              },
+              "expected_revision": "fictional-before",
+              "request_id": "fictional-request",
+              "history": {
+                "actor": "Codex",
+                "actorKind": "agent"
+              }
+            },
+            "data": {
+              "name": "Épargne 旅行",
+              "type": "depository",
+              "subtype": "savings",
+              "currency": "USD",
+              "onBudget": false,
+              "balance": 0,
+              "balanceUnknown": true,
+              "id": "fictional-account",
+              "institution": "Manual account",
+              "source": "manual",
+              "stale": false,
+              "closed": false,
+              "unclassified": false,
+              "balanceStatus": "unknown",
+              "recordedActivity": 0
+            },
+            "savedRevision": "fictional-saved",
+            "replayed": false
+          }
+        }
+      ],
+      "side_effects": "Normal execution performs one native atomic add_account operation, revision advancement and synchronous durable checkpoint with permanent audit history. Creates an empty source=manual register; no opening transaction, bank connection or sync. Unknown balances remain excluded from known assets/debts/cash snapshots. Later posted activity follows existing financial rules; creation itself adds no funding. Dry-run performs accounts read and pure shared validation only.",
+      "permissions": "Authorized personal-workspace public ledger access. Uses HTTPS/local host or supported remote transport; CLI never accesses native storage directly.",
+      "scope": "One explicitly addressed budget, personal workspace and configured environment. Account currency is explicit; no conversion, cross-budget references or provider mappings.",
+      "errors": [
+        "Missing type/currency/scope, conflicting scope, invalid type/subtype/currency and empty/duplicate names are rejected; duplicate diagnostics include existing IDs.",
+        "Stale revisions or conflicting request-ID reuse reject the operation. Unsupported hosts/backends reject unknown/unique manual creation before mutation.",
+        "Uncertain transport, durable-save or verification responses retain the original intent and are never replayed automatically. HTTP status alone is not a claim of rollback. Inspect account list/show and permanent history."
+      ],
+      "retry": "Retain and replay BOTH original --revision/--request-id plus the exact original name/type/subtype/scope/currency/agent/batch. Durable successful receipts return the original ID without another account/history/revision/save after same-runtime restart. Do not retry uncertain writes with new identity/revision. Runtime-local receipts/revisions are not portable: a new runtime restoring a budget retains account/history but rejects old-runtime retries as stale. Expired receipts also fail old-revision guards.",
+      "availability": "CLI 2.26+, WHAB 2.86+, SQLite 1.32+ or JSON 1.24+ (or compatible storage declaring supports_manual_account_creation). Shared public normalize_manual_account validates preview and native creation; existing public add_account and accounts query handle persistence/verification. Root/account/create help and this schema are packaged and work offline."
     },
     {
       "name": "account.classify",

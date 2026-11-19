@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.26.0 — 2026-11-18
+
+PR: [#218](https://github.com/Fillll/whab/pull/218)
+
+- Add name-addressed `account create` with explicit classification, scope and currency, read-only preview, agent attribution, verified saved results and exact-request recovery.
+- Document the historical manual-register workflow, unknown balance versus recorded activity, and transaction/transfer commands in complete offline help and packaged examples.
+
 ## 2.25.0 — 2026-11-16
 
 PR: [#217](https://github.com/Fillll/whab/pull/217)

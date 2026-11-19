@@ -6,7 +6,12 @@ from uuid import uuid4
 
 lazy import httpx
 
-from whab.plugins import ACCOUNT_SUBTYPES, ACCOUNT_TYPES, StoreError, normalize_account
+from whab.plugins import (
+    ACCOUNT_SUBTYPES,
+    ACCOUNT_TYPES,
+    StoreError,
+    normalize_account,
+)
 from whab.plugins.documentation import operation
 
 from .transaction_commands import checked
@@ -14,6 +19,8 @@ from .transaction_reads import terminal_text
 
 
 def add_account_parser(commands, catalog):
+    from .account_creation import add_create_parser
+    from .account_help import CREATE_HELP
     from .bulk_commands import bulk_options
     from .bulk_help import BULK_HELP
     types = operation(catalog['core'], 'command', 'update_account')['input']['properties']['type']['enum']
@@ -26,15 +33,16 @@ def add_account_parser(commands, catalog):
                 '  whab "My budget" account classify "Example CD" --type deposit --subtype cd --off-budget\n'
                 '  whab "My budget" account close "Example CD"\n'
                 '  whab "My budget" account reopen "Example CD"\n\n')
-    account = commands.add_parser('account', help='List, classify and archive accounts by name or ID',
-        description='Read, classify, close or reopen accounts in one explicitly addressed budget; no interactive wizard.',
+    account = commands.add_parser('account', help='Create, list, classify and archive accounts by name or ID',
+        description='Create an empty manual register, or read, classify, close or reopen accounts in one explicitly addressed budget; no interactive wizard.',
         epilog=examples + 'Names match exactly, ignoring case and outer whitespace; IDs take precedence. Missing or ambiguous names fail with candidates. Quote spaces, emoji and non-Latin names. JSON is the default; --format table is for display. No bank synchronization is requested.',
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    account.epilog += '\n\n' + BULK_HELP
+    account.epilog += '\n\n' + CREATE_HELP + '\n\n' + BULK_HELP
     actions = account.add_subparsers(dest='account_action', required=True)
+    add_create_parser(actions, types, guide)
     listing = actions.add_parser('list', help='List account identities and classifications',
         description='List this budget’s accounts, including name, stable ID, type, subtype, onBudget, closed lifecycle and unclassified (type=other).',
-        epilog=examples + 'Reads only; --unclassified selects type=other, independently of balance verification. Imported balance estimates stay unverified.',
+        epilog=examples + 'Reads only; --unclassified selects type=other, independently of balance verification. Imported balance estimates stay unverified. For an unknown-balance manual register, recordedActivity is signed integer minor units (inflows positive), not a verified opening/current balance.',
         formatter_class=argparse.RawDescriptionHelpFormatter)
     state = listing.add_mutually_exclusive_group()
     state.add_argument('--closed', dest='lifecycle', action='store_const', const=True, default=None, help='Only archived accounts; default lists open and closed')
@@ -42,7 +50,7 @@ def add_account_parser(commands, catalog):
     listing.add_argument('--unclassified', action='store_true', help='Only accounts whose type is other (generic/unclassified)')
     show = actions.add_parser('show', help='Read one account by unique name or stable ID',
         description='Read one saved account’s classification, budget scope and closed lifecycle without changing it. closed=true means archive, separately from financial scope. Names ignore case and outer whitespace; no fuzzy matching.',
-        epilog=examples + 'A missing or ambiguous name returns candidate names and IDs. Use the stable ID to disambiguate. Imported balances remain unverified.',
+        epilog=examples + 'A missing or ambiguous name returns candidate names and IDs. Use the stable ID to disambiguate. Imported balances remain unverified. For an unknown-balance manual register, recordedActivity is signed integer minor units (inflows positive), not a verified opening/current balance.',
         formatter_class=argparse.RawDescriptionHelpFormatter)
     edit = actions.add_parser('classify', help='Classify 1–100 explicit accounts; multiple targets commit and save once',
         description='Classify one account or apply the same classification to 2–100 accounts atomically. Reads the current revision and generates one unique request ID automatically. --atomic selects the bulk operation even for one target.',
@@ -76,7 +84,9 @@ def resolve_account(rows, value, error):
 
 
 def classified(row):
-    return {**row, 'unclassified': row['type'] == 'other', 'closed': row.get('closed', False)}
+    return {**row, 'unclassified': row['type'] == 'other', 'closed': row.get('closed', False),
+            **({'balanceStatus': 'unknown', 'recordedActivity': row.get('recordedActivity')}
+               if row.get('source') == 'manual' and row.get('balanceUnknown') else {})}
 
 
 def execute_account(connection, identifier, prefix, args, exchange, error):
@@ -124,13 +134,21 @@ def account_table(result):
     data = result['data']
     rows = data if isinstance(data, list) else [data]
     lines = [f"Budget: {terminal_text(result['budget'], 100)} ({terminal_text(result['budgetId'], 200)})"]
-    cells = [['ID', 'Name', 'Type', 'Subtype', 'Scope', 'State', 'Unclassified']]
-    cells += [[row['id'], row['name'], row['type'], row.get('subtype') or '—',
-               'on-budget' if row['onBudget'] else 'off-budget', 'closed' if row['closed'] else 'open', 'yes' if row['unclassified'] else 'no'] for row in rows]
-    cells = [[terminal_text(value, limit) for value, limit in zip(row, (40, 36, 18, 22, 10, 6, 12), strict=True)] for row in cells]
-    widths = [max(len(row[index]) for row in cells) for index in range(7)]
+    cells = [['ID', 'Name', 'Type', 'Subtype', 'Scope', 'Currency', 'Source', 'State', 'Unclassified']]
+    cells += [[row['id'] or '(assigned on save)', row['name'], row['type'], row.get('subtype') or '—',
+               'on-budget' if row['onBudget'] else 'off-budget', row.get('currency', '—'), row.get('source', '—'),
+               'closed' if row['closed'] else 'open', 'yes' if row['unclassified'] else 'no'] for row in rows]
+    cells = [[terminal_text(value, limit) for value, limit in zip(row, (40, 36, 18, 22, 10, 8, 12, 6, 12), strict=True)] for row in cells]
+    widths = [max(len(row[index]) for row in cells) for index in range(9)]
     lines += ['  '.join(value.ljust(width) for value, width in zip(row, widths, strict=True)) for row in cells]
     if not rows:
         lines.append('No matching accounts.')
+    for row in rows:
+        if row.get('balanceStatus') == 'unknown':
+            activity = 'unavailable' if row['recordedActivity'] is None else f"{row['recordedActivity']:+d} {terminal_text(row['currency'], 8)} minor units (inflows positive)"
+            lines.append(f"{terminal_text(row['name'], 100)}: opening/current balance UNKNOWN; recorded activity {activity}, not a verified balance.")
+    if 'dryRun' in result and 'intent' in result:
+        lines.append('Preview only; nothing saved and no ID/name reserved.' if result['dryRun'] else 'Saved account identity verified.' + (' Exact request replay; current account shown.' if result['replayed'] else ''))
+        lines.append('Exact intent: ' + json.dumps(result['intent'], ensure_ascii=True))
     lines.append('Classification does not verify imported balance estimates. JSON retains complete public fields.')
     return '\n'.join(lines)

@@ -47,10 +47,11 @@
       "scope": "Host-supplied budget/environment context and personal/demo workspace where the method accepts it. Credentials remain machine-local.",
       "errors": [
         "Invalid or unsupported input is rejected without applying a new decision.",
-        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict."
+        "Unavailable feature/storage returns an authored error; stale revisions and reused request IDs with different intent conflict.",
+        "Unsupported balanceUnknown/uniqueName creation is rejected by the addressed authority before mutation; upgrade its core/storage rather than falling back to an asserted zero balance."
       ],
       "retry": "Read again as needed; reads never authorize a later write using an old revision.",
-      "availability": "SDK callback only; consult the owning README for the typed in-process contract."
+      "availability": "SDK callback only; delegates core guarded commands. Unknown-balance/unique-name add_account requires WHAB 2.86+ and supporting storage at the authority."
     }
   ]
 }
