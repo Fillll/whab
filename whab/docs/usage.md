@@ -11,6 +11,7 @@ Detailed operating guidance for WHAB. Start with the [quick start](../app/README
 - [Settings and plugin manager](#settings-and-plugin-manager)
 - [Connect Plaid Sandbox](#connect-plaid-sandbox)
 - [Importing and data handling](#importing-and-data-handling)
+- [Manual historical registers](#manual-historical-registers)
 - [Budget scope](#budget-scope)
 - [Local access and private files](#local-access-and-private-files)
 - [Official references](#official-references)
@@ -181,6 +182,31 @@ This prototype requests **Transactions**. Investments import is the next separat
 - Disconnect removes the remote Item before marking the local connection disconnected. Imported transactions remain.
 - **Manage** uses Link update mode for existing healthy connections; **Reconnect** repairs expired authorization. The frontend checks institution/account name/mask before exchanging a likely duplicate connection. This is a practical safeguard, not complete joint-account deduplication across different logins.
 - Core supports multiple currencies with separate totals and no conversion; the bundled Plaid and YNAB importers currently accept USD only. CSV exports retain `amount_cents` for compatibility, containing integer currency minor units, and append a `currency` column. Text cells are protected against spreadsheet formula injection.
+
+## Manual historical registers
+
+Use an empty manual register when an old account is absent from an import and its
+opening balance is unknown. No bank connection or opening transaction is created:
+
+```sh
+whab "My budget" account create "Example Savings" --type depository --subtype savings --off-budget --currency USD --agent Codex --dry-run
+whab "My budget" account create "Example Savings" --type depository --subtype savings --off-budget --currency USD --agent Codex
+whab "My budget" account show "Example Savings"
+```
+
+Savings uses `depository`; `deposit` means a fixed-term deposit such as a CD.
+Account names, including spaces and Unicode, are checked for conflicts. The
+created account has a stable ID and an explicit currency. Its recorded activity
+starts at zero; that is not a verified opening or current balance. Manual debits
+and credits accumulate activity while the balance remains unknown and excluded
+from known account totals.
+
+Use `trnx create --help` to record a historical counterpart, then
+`trnx match-transfers --help` to preview and explicitly link the two transaction
+IDs. Review remains an explicit decision. Keep the original transaction's
+financial fields intact. See `account create --help` for saved-result
+verification and exact-request recovery after an uncertain response; never retry
+an uncertain write with a fresh request ID.
 
 ## Budget scope
 
