@@ -13,6 +13,7 @@ Detailed operating guidance for WHAB. Start with the [quick start](../app/README
 - [Importing and data handling](#importing-and-data-handling)
 - [Manual historical registers](#manual-historical-registers)
 - [Budget scope](#budget-scope)
+- [Monthly spending](#monthly-spending)
 - [Local access and private files](#local-access-and-private-files)
 - [Official references](#official-references)
 
@@ -295,6 +296,20 @@ On Budget, the red rounded frame marks the visible month range. Drag the bottom 
 ### Add a manual transaction
 
 Open **Transactions → Add transaction** to record spending or an inflow in any account, including YNAB-imported and connected bank accounts. The account list uses the current currency view; an individual account’s sidebar link opens its currency. Date, currency, category and money validation remain in force. The action is unavailable only when there is no account in that currency view. Manual entries update the local balance and stay separate from bank-imported records; a future bank refresh supplies its current balance snapshot and preserves the manual entries.
+
+## Monthly spending
+
+Enable **Monthly spending** in **Settings → Plugins**, then open **Insights**.
+The graph has one column per month. Choose the first and last months to compare
+an inclusive range of up to 24 months. Switch between **Groups** for the broad
+breakdown and **Categories** for the individual budget categories.
+
+Stacks show net posted spending from on-budget accounts in the selected currency.
+Refunds reduce their category's spending. Months with a net refund for a series
+can show a segment below zero. Uncategorized outflows have their own series.
+Income, transfers, opening balances, pending and off-budget activity are excluded.
+The total line shows net spending for each month. Use the breakdown for the values
+behind the chart.
 
 ## View investment positions
 
