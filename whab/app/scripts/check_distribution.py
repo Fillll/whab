@@ -316,6 +316,23 @@ with TestClient(create_app(settings=json_settings), base_url="https://127.0.0.1:
     assert account["id"] == account_id and account["balance"] == 12220
 assert (json_settings.home / "data" / "whab-sandbox.json").is_file()
 assert not tuple(json_settings.home.rglob("*.sqlite"))
+chart_settings = replace(json_settings, home=settings.home / "monthly-insight", plugins=("monthly-spending",))
+with TestClient(create_app(settings=chart_settings), base_url="https://127.0.0.1:5173") as client:
+    account = client.post("/api/accounts", json={
+        "workspace": "personal", "name": "Fictional checking", "type": "depository", "balance": 25000,
+    })
+    assert account.status_code == 200
+    transaction = client.post("/api/transactions", json={
+        "workspace": "personal", "accountId": account.json()["accountId"], "date": "2026-02-10",
+        "merchant": "Fictional chart purchase", "amount": 12300, "categoryId": None,
+    })
+    assert transaction.status_code == 200
+    page = client.get("/budgets/home/insights/2026-03/usd", params={
+        "insight_from": "2026-02", "insight_to": "2026-03", "insight_group": "category",
+    })
+    assert page.status_code == 200 and "data-monthly-plot" in page.text
+    assert "February 2026 · Net spending $123" in page.text
+    assert "March 2026 · Net spending $0" in page.text
 print("Installed wheels: curated catalog resource/contracts, independent versions, MIT licenses, pages, assets and plugin discovery passed.")
 """
 
@@ -418,7 +435,7 @@ def main():
                 "module": entrypoint.split(":", 1)[0].split(".", 1)[0],
             }
         teaching = {"example", "example-api", "example-ui", "example-bank", "example-remote-client", "example-storage", "example-branding", "example-file-import", "example-categorization"}
-        assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", "llm-categorization", "ai-credentials", "subscriptions", "subscriptions-ai", "cli", *teaching}
+        assert set(expected) == {"whab", "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", "llm-categorization", "ai-credentials", "subscriptions", "subscriptions-ai", "cli", "monthly-spending", *teaching}
         optional = project_metadata(source)["optional-dependencies"]["bundled"]
         assert set(optional) == {
             f'{record["distribution"]}>={record["version"]},<{int(record["version"].split(".")[0]) + 1}'

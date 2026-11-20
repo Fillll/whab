@@ -1724,6 +1724,205 @@ strong {
   padding: 0 0 28px;
   border-bottom: 1px solid var(--line);
 }
+.monthly-insights {
+  min-width: 0;
+  margin-bottom: 34px;
+  padding-bottom: 23px;
+  border-bottom: 1px solid var(--line);
+}
+.monthly-insights-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+.monthly-insights-heading h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -.035em;
+}
+.monthly-insight + .monthly-insight { margin-top: 22px; }
+.monthly-insight h3 { font-size: 14px; margin: 0 0 10px; }
+.monthly-insight-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 9px 12px;
+  margin-bottom: 18px;
+}
+.monthly-insight-filters > label,
+.monthly-insight-mode legend {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.monthly-insight-filters > label { display: grid; gap: 5px; }
+.monthly-insight-filters input[name='insight_from'],
+.monthly-insight-filters input[name='insight_to'] {
+  width: min(164px, 100%);
+  min-height: 36px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.monthly-insight-mode { min-width: 0; padding: 0; margin: 0; border: 0; }
+.monthly-insight-mode legend { padding: 0; margin-bottom: 5px; }
+.monthly-insight-mode > div {
+  display: flex;
+  min-height: 36px;
+  align-items: stretch;
+  padding: 2px;
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: var(--field);
+}
+.monthly-insight-mode label { display: flex; cursor: pointer; }
+.monthly-insight-mode label > span {
+  display: grid;
+  place-items: center;
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.monthly-insight-mode input:checked + span {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.monthly-insight-mode input:focus-visible + span,
+.monthly-chart-scroll:focus-visible,
+.monthly-chart-table:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.monthly-insight-filters > button { min-height: 36px; }
+.monthly-chart-scroll {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.monthly-chart {
+  display: block;
+  min-width: var(--plot-width);
+  width: 100%;
+  height: 290px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.monthly-chart text { fill: var(--muted); }
+.monthly-chart-grid { stroke: var(--line); stroke-dasharray: 3 5; }
+.monthly-chart-zero { stroke: var(--control-border); }
+.monthly-chart-net { fill: none; stroke: var(--ink); stroke-width: 1.6; opacity: .72; }
+.monthly-chart-point { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.monthly-chart [data-chart-series] { transition: opacity 140ms ease; }
+.monthly-chart [data-chart-dimmed] { opacity: .22; }
+.monthly-chart-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 6px 15px;
+  margin: 12px 0 7px;
+}
+.monthly-chart-total-key {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 30px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.monthly-chart-total-key::before {
+  content: '';
+  width: 16px;
+  height: 2px;
+  background: var(--ink);
+}
+.monthly-chart-legend {
+  display: flex;
+  flex: 1 1 320px;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  max-height: 116px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.monthly-chart-legend > li { min-width: 0; max-width: 100%; }
+.monthly-chart-legend button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.monthly-chart-legend button:disabled { opacity: 1; cursor: default; }
+.monthly-chart-legend button:hover:not(:disabled) { background: var(--surface); }
+.monthly-chart-legend button[aria-pressed='true'] {
+  border-color: var(--control-border);
+  background: var(--current);
+  color: var(--ink);
+}
+.monthly-chart-swatch {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--series-color);
+}
+.monthly-insight [data-monthly-breakdown] > summary {
+  width: fit-content;
+  min-height: 30px;
+  padding: 7px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+.monthly-chart-table { margin-top: 6px; }
+.monthly-chart-table table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: max-content;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.monthly-chart-table :is(td, th) {
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+.monthly-chart-table :is(thead, tfoot) { background: var(--current); }
+.monthly-chart-table :is(th[scope='row'], th:first-child) {
+  max-width: 220px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.monthly-chart-table tfoot { font-weight: 600; }
+.monthly-insight-detail {
+  margin: 7px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+@media (max-width: 550px) {
+  .monthly-insight-filters > label { flex: 1 1 112px; min-width: 0; }
+  .monthly-insight-filters input[name='insight_from'],
+  .monthly-insight-filters input[name='insight_to'] { width: 100%; }
+  .monthly-chart { height: 248px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .monthly-chart [data-chart-series] { transition: none; }
+}
 .insights-columns {
   display: grid;
   grid-template-columns: 1.1fr 1fr;

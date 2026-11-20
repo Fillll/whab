@@ -18,6 +18,7 @@ from .sdk import (
     AccountSnapshot,
     BudgetSnapshot,
     CategorySnapshot,
+    ChartSeries,
     ExportTable,
     Insight,
     LogoImage,
@@ -26,6 +27,9 @@ from .sdk import (
     PluginDescription,
     PluginInsightResult,
     PluginSettings,
+    SpendingCategory,
+    SpendingMonth,
+    StackedMonthlyChart,
     TransactionSnapshot,
     valid_merchant_logo_key,
     valid_plugin_name,
@@ -47,8 +51,8 @@ def _copy_record(value: object, record_type: type):
     return record_type(**{field.name: getattr(value, field.name) for field in fields(record_type)})
 
 
-def copy_snapshot(snapshot: BudgetSnapshot) -> BudgetSnapshot:
-    """Make fresh recursively immutable records, retaining exactly one workspace/month."""
+def copy_snapshot(snapshot: BudgetSnapshot, *, include_spending: bool = False) -> BudgetSnapshot:
+    """Copy the single-month records and any opted-in monthly spending aggregates."""
     if type(snapshot) is not BudgetSnapshot:
         raise ValueError("Plugin snapshot must be a BudgetSnapshot.")
     return BudgetSnapshot(
@@ -58,7 +62,23 @@ def copy_snapshot(snapshot: BudgetSnapshot) -> BudgetSnapshot:
         categories=tuple(_copy_record(row, CategorySnapshot) for row in snapshot.categories),
         transactions=tuple(_copy_record(row, TransactionSnapshot) for row in snapshot.transactions),
         currency=snapshot.currency,
+        spending=tuple(SpendingMonth(row.month, row.uncategorized_cents, tuple(
+            _copy_record(category, SpendingCategory) for category in row.categories
+        )) for row in snapshot.spending) if include_spending else (),
+        spending_by=snapshot.spending_by if include_spending else "group",
     )
+
+
+def _copy_insight(value, *, include_chart=False):
+    insight = _copy_record(value, Insight)
+    chart = insight.chart
+    if chart is None:
+        return insight
+    if not include_chart:
+        raise ValueError("Visual insights require reporting.insights version 2.")
+    return Insight(insight.title, insight.value, insight.detail, StackedMonthlyChart(
+        chart.currency, chart.months, tuple(_copy_record(row, ChartSeries) for row in chart.series),
+    ))
 
 
 class PluginRegistry:
@@ -214,7 +234,7 @@ class PluginRegistry:
             if type(output) is not tuple or len(output) > 50:
                 raise ValueError("Settings output must be a tuple of at most 50 records.")
             return {
-                "insights": tuple(_copy_record(row, Insight) for row in output),
+                "insights": tuple(_copy_insight(row) for row in output),
                 "actions": tuple(_copy_record(action, PluginAction) for action in settings.actions),
             }
         except Exception:
@@ -414,10 +434,16 @@ class PluginRegistry:
             if plugin.insights is None:
                 continue
             try:
-                output = plugin.insights(copy_snapshot(snapshot))
+                visual = any(row.name == "reporting.insights" and row.version == 2 for row in contract_for(plugin).provides)
+                output = plugin.insights(copy_snapshot(snapshot, include_spending=visual))
                 if type(output) is not tuple or len(output) > 50:
                     raise ValueError("Insight output must be a tuple of at most 50 records.")
-                insights = tuple(_copy_record(row, Insight) for row in output)
+                insights = tuple(_copy_insight(row, include_chart=visual) for row in output)
+                if sum(row.chart is not None for row in insights) > 1:
+                    raise ValueError("Each Insights plugin may return at most one chart.")
+                chart = next((row.chart for row in insights if row.chart is not None), None)
+                if chart is not None and (chart.currency != snapshot.currency or chart.months != tuple(row.month for row in snapshot.spending)):
+                    raise ValueError("The chart must match the snapshot's currency and spending months.")
             except Exception:
                 results.append(
                     PluginInsightResult(

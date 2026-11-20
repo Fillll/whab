@@ -448,7 +448,6 @@ import sys
 from whab import __version__
 from whab.plugins import AccountSnapshot, BudgetSnapshot, CategorySnapshot, TransactionSnapshot, load_plugins
 from whab.plugins.wire import HEADER, Frame, frame_lengths
-from dataclasses import asdict
 
 def serve(plugin_id, source, target):
     registry = load_plugins((plugin_id,), _worker=True)
@@ -482,7 +481,8 @@ def serve(plugin_id, source, target):
                                   tuple(CategorySnapshot(**row) for row in value['categories']),
                                   tuple(TransactionSnapshot(**row) for row in value['transactions']),currency=value['currency'])
         if request['operation'] == 'insights':
-            output = [asdict(row) for row in registry.insights(snapshot)[0].insights]
+            output = [{'title': row.title, 'value': row.value, 'detail': row.detail}
+                      for row in registry.insights(snapshot)[0].insights]
         else:
             table = registry.export(plugin_id,snapshot)
             output = {'columns':list(table.columns),'rows':[list(row) for row in table.rows]}
@@ -544,6 +544,8 @@ def test_synthetic_saved_protocol1_environment_is_fenced_then_explicitly_reprepa
 
     class LegacyProbe(ReportWorker):
         """A report-only protocol-1 client used solely to publish the old fixture."""
+        _visual_insights = False
+
         def __init__(self, plugin_id, *, python, timeout, expected_distribution, expected_version, on_create=None):
             self.plugin_id, self.timeout, self._lock, self._retiring = plugin_id, timeout, Lock(), None
             self._process = None

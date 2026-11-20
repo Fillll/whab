@@ -164,7 +164,7 @@ def test_local_storage_worker_static_contract_is_explicit(metadata_tool, static_
     ("file_import=parser,branding_factory=fresh", ""),
     ("bank_logos=branding,bind=binder", ""),
     ("bank_logos=branding", ",state_version=2"),
-    ("insights=insights", ",provides=(Capability('reporting.insights',2),)"),
+    ("insights=insights", ",provides=(Capability('reporting.insights',3),)"),
 ])
 def test_unsupported_live_shapes_cannot_claim_worker_compatibility(metadata_tool, static_repository, hooks, contract):
     root, _, module = static_repository
@@ -195,7 +195,7 @@ def test_actual_catalog_has_exact_static_contracts_for_supported_packages(metada
     records = metadata_tool.source_inventory()
     generated = metadata_tool.build_catalog()
     assert {row["id"] for row in records if row["support"] == "maintained"} == {
-        "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", "llm-categorization", "ai-credentials", "subscriptions", "subscriptions-ai", "cli",
+        "web", "sqlite", "json", "plaid", "bank-logos", "ynab", "server", "client", "random-forest-categorization", "llm-categorization", "ai-credentials", "subscriptions", "subscriptions-ai", "cli", "monthly-spending",
     }
     assert json.loads(json.dumps(generated))["plugins"]
 

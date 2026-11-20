@@ -22,6 +22,7 @@ from whab.plugins import (
 )
 
 from .icons import category_icon, icon
+from .monthly_chart import series_color, stacked_monthly_plot
 
 WEB_ASSET_VERSION = package_version("whab_plugin_web")
 WEB_MODULES = tuple(path.name for path in (Path(__file__).parent / "static").glob("*.js"))
@@ -380,6 +381,8 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "money_number": lambda value: money_number(value, currency),
         "valid_money": valid_money,
         "month_label": month_label,
+        "series_color": series_color,
+        "stacked_monthly_plot": stacked_monthly_plot,
         "shift_month": shift_month,
         "icon": icon,
         "category_icon": category_icon,

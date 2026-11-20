@@ -44,6 +44,7 @@ Use lowercase, hyphen-separated names for plugin IDs and folders, such as `bank-
 | `ingestion/plaid/` | `plaid` | `whab_plugin_plaid` | Bank normalization, credentials, connection UI and synchronization |
 | `ingestion/ynab/` | `ynab` | `whab_plugin_ynab` | Local YNAB ZIP parsing, migration preview and import controls |
 | `interface/web/` | `web` | `whab_plugin_web` | View models, icons, templates and browser assets |
+| `insight/monthly-spending/` | `monthly-spending` | `whab_plugin_monthly_spending` | Monthly spending breakdown by category or group |
 | `interface/bank-logos/` | `bank-logos` | `whab_plugin_bank_logos` | Curated institution lookup and public icon fetching |
 | `interface/server/` | `server` | `whab_plugin_server` | HTTPS bearer-authorized public ledger API interface |
 | `storage/client/` | `client` | `whab_plugin_client` | Remote storage and portable connection payload |
@@ -100,6 +101,7 @@ This is the canonical supported-set inventory. Keep it aligned with the host's `
 | `plaid` | `whab_plugin_plaid` | Optional, enabled unless overridden |
 | `bank-logos` | `whab_plugin_bank_logos` | Disabled |
 | `ynab` | `whab_plugin_ynab` | Disabled |
+| `monthly-spending` | `whab_plugin_monthly_spending` | Disabled |
 | `server` | `whab_plugin_server` | Disabled |
 | `client` | `whab_plugin_client` | Not selected; choose as storage for a remote connection |
 | `random-forest-categorization` | `whab_plugin_random_forest_categorization` | Disabled |

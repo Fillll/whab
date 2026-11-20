@@ -13,6 +13,7 @@ from whab.domain.budget import select_currency
 from whab.domain.dates import current_month
 from whab.plugins import PluginError
 from whab.plugins.catalog import CatalogError, catalog_snapshot
+from whab.plugins.insight_wire import insight_data
 from whab.web.csv import safe_cell
 from whab.web.navigation import budget_key
 from whab.web.plugin_snapshot import build_snapshot
@@ -162,7 +163,8 @@ def create_router(store, plugins, plugin_manager=None):
             if error.code == "unavailable":
                 raise HTTPException(404, "Plugin settings not found") from None
             raise
-        result = {key: [asdict(record) for record in records] for key, records in settings.items()}
+        result = {"insights": [insight_data(row) for row in settings["insights"]],
+                  "actions": [asdict(row) for row in settings["actions"]]}
         if any(plugin.id == plugin_id and plugin.categorization for plugin in plugins.descriptors()):
             result["categorization"] = True
         return result

@@ -17,6 +17,14 @@ from .validation import validate_month
 ROLLOVER_MODES = frozenset({"category", "balance"})
 
 
+def posted_expense_amount(transaction: dict, kind: str) -> int:
+    """Net expense activity for a transaction already scoped to on-budget accounts."""
+    if kind != "expense" or transaction.get("pending") or transaction.get("deleted") or transaction.get("isTransfer"):
+        return 0
+    amount = transaction["amount"]
+    return amount if transaction.get("categoryId") is not None else max(0, amount)
+
+
 def rollover_mode(state: dict, month: str, currency: str) -> str:
     """A source month's rule controls the boundary into its following month."""
     return state.get("rolloverModes", {}).get(month, {}).get(currency, "category")
@@ -164,8 +172,7 @@ def _currency_history(state: dict) -> dict:
         if amount < 0 and category is None and state["accounts"][row["accountId"]].get("type") != "credit":
             income[source] -= amount
             unclassified_income[source] -= amount
-        if amount > 0 or category is not None:
-            spent[source] += amount
+        spent[source] += posted_expense_amount(row, kind)
     return {"transactions": transactions, "posted": posted, "spending": spending,
             "income": income, "spent": spent, "classifiedIncome": classified_income,
             "unclassifiedIncome": unclassified_income, "openingFunding": opening_funding,

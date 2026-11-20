@@ -7,7 +7,7 @@ import signal
 import subprocess
 import sys
 import time
-from dataclasses import asdict, replace
+from dataclasses import replace
 from importlib import metadata
 from types import SimpleNamespace
 
@@ -119,9 +119,7 @@ def test_decoder_rejects_malformed_headers_lengths_json_and_duplicate_fields(raw
 
 
 def test_snapshot_boundary_rejects_floats_booleans_unknown_fields_and_raw_objects(worker_snapshot):
-    valid = asdict(worker_snapshot)
-    for name in ("accounts", "categories", "transactions"):
-        valid[name] = [dict(row) for row in valid[name]]
+    valid = report_worker._snapshot_data(worker_snapshot)
     for value in (1.25, True, "125"):
         malformed = json.loads(json.dumps(valid))
         malformed["transactions"][0]["amount_cents"] = value
@@ -291,7 +289,8 @@ def test_real_example_worker_roundtrip_matches_public_results_and_closes(worker_
                                   'hello:{"insights":false,"export":false}', 'hello:{"insights":"true"}',
                                   'hello:{"unknown":true}', 'hello:{"host":""}',
                                   'hello:{"live":1}', 'hello:{"live":"true"}',
-                                  'hello:{"capabilities":[]}', 'hello:{"capabilities":[{"name":"reporting.insights","version":2}]}',
+                                  'hello:{"capabilities":[]}',
+                                  'hello:{"capabilities":[{"name":"reporting.insights","version":3},{"name":"reporting.export","version":1}]}',
                                   'hello:{"capabilities":[{"name":"reporting.insights","version":true}]}',
                                   'hello:{"capabilities":[{"name":"reporting.insights","version":1,"extra":true}]}'])
 def test_startup_rejects_crashes_timeouts_and_incompatible_hello_and_cleans_process(mode, fixture_process):
@@ -573,9 +572,7 @@ def test_worker_loop_accepts_only_report_operations_and_sanitizes_hook_errors(mo
     monkeypatch.setattr(report_worker.metadata, "entry_points", lambda **_: (
         SimpleNamespace(name="fixture", dist=SimpleNamespace(metadata={"Name": "fixture-package"}, version="1.0.0")),
     ))
-    value = asdict(worker_snapshot)
-    for name in ("accounts", "categories", "transactions"):
-        value[name] = list(value[name])
+    value = report_worker._snapshot_data(worker_snapshot)
     request = Frame({"id": "request", "operation": "insights", "snapshot": value}).encode()
     target = io.BytesIO()
     serve("fixture", io.BytesIO(request), target)
