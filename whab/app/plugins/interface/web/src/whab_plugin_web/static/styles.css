@@ -841,28 +841,83 @@ strong {
   padding-bottom: 14px;
   flex-wrap: wrap;
 }
-.search-input {
+.transaction-account-title {
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}
+.transaction-toolbar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.transaction-toolbar .transaction-filters {
+  gap: 8px;
+  padding-bottom: 0;
+}
+.transaction-toolbar-actions {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+  margin-left: auto;
+}
+.transaction-toolbar-actions .button {
+  min-height: 39px;
+}
+.transaction-count {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.transaction-search {
+  position: relative;
+  flex: none;
+}
+.transaction-search-toggle {
+  position: relative;
+  width: 39px;
+  min-height: 39px;
+  padding: 0;
+  cursor: pointer;
+  list-style: none;
+}
+.transaction-search-toggle::-webkit-details-marker { display: none; }
+.transaction-search-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.transaction-search-toggle.has-search,
+.transaction-search[open] .transaction-search-toggle {
+  border-color: var(--accent-border);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.transaction-search-form {
+  position: absolute;
+  z-index: 21;
+  top: calc(100% + 5px);
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
+  width: min(375px, calc(100vw - 108px));
+  padding: 8px;
   border: 1px solid var(--control-border);
   border-radius: 7px;
-  background: var(--field);
-  padding-left: 11px;
-  flex: 1;
-  max-width: 340px;
-  min-width: 180px;
-  color: var(--muted);
+  background: var(--surface);
+  box-shadow: 0 6px 18px var(--shadow-toast);
 }
-.search-input input {
-  border: 0;
-  background: none;
-  width: 100%;
+.transaction-search-form input[type='search'] {
+  flex: 1 1 145px;
+  min-width: 0;
   font-size: 11px;
   min-height: 37px;
-}
-.search-input input::placeholder {
-  color: var(--muted);
+  background: var(--field);
 }
 .transaction-filters select {
   font-size: 11px;
@@ -1161,9 +1216,6 @@ strong {
   border-radius: 4px;
   scrollbar-gutter: stable;
 }
-.transaction-filters > form { margin: 0; }
-.transaction-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.transaction-pagination nav { display: flex; align-items: center; gap: 16px; white-space: nowrap; }
 .transactions-scroll:focus-visible {
   scrollbar-color: var(--focus) var(--surface);
 }
@@ -2859,9 +2911,6 @@ strong {
     flex-direction: column;
     gap: 7px;
   }
-  .transaction-filters .search-input {
-    max-width: none;
-  }
 }
 @media (max-width: 760px) {
   .sidebar {
@@ -3027,10 +3076,6 @@ strong {
   .filter-button {
     font-size: 9px;
     padding: 10px;
-  }
-  .transaction-filters > .search-input {
-    min-width: 100%;
-    max-width: 100%;
   }
   .connection-notice {
     padding: 15px;
@@ -3414,6 +3459,34 @@ strong {
 .page-content:has(.budget-planner) {
   padding: 0 14px 20px;
 }
+/* Size the register against its actual controls and notices. */
+.app-shell > main:has([data-transaction-register]) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+main:has([data-transaction-register]) > .topbar,
+main:has([data-transaction-register]) > .demo-ribbon {
+  flex-shrink: 0;
+}
+.page-content:has(> [data-transaction-register]),
+[data-transaction-register] {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.page-content:has(> [data-transaction-register]) { padding-bottom: 12px; }
+[data-transaction-register] > :not(.transactions-scroll) { flex-shrink: 0; }
+[data-transaction-register] > .transactions-scroll {
+  flex: 1;
+  min-height: 160px;
+  max-height: none;
+}
+[data-transaction-register] > .transactions-scroll:has(+ .empty-state) {
+  flex: 0 0 auto;
+  min-height: 0;
+}
 /* Reserve the footer's actual height instead of estimating the table viewport. */
 .app-shell > main:has(.budget-planner) {
   height: 100dvh;
@@ -3445,8 +3518,7 @@ main:has(.budget-planner) > .demo-ribbon,
 }
 .modal-form label > input,
 .modal-form label > select,
-.money-input,
-.search-input {
+.money-input {
   background-color: var(--field);
 }
 .toast {
@@ -4742,19 +4814,84 @@ main:has(.budget-planner) > .demo-ribbon,
 .transactions-table.is-resizing-columns * { cursor: col-resize !important; user-select: none; }
 .transaction-period-navigation { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .transaction-period-navigation > .icon-button { flex-shrink: 0; width: 30px; height: 37px; }
+@media (min-width: 1000px) {
+  .transaction-toolbar,
+  .transaction-toolbar .transaction-filters { flex-wrap: nowrap; }
+  .transaction-toolbar .transaction-filters { min-width: 0; }
+  .transaction-toolbar .transaction-review-filter { flex: none; }
+}
+@media (min-width: 701px) and (max-width: 1180px) {
+  .transaction-toolbar { gap: 8px; }
+  .transaction-toolbar .transaction-account-filter { width: 158px; }
+  .transaction-toolbar .transaction-period-filter { width: 154px; }
+  .transaction-toolbar .account-picker-toggle { gap: 7px; padding-inline: 9px; }
+  .transaction-toolbar .account-picker-value { gap: 6px; }
+  .transaction-toolbar .transaction-period-navigation { gap: 2px; }
+  .transaction-toolbar .transaction-period-navigation > .icon-button { width: 24px; }
+  .transaction-toolbar-actions .button { padding-inline: 10px; }
+}
+@media (max-width: 1180px) {
+  .transaction-toolbar-actions [data-edit-account] > span { display: none; }
+}
 @media (max-width: 700px) {
   .transaction-period-navigation { flex: 1 1 100%; }
   .transaction-period-navigation .transaction-period-filter { flex: 1; width: auto; }
+  .transaction-toolbar .transaction-filters {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    width: 100%;
+  }
+  .transaction-toolbar .transaction-account-filter {
+    grid-column: 2 / -1;
+    width: 100%;
+    max-width: none;
+  }
+  .transaction-toolbar .account-picker-popup {
+    right: 0;
+    left: auto;
+    width: min(320px, calc(100vw - 108px));
+  }
+  .transaction-toolbar .transaction-period-navigation {
+    position: relative;
+    grid-column: 1 / 3;
+  }
+  .transaction-toolbar .transaction-period-filter { position: static; }
+  .transaction-toolbar .transaction-period-popup {
+    right: auto;
+    left: 0;
+    min-width: 0;
+    width: min(320px, calc(100vw - 108px));
+  }
 }
 
-/* Transfer suggestions remain a review surface, separate from the register. */
-.transfer-matches {margin: 0 0 18px; padding: 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface);}
-.transfer-matches h2 {font-size: 16px; margin: 0;}
-.transfer-matches > p, .transfer-match p {font-size: 12px; color: var(--muted);}
-.transfer-match {padding: 14px 0; border-top: 1px solid var(--line);}
-.transfer-match h3 {font-size: 13px; margin: 0 0 8px;}
-.transfer-match-leg {display: grid; gap: 4px; padding: 8px 0; overflow-wrap: anywhere;}
-.transfer-match-leg small {color: var(--muted); font-size: 10px;}
+/* One review workspace for suggested and manually chosen pairs. */
+.transfer-workspace { width: 680px; }
+.transfer-workspace .modal-heading { align-items: center; margin-bottom: 14px; }
+.transfer-workspace .modal-heading h2 { margin: 0; }
+.transfer-modes { display: flex; flex-wrap: wrap; gap: 6px; }
+.transfer-modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.transfer-message, .transfer-help { margin: 14px 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.transfer-candidate { border-top: 1px solid var(--line); padding: 14px 0; }
+.transfer-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.transfer-leg { min-width: 0; display: grid; align-content: start; gap: 5px; overflow-wrap: anywhere; }
+.transfer-leg + .transfer-leg { border-inline-start: 1px solid var(--line); padding-inline-start: 18px; }
+.transfer-leg-heading, .transfer-leg-money { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px 8px; }
+.transfer-leg-heading strong, .transfer-leg-money strong { font-size: 14px; }
+.transfer-leg-direction { color: var(--muted); font-size: 11px; font-weight: 600; }
+.transfer-leg-detail { display: flex; flex-wrap: wrap; gap: 3px 9px; color: var(--muted); font-size: 12px; }
+.transfer-leg-money { font-variant-numeric: tabular-nums; }
+.transfer-leg-money small, .transfer-leg-review { color: var(--muted); font-size: 11px; }
+.transfer-leg-memo { margin: 3px 0 0; white-space: pre-wrap; color: var(--muted); font-size: 12px; }
+.transfer-candidate-actions, .transfer-confirm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.transfer-candidate-actions { margin-top: 10px; justify-content: space-between; }
+.transfer-candidate-actions p { margin: 0; color: var(--muted); font-size: 11px; }
+.transfer-review-title { margin: 8px 0 14px; font-size: 16px; }
+.transfer-confirm-actions { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); justify-content: flex-end; }
+@media (max-width: 520px) {
+  .transfer-workspace { padding: 18px; }
+  .transfer-pair { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .transfer-leg + .transfer-leg { border-inline-start: 0; border-top: 1px solid var(--line); padding-inline-start: 0; padding-top: 10px; }
+}
 
 /* User-controlled sidebar; the compact state retains named navigation icons. */
 .sidebar-header {
@@ -4798,8 +4935,6 @@ html[data-sidebar='collapsed'] .sidebar-bottom { width: 100%; padding-top: 20px;
 html[data-sidebar='collapsed'] .local-status { width: 46px; margin: 0; padding-top: 12px; border-top: 1px solid var(--line); }
 html[data-sidebar='collapsed'] .settings-trigger { width: 46px; min-height: 44px; padding: 0; margin-left: 0; justify-content: center; }
 html[data-sidebar='collapsed'] .app-shell > main { margin-left: 62px; }
-.transaction-toolbar { justify-content: flex-end; margin-bottom: 16px; }
-.transaction-toolbar:has(h1:not(.sr-only)) { justify-content: space-between; }
 @media (max-width: 760px) {
   .sidebar-header { flex-direction: column; margin: 0 0 18px; gap: 8px; }
   html[data-sidebar='expanded'] .sidebar { width: 208px; align-items: stretch; padding: 20px 12px 0; box-shadow: 8px 0 24px #0003; }
@@ -4818,7 +4953,6 @@ html[data-sidebar='collapsed'] .app-shell > main { margin-left: 62px; }
   html[data-sidebar='expanded'] .sidebar-account > span > span,
   html[data-sidebar='expanded'] .sidebar-account small { display: inline; }
 }
-.transaction-toolbar:has(> h1.sr-only) > .button-group { max-width: none; }
 .topbar:not(:has(.topbar-right)) .breadcrumb { max-width: 100%; }
 
 /* The complete sortable header is the link; resize grips remain independent. */
@@ -4845,7 +4979,7 @@ html[data-sidebar='collapsed'] .app-shell > main { margin-left: 62px; }
 }
 
 /* Sidebar ordering is an optional browser-only layout mode. */
-.sidebar-account-heading-actions { display: inline-flex; align-items: center; gap: 6px; }
+.account-add-actions { flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
 .sidebar-accounts .nav-label [data-account-reorder] { width: 25px; height: 25px; border-radius: 4px; font-size: 19px; line-height: 1; }
 .sidebar-accounts .nav-label [data-account-reorder]:hover,
 .sidebar-accounts .nav-label [data-account-reorder][aria-expanded='true'] { background: var(--surface); color: var(--ink); }

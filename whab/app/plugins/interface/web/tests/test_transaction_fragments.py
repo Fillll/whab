@@ -227,7 +227,7 @@ def test_all_period_exposes_full_history_with_account_search_and_review_scope(cl
     assert 'data-period-label>All</span>' in response.text
     assert all(f'data-transaction-id="{identifier}"' in response.text for identifier in identifiers)
     assert f'data-transaction-id="{excluded}"' not in response.text
-    assert '3 transactions · All dates' in response.text
+    assert 'id="transaction-count" class="transaction-count" role="status">3 transactions</span>' in response.text
     store.edit_transaction('personal', identifiers[0], reviewed=True)
     reviewed = client.get(path, headers=headers)
     assert f'data-transaction-id="{identifiers[0]}"' not in reviewed.text

@@ -8,7 +8,14 @@
     <p>Budget with everyday accounts and track your other assets and debts.</p>
     <p class="settings-notice">Closed accounts are archives: no new manual entries or bank updates. Closing does not zero or verify balances, settle debt, or change budget scope and historical reporting. Reopening permits entries and resumes configured bank history on the next sync.</p>
   </div>
-  <button class="button primary" data-dialog="account-dialog">{{ icon('plus', 16) }}Add manual account</button>
+  <div class="button-group account-add-actions">
+    {% set bank_ids = bank_panels|default([])|map(attribute='id')|list %}
+    {% set manager = plugin_management|default({'plugins': []}) %}
+    {% for provider in manager.plugins|rejectattr('installed', 'equalto', false)|rejectattr('category', 'equalto', 'example')|rejectattr('id', 'equalto', 'example') if provider.id in bank_ids %}
+    <button type="button" class="button secondary" data-dialog="plugin-options-{{ provider.id }}">Connect bank{% if bank_ids|length > 1 %} · {{ provider.display_name }}{% endif %}</button>
+    {% endfor %}
+    <button type="button" class="button primary" data-dialog="account-dialog">{{ icon('plus', 16) }}Add manual account</button>
+  </div>
 </div>
 {% if all_accounts %}
   <div data-account-totals>
@@ -67,7 +74,7 @@
   <div class="empty-state">
     <span>{{ icon('accounts', 28) }}</span>
     <h2>Start with one account</h2>
-    <p>{% if bank_panels %}Connect an account in its bank plugin’s settings, or add a manual account.{% else %}Add a manual account to start planning your budget.{% endif %}</p>
+    <p>{% if bank_panels %}Connect a bank or add a manual account to start planning your budget.{% else %}Add a manual account to start planning your budget.{% endif %}</p>
   </div>
 {% endif %}
 {% if workspace=="demo" %}

@@ -270,6 +270,13 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
         pendingCancel = null;
         return true;
       }
+      // A search result replaces the section. Keep an open popover and the search
+      // caret, or respect Escape/outside dismissal while the response was pending.
+      const searchPicker = focus === '#transaction-search' ? current.querySelector('[data-transaction-search-picker]') : null;
+      const searchTrigger = searchPicker?.querySelector('summary');
+      const searchOpen = searchPicker?.open;
+      const active = document.activeElement;
+      const caret = searchOpen && active?.id === 'transaction-search' ? [active.selectionStart, active.selectionEnd] : null;
       current.replaceWith(fresh);
       if (accountList) accountList.replaceChildren(accountTemplate.content.cloneNode(true));
       if (generic) syncFormOptions(options, context);
@@ -283,10 +290,18 @@ export function initAccountNavigation({onReplace = () => {}, beforeReplace = () 
         sidebar.scrollTop = position.top;
         sidebar.scrollLeft = position.left;
       }
-      const focusTarget = focus === 'heading' ? fresh.querySelector('h1') : focus && fresh.querySelector(focus);
+      let focusTarget = focus === 'heading' ? fresh.querySelector('h1') : focus && fresh.querySelector(focus);
+      if (searchPicker) {
+        const freshSearch = fresh.querySelector('[data-transaction-search-picker]');
+        if (freshSearch) {
+          freshSearch.open = searchOpen;
+          if (!searchOpen) focusTarget = active === searchTrigger ? freshSearch.querySelector('summary') : null;
+        }
+      }
       if (focusTarget) {
         if (focus === 'heading') focusTarget.setAttribute('tabindex', '-1');
         focusTarget.focus({preventScroll: true});
+        if (caret) focusTarget.setSelectionRange(...caret);
       }
       if (!refresh && getContext().pageFragments === true && (generic || action === 'none')) {
         const position = action === 'none' ? scrollPositions.get(canonical.href) : null;

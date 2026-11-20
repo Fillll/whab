@@ -59,7 +59,7 @@ function harness(count = 5, options = {}) {
   };
   const rowList = Array.from({length: count}, (_, index) => makeRow(index));
   const body = {querySelector: () => rowList[0], append(row) {rowList.push(row);}, insertBefore(row, anchor) {rowList.splice(rowList.indexOf(anchor), 0, row);}};
-  let streamCallbacks;
+  let streamCallbacks, transferRows, beforeTransfers;
   const bulk = element({dataset: {bulkReviewed: 'true'}}), clear = element(), selectionCount = element();
   const selectionBar = element({querySelector: selector => selector === '[data-clear-selection]' ? clear : selectionCount,
     querySelectorAll: () => [bulk]});
@@ -102,7 +102,11 @@ function harness(count = 5, options = {}) {
     encodeURIComponent, location: {href: options.href || 'https://localhost:5173/budgets/home/transactions/2026-10/usd', assign() {throw new Error('Unexpected full navigation.');}, reload() {reloads.push(true);}},
     notify() {}, apiUrl: value => value, pageUrl: value => value,
     initTransactionColumns() {return {dispose() {}};},
-    initTransferMatches() {return {dirty:false, flush:async () => true, dispose() {}};},
+    initTransferMatches({selectedRows, before}) {
+      transferRows = selectedRows;
+      beforeTransfers = before;
+      return {dirty:false, flush:async () => true, dispose() {}};
+    },
     updateContext: value => contexts.push(value),
     initAccountPicker(_, onChoose) {
       pickerChoose = onChoose;
@@ -150,7 +154,7 @@ function harness(count = 5, options = {}) {
     navigations.push({url: JSON.parse(JSON.stringify(url)), details: JSON.parse(JSON.stringify(details))});
     return true;
   }, ...options});
-  return {register, root, requests, receiptRequests, makeRow, stream: streamCallbacks, imageRequests, receiptControls, objectUrls, revokedUrls,
+  return {register, root, requests, receiptRequests, makeRow, stream: streamCallbacks, transferRows, beforeTransfers, imageRequests, receiptControls, objectUrls, revokedUrls,
     rows: rowList, mutations, controlLinks, bulk, clear, selectionCount, selectionBar, window, feedback, feedbackText, controls, navigations, reloads,
     chooseAccount: value => pickerChoose(value), isPickerDisposed: () => pickerDisposed,
     choosePeriod: value => periodChoose(value), isPeriodDisposed: () => periodDisposed, reviewLabel, contexts, history, searchForm, pageLink, document: context.document, receiptDialog};
@@ -1288,5 +1292,33 @@ test('explicit Expense and Opening Balance classification overrides an imported 
     assert.equal(row.dataset.reviewClassified, 'true');
     assert.equal(review.disabled, false);
   }
+  state.register.dispose();
+});
+
+test('manual transfer lookup ignores a provisional category still displayed in the register', () => {
+  const state = harness(1);
+  const row = state.rows[0];
+  const category = row.controls['[data-transaction-field="categoryId"]'];
+  category.value = 'fictional-groceries';
+  category.selectedOptions = [{dataset: {categoryKind: 'expense'}}];
+  row.dataset.suggestionId = 'fictional-category-suggestion';
+  assert.equal(state.transferRows()[0].categoryId, null);
+  delete row.dataset.suggestionId;
+  assert.equal(state.transferRows()[0].categoryId, 'fictional-groceries');
+  assert.equal(state.requests.length, 0);
+  state.register.dispose();
+});
+
+test('opening Transfers cancels an in-flight search debounce and leaves register paging ready', async () => {
+  const state = harness(1, {paged: true, stream: true, search: 'saved filter'});
+  const search = state.controls['#transaction-search'];
+  search.value = 'unapplied filter';
+  search.emit('input');
+  assert.equal(state.stream.ready(), false);
+  assert.equal(await state.beforeTransfers(), true);
+  assert.equal(search.value, 'saved filter');
+  assert.equal(state.stream.ready(), true);
+  await new Promise(resolve => setTimeout(resolve, 330));
+  assert.deepEqual(state.navigations, []);
   state.register.dispose();
 });

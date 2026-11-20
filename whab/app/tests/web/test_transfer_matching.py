@@ -16,10 +16,11 @@ def test_web_proposal_preview_confirm_unmatch_and_stale_guards(store, tmp_path, 
     from whab_plugin_sqlite import Store
 
     seed = Store(':memory:', _authority=False) if zero_pair else store
-    ids = []
-    for name, amount in [('旅行 🍏', 100), ('Сбережения', -100)]:
+    ids, accounts = [], []
+    for name, amount, date in [('旅行 🍏', 100, '2026-11-01'), ('Сбережения', -100, '2026-10-31')]:
         account = seed.add_account('personal', {'name': name, 'type': 'depository', 'balance': 10000})
-        ids.append(seed.add_transaction('personal', {'accountId': account, 'date': '2026-11-01', 'merchant': 'Fictional', 'amount': amount, 'categoryId': None}))
+        accounts.append(account)
+        ids.append(seed.add_transaction('personal', {'accountId': account, 'date': date, 'merchant': 'Fictional', 'amount': amount, 'categoryId': None}))
     transfer = seed.add_category('personal', {'name': 'Fictional transfer', 'group': 'Technical', 'kind': 'transfer'})
     expense = seed.add_category('personal', {'name': 'Fictional expense', 'group': 'Everyday'})
     if zero_pair:
@@ -34,20 +35,34 @@ def test_web_proposal_preview_confirm_unmatch_and_stale_guards(store, tmp_path, 
     app = create_app(store=store, settings=settings)
     with TestClient(app, base_url='https://127.0.0.1:5173') as client:
         before = deepcopy(store.export_budget())
-        body = {'workspace': 'personal', 'operation': 'transfer_candidates', 'parameters': {}}
+        body = {'workspace': 'personal', 'operation': 'transfer_candidates', 'parameters': {
+            'accountIds': [accounts[0]], 'currency': 'USD', 'since': '2026-11-01', 'until': '2026-11-01',
+        }}
         proposals = client.post('/api/transfers/query', json=body).json()
         assert proposals['data']['total'] == (0 if zero_pair else 1)
+        if not zero_pair:
+            pair = proposals['data']['candidates'][0]
+            assert pair['transactionIds'] == ids
+            assert pair['transactions'][1]['date'] == '2026-10-31'
+            assert pair['transactions'][1]['accountId'] == accounts[1]
         preview = client.post('/api/transfers/query', json={**body, 'operation': 'preview_transfer_match', 'parameters': {'transactionIds': ids, 'action': 'match'}}).json()
         assert store.export_budget() == before
         payload = {'workspace': 'personal', 'transactionIds': ids, 'action': 'match', 'fingerprint': preview['data']['fingerprint'], 'revision': preview['revision'], 'requestId': 'fictional-browser'}
         saved = client.post('/api/transfers/apply', json=payload)
         assert saved.status_code == 200 and saved.json()['data']['count'] == 2
+        result = saved.json()['data']
+        assert result['action'] == 'match' and result['fingerprint'] == payload['fingerprint']
+        for index, change in enumerate(result['changes']):
+            assert change['id'] == change['after']['id'] == ids[index]
+            assert change['after']['isTransfer'] and not change['after']['reviewed']
+            assert change['after']['transferPeerId'] == ids[1-index]
         assert client.post('/api/transfers/apply', json=payload).json() == saved.json()
         stale = client.post('/api/transfers/apply', json={**payload, 'requestId': 'stale-new'})
         assert stale.status_code == 409 and stale.json()['code'] == 'transfer_revision_conflict'
         assert all(row.get('transferPeerId') and not row['reviewed'] for row in store.transactions('personal'))
         page = client.get('/budgets/home/transactions/2026-11').text
-        assert 'Suggest transfers' in page and 'data-transfer-panel' in page and 'data-transfer-unmatch' in page
+        assert 'data-transfer-find' in page and 'data-transfer-panel' in page and 'data-transfer-unmatch' in page
+        assert 'data-transfer-manual' in page and 'data-transfer-selected' in page
         assert 'Choose a Transfer category, or keep the matched pair without a category' in page
         assert 'Transfer (matched)' in page and 'data-transfer-pair-valid="true"' in page
         assert not re.search(r'data-transaction-field="categoryId"[^>]* disabled', page)

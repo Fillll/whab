@@ -34,6 +34,11 @@ and is not scoped to a month. Existing month/currency-suffixed bookmarks still
 open, then adopt the short canonical address. The saved budget currency and
 current month remain available as context for links to date-scoped views.
 
+Start account additions here. **Add manual account** opens manual entry, and
+**Connect bank** opens the active provider's existing connection flow. If more
+than one provider is available, each button names its provider. The sidebar
+heading offers account ordering.
+
 Closed accounts are read-only archives and cannot be shown in the sidebar. Their
 disabled controls do not count as unfinished saves or block leaving Accounts.
 Actual in-flight writes and unsaved account edits keep the existing save guards;
@@ -234,7 +239,7 @@ current household calendar on each load. At the supported calendar limits the
 unavailable arrow is disabled. Category editors and their native choices display
 **Group > Category** to disambiguate duplicate names, including newly created rows.
 
-Large transaction selections initially render at most 100 editable rows and automatically append further batches as the table scrolls. The table has no page controls; each request remains bounded to 100 rows. Payee and memo search and the review filter apply across the entire selected account/date range before rows are loaded. Loading preserves those filters and mounted editors; pending edits finish before the view changes. The `q` parameter retains search in bookmarks, and earlier `tx_page` bookmarks retain their position; search also works as a normal GET form without JavaScript. Export still contains the complete selected currency. All web module dependencies use the plugin version to load matching scripts after an update. For isolated rendering measurements with fictional data, run `.venv/bin/python scripts/benchmark_register.py --all-accounts` from the application directory; the script also accepts `--page accounts` and `--page budget`. It measures server rendering and markup size, excluding browser layout and network time.
+Large transaction selections initially render at most 100 editable rows and automatically append further batches as the table scrolls. The table has no page controls; each request remains bounded to 100 rows. Payee and memo search and the review filter apply across the entire selected account/date range before rows are loaded. Loading preserves those filters and mounted editors; pending edits finish before the view changes. The leftmost **Search transactions** button opens and focuses the payee and memo search. Search, account, period, review and the matching count sit alongside Transfers and Add transaction on desktop. Escape closes the search and Clear removes the query. The `q` parameter retains search in bookmarks, and earlier `tx_page` bookmarks retain their position. Search also works as a normal GET form without JavaScript. The table uses the remaining viewport height. The existing CSV endpoint remains available to integrations. All web module dependencies use the plugin version to load matching scripts after an update. For isolated rendering measurements with fictional data, run `.venv/bin/python scripts/benchmark_register.py --all-accounts` from the application directory; the script also accepts `--page accounts` and `--page budget`. It measures server rendering and markup size, excluding browser layout and network time.
 
 Successful ordinary row edits request only a small server-rendered sidebar summary when needed, keeping the current rows, editors, selection and displayed order in place even under search, review or sort filters. A row that no longer matches stays visible until an explicit refresh or filter/sort/page navigation. The updated R state remains visible and can be toggled again. Summary responses validate the addressed budget, currency, account/date filters and requested page before changing the count; canceled or superseded responses cannot replace a newer view. Use `--summary` in the benchmark to compare response size. `--profile-memory` separately measures Python request allocation peaks; it excludes SQLite/native memory and the browser.
 
@@ -473,7 +478,7 @@ Click a field to edit it immediately. Up/Down move within a text column; Left/Ri
 
 ### Continuous register loading
 
-The scroll container loads the next batch near its bottom and retains every mounted row, field draft, selection and keyboard position. Newly loaded rows have the same editing, suggestions, review and receipt controls. A failed load offers Retry without discarding existing rows. Account/date/search/review changes cancel old requests; late responses cannot append to the new view. Saved local edits update the loader's revision, and ordering/membership edits restart its scan with ID de-duplication. Before local edits, an unrelated ledger revision refreshes the view instead of combining snapshots. After local edits, it pauses further loading and asks for an explicit refresh, preserving held rows and selections. Earlier `tx_page` bookmarks also load preceding batches when scrolled to the top. Back/Forward reloads the necessary batches before restoring the table’s scroll position, without caching financial HTML. The footer reports the total and loaded rows; Export includes the complete selection.
+The scroll container loads the next batch near its bottom and retains every mounted row, field draft, selection and keyboard position. Newly loaded rows have the same editing, suggestions, review and receipt controls. A failed load offers Retry without discarding existing rows. Account/date/search/review changes cancel old requests; late responses cannot append to the new view. Saved local edits update the loader's revision, and ordering/membership edits restart its scan with ID de-duplication. Before local edits, an unrelated ledger revision refreshes the view instead of combining snapshots. After local edits, it pauses further loading and asks for an explicit refresh, preserving held rows and selections. Earlier `tx_page` bookmarks also load preceding batches when scrolled to the top. Back/Forward reloads the necessary batches before restoring the table’s scroll position, without caching financial HTML. The toolbar reports how many transactions match the filters. Loading progress remains available to assistive technology.
 
 ## Subscriptions and shared AI connections
 
@@ -517,10 +522,22 @@ changes and retained across reopen and exports. Earlier changes are not backfill
 
 ## Reviewed transfer matching
 
-**Suggest transfers** remains a read-only proposal panel. Explicit pair confirmation
-uses the core's reciprocal two-leg rules and leaves both transactions unreviewed.
-Automatic proposals exclude zero-value entries. The CLI can explicitly pair two
-already-existing posted zero entries without creating records or inferring direction.
+Open **Transfers** in the register toolbar to see **Suggestions** and **Match existing**.
+Suggestions show accounts, payees, dates, opposite amounts and bank hints. When
+an entry has multiple possible counterparts, each pair stays available for inspection.
+Suggestions use the current account and date scope and may include a counterpart
+outside the visible register. Choose **Review pair** to compare exact amounts and memos.
+
+To match manually, select two known entries in the register and choose **Match transfer**.
+Select one entry and choose **Find transfer match** to look for compatible counterparts
+across accounts without changing the current filters. Two explicitly selected posted zero
+entries can be paired. If an entry is missing, use **Add transaction** to record it, then
+select both entries. Recording an entry is a separate save from matching a pair.
+
+**Confirm transfer** links the exact entries in one guarded save and leaves both
+transactions unreviewed. Use the register's **R** control to review each entry. The
+link beside a matched payee opens an explicit unmatch preview. If the save response
+is uncertain, the dialog retains the original confirmation for exact retry.
 Valid pairs can involve historical closed accounts or different current budget
 scopes. Review availability uses the authority's complete pair verification even
 when the counterpart is outside the visible page/date filter. Imported hints and

@@ -35,12 +35,23 @@ function badge(text) {
   return {...element(), textContent: text, cloneNode() {return badge(this.textContent);}};
 }
 
-function harness({flush = async () => true, beforeReplace = () => true, initialContext = {}, href = first} = {}) {
+function harness({flush = async () => true, beforeReplace = () => true, initialContext = {}, href = first, searchPopover = false} = {}) {
   const requests = [], replacements = [], histories = [], fallbacks = [], notices = [];
   const listeners = {};
   const navigationLinks = [];
   let nextBadge, nextAccountList = true;
   let content = element();
+  function addSearchPopover(node) {
+    const query = node.querySelector;
+    const trigger = element();
+    const search = {...element(), id: 'transaction-search',
+      setSelectionRange(start, end) {this.selectionStart = start; this.selectionEnd = end;}};
+    const picker = {...element(), open: false, querySelector: name => name === 'summary' ? trigger : null};
+    node.querySelector = name => name === '#transaction-search' ? search :
+      name === '[data-transaction-search-picker]' ? picker : query(name);
+    return {picker, trigger, search};
+  }
+  const oldSearch = searchPopover ? addSearchPopover(content) : null;
   const accountList = element();
   const accountListReplacements = [];
   accountList.replaceChildren = content => accountListReplacements.push(content);
@@ -76,6 +87,7 @@ function harness({flush = async () => true, beforeReplace = () => true, initialC
         const countTemplate = nextBadge === undefined ? null : {content: {querySelector: () => nextBadge === null ? null : badge(nextBadge)}};
         fresh.querySelector = selector => selector === 'h1' ? heading : selector === 'template[data-transaction-navigation-count]' ? countTemplate : null;
         fresh.heading = heading;
+        if (searchPopover) fresh.search = addSearchPopover(fresh);
         return {querySelector: selector => ['.page-content[data-transactions-fragment]', '[data-transactions-summary]'].includes(selector) ? fresh :
           selector === 'template[data-account-list]' && nextAccountList ? {content: {cloneNode: () => ({refreshedAccountList: true})}} : null};
       }
@@ -102,8 +114,37 @@ function harness({flush = async () => true, beforeReplace = () => true, initialC
         canonicalUrl: target.href, monthToken: parts.month, currency: parts.currency.toUpperCase(), ...override})});
   }
   return {navigator, requests, replacements, histories, fallbacks, notices, sidebar, status, context,
-    location, listeners, respond, accountListReplacements, content: () => content, navigationLinks};
+    location, listeners, respond, accountListReplacements, content: () => content, navigationLinks, oldSearch};
 }
+
+test('search results restore the popover and caret, respecting dismissal while loading', async () => {
+  for (const dismiss of [false, true]) {
+    const state = harness({searchPopover: true});
+    const {picker, trigger, search} = state.oldSearch;
+    picker.open = true;
+    search.setSelectionRange(2, 4);
+    state.context.document.activeElement = search;
+    const pending = state.navigator.navigate(first + '&q=older', {focus: '#transaction-search'});
+    await tick();
+    if (dismiss) {
+      picker.open = false;
+      state.context.document.activeElement = trigger;
+    }
+    state.respond(0, {override: {transactionSearch: 'older'}});
+    assert.equal(await pending, true);
+    const current = state.content().search;
+    assert.equal(current.picker.open, !dismiss);
+    if (dismiss) {
+      assert.equal(current.trigger.focused, true);
+      assert.equal(current.search.focused, undefined);
+    } else {
+      assert.equal(current.search.focused, true);
+      assert.equal(current.search.selectionStart, 2);
+      assert.equal(current.search.selectionEnd, 4);
+    }
+    assert.equal(state.fallbacks.length, 0);
+  }
+});
 
 test('ordinary account, search and page navigation omits the unused sidebar fragment', async () => {
   const state = harness();
