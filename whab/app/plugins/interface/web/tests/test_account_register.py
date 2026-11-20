@@ -43,12 +43,12 @@ def test_sidebar_accounts_open_all_dates_and_keep_account_management_separate(cl
     assert re.search(r'<h1\b[^>]*>First wallet</h1>', register)
     assert f'<option value="{first}" selected>First wallet</option>' in register
     assert 'id="transaction-period-toggle"' in register and 'data-period-label>All</span>' in register
-    assert '2 transactions · All dates' in register
+    assert 'id="transaction-count" class="transaction-count" role="status">2 transactions</span>' in register
     assert re.search(r'<a class="sidebar-account"[^>]*href="[^"]*/first-wallet/transactions/current-month\?all_dates=true"[^>]*aria-current="page"', register)
     monthly = client.get(f"/budgets/home/transactions/2026-10/usd?account={first}").text
     assert len(register_rows(monthly)) == 1
     assert "Earlier first purchase" not in monthly
-    assert '1 transaction · October 2026' in monthly
+    assert 'id="transaction-count" class="transaction-count" role="status">1 transaction</span>' in monthly
     off_budget = client.get(unescape(account_links[1])).text
     assert "Other account purchase" in off_budget
     assert re.search(r'<h1\b[^>]*>Second wallet</h1>', off_budget)
@@ -127,7 +127,7 @@ def test_large_register_searches_unrendered_transactions_and_preserves_page_filt
     path = f"/budgets/home/transactions/2026-10/usd?account={account}&all_dates=true"
     first = client.get(path).text
     assert len(register_rows(first)) == 100
-    assert "205 transactions · All dates" in first
+    assert 'id="transaction-count" class="transaction-count" role="status">205 transactions</span>' in first
     assert 'aria-label="Transaction pages"' not in first and "Page 1 of 3" not in first
     assert 'data-stream-next="' in first and 'data-stream-revision="' in first
     assert "100 loaded" in first
@@ -153,13 +153,14 @@ def test_large_register_searches_unrendered_transactions_and_preserves_page_filt
     offscreen = re.search(r'data-merchant="(Purchase \d+)"', register_rows(last)[0])[1]
     searched = client.get(path + "&q=" + offscreen.replace(" ", "+") + "&tx_page=3").text
     assert len(register_rows(searched)) == 1 and offscreen in register_rows(searched)[0]
-    assert "1 matching transaction of 205" in searched
-    assert f'value="{offscreen}" placeholder="Search all transactions…"' in searched
+    assert "1 of 205 transactions" in searched
+    assert f'id="transaction-search" value="{offscreen}"' in searched
+    assert 'transaction-search-toggle has-search' in searched
     assert 'method="get"' in searched and 'name="all_dates" value="true"' in searched
     assert 'name="tx_page"' not in searched
     missing = client.get(path + "&q=unfindable").text
     assert not register_rows(missing) and "No matching transactions" in missing
-    assert "0 matching transactions of 205" in missing
+    assert "0 of 205 transactions" in missing
 
 
 @pytest.mark.parametrize("headers", [{}, {"X-WHAB-Transactions-Fragment": "1"}])

@@ -36,5 +36,5 @@ def test_register_search_counts_are_complete_without_reading_other_pages(client,
     response = client.get("/budgets/home/transactions/2026-10/usd?q=Example+2&tx_page=999")
     assert response.status_code == 200
     assert response.text.count('class="transaction-row"') == 1
-    assert "1 matching transaction of 3" in response.text
+    assert "1 of 3 transactions" in response.text
     assert '<span class="nav-count">3</span>' in response.text

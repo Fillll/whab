@@ -176,13 +176,28 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
   const grid = initTransactionGrid(root.querySelector('.transactions-table'));
   const columns = initTransactionColumns(root.querySelector('.transactions-table'));
   const transfers = initTransferMatches({root, api, context: () => ({...getContext(), workspace}),
-    before: async () => (!draft || draft.hidden) && await flushRows(),
-    saved: async () => {onMutation(); notify('Transfer change saved. Both transactions still need review.'); await go(new URL(location.href), false, true);},
+    before: async () => {
+      const ready = await flush();
+      if (!ready) notify('Save or cancel the current transaction edit before opening Transfers.');
+      else if (!disposed && (searchTimer || filterNavigationPending || pendingDestination() || search.value !== displayedSearch)) editStarted();
+      return ready;
+    },
+    selectedRows: () => rows.filter(row => row.querySelector('[data-select-transaction]').checked).map(row => {
+      const category = row.querySelector('[data-transaction-field="categoryId"]');
+      return {id: row.dataset.transactionId, accountId: row.dataset.account, date: row.dataset.transactionDate,
+        currency: row.dataset.privateCurrency, amount: Number(row.dataset.amount), pending: row.dataset.pending === 'true',
+        matched: Boolean(row.querySelector('[data-transfer-unmatch]')),
+        categoryId: row.dataset.suggestionId ? null : category.value,
+        categoryKind: category.selectedOptions?.[0]?.dataset.categoryKind};
+    }),
+    saved: async () => {onMutation(); notify('Transfer change saved. Both transactions still need review.'); await go(new URL(location.href), '[data-transfer-find]', true);},
   });
   const createForm = root.querySelector('[data-transaction-create]');
   const draft = root.querySelector('[data-new-transaction]');
   let creating = false, createRequestId = null;
   const search = root.querySelector('#transaction-search');
+  const searchPicker = root.querySelector('[data-transaction-search-picker]');
+  const clearSearch = searchPicker?.querySelector('[data-transaction-search-clear]');
   const account = root.querySelector('#account-filter');
   const reviewFilter = root.querySelector('#review-filter');
   const count = root.querySelector('#transaction-count');
@@ -278,6 +293,12 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     selectAll.indeterminate = !selectAll.checked && selected.some(row => !row.hidden);
     selectionBar.hidden = !selected.length;
     selectionBar.querySelector('[data-transaction-selection-count]').textContent = `${selected.length} selected`;
+    const match = root.querySelector('[data-transfer-selected]');
+    if (match) {
+      match.hidden = !selected.length || selected.length > 2;
+      match.disabled = bulkBusy || categoriesLocked;
+      match.textContent = selected.length === 1 ? 'Find transfer match' : 'Match transfer';
+    }
     for (const row of rows) row.classList.toggle('is-selected', row.querySelector('[data-select-transaction]').checked);
     for (const button of selectionBar.querySelectorAll('[data-bulk-reviewed]')) {
       button.disabled = bulkBusy || categoriesLocked || !selected.length ||
@@ -295,7 +316,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       if (row.hidden) row.querySelector('[data-select-transaction]').checked = false;
       else visible += 1;
     }
-    count.textContent = `${visible} ${visible === 1 ? 'transaction' : 'transactions'} · ${count.dataset.period}`;
+    count.textContent = `${visible} ${visible === 1 ? 'transaction' : 'transactions'}`;
     selection();
   }
   async function go(url, focus = 'heading', refresh = false, summary = false) {
@@ -331,10 +352,10 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
       if (!disposed && !filterNavigationPending && !pendingDestination() && !timers.size && !searchTimer &&
-          search.value === displayedSearch && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
+          search.value === displayedSearch && !searchPicker?.open && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
           document.activeElement?.matches?.('[data-transaction-field="note"]') !== true &&
           !document.activeElement?.closest?.('td.grid-current') && (!draft || draft.hidden) &&
-          !receiptDialog.open && !receiptBusy && !bulkBusy &&
+          !transfers.open && !receiptDialog.open && !receiptBusy && !bulkBusy &&
           ![...editors.values()].some(writer => writer.dirty)) {
         void go(new URL(location.href), false, true, true);
       }
@@ -348,6 +369,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     searchTimer = null;
     if (paged) {
       search.value = displayedSearch;
+      if (clearSearch) clearSearch.disabled = !displayedSearch;
       if (reviewFilter.dataset.reviewState !== displayedReview) setReviewState(displayedReview);
       pendingFilters = {};
       if (interruptedFilters) accountPicker.restore?.();
@@ -403,6 +425,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
       applyFilters({q: search.value}, '#transaction-search');
     };
     listen(search, 'input', event => {
+      if (clearSearch) clearSearch.disabled = !search.value;
       clearTimeout(searchTimer);
       filterNavigationRevision += 1;
       filterNavigationPending = false;
@@ -411,6 +434,32 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     });
     listen(search, 'compositionend', searchNow);
     listen(searchForm, 'submit', event => { event.preventDefault(); searchNow(); });
+    if (searchPicker) {
+      const trigger = searchPicker.querySelector('summary');
+      clearSearch.hidden = false;
+      clearSearch.disabled = !search.value;
+      listen(clearSearch, 'click', () => {
+        search.value = '';
+        search.focus({preventScroll: true});
+        clearSearch.disabled = true;
+        searchNow();
+      });
+      listen(searchPicker, 'toggle', () => {
+        if (searchPicker.open) search.focus({preventScroll: true});
+        else {
+          if (refreshNeeded) refreshAfterMutation();
+          stream?.check();
+        }
+      });
+      listen(searchPicker, 'keydown', event => {
+        if (event.key !== 'Escape' || event.isComposing || !searchPicker.open) return;
+        event.preventDefault();
+        searchPicker.open = false;
+        trigger.focus({preventScroll: true});
+      });
+      listen(searchPicker, 'focusout', event => { if (!searchPicker.contains(event.relatedTarget)) searchPicker.open = false; });
+      listen(document, 'pointerdown', event => { if (!searchPicker.contains(event.target)) searchPicker.open = false; });
+    }
     for (const link of root.querySelectorAll('[data-transaction-page]')) listen(link, 'click', event => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
@@ -490,6 +539,7 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
         }
         if ('merchant' in patch) row.dataset.merchant = patch.merchant;
         if ('accountId' in patch) row.dataset.account = patch.accountId;
+        if ('date' in patch) row.dataset.transactionDate = patch.date;
         if ('amount' in patch) row.dataset.amount = String(patch.amount);
         if ('categoryId' in patch) row.applyCategory({categoryId:patch.categoryId, isTransfer:transfer, amount:Number(row.dataset.amount)}, category.selectedOptions?.[0]);
         const amountField = detailFields.find(control => control.dataset.transactionDetail === 'amount');
@@ -866,8 +916,8 @@ export function initTransactionRegister({navigate = async () => false, pendingDe
     if (transfers.dirty || categoryBatch.dirty || creating || draft && !draft.hidden || rows.some(row => row.hasDraft()) || bulkBusy || [...editors.values()].some(writer => writer.dirty) || timers.size || receiptBusy) { event.preventDefault(); event.returnValue = ''; }
   }
   stream = initTransactionStream({root, context: {...getContext()},
-    ready: () => !transfers.dirty && !categoryBatch.dirty && !streamPaused && !disposed && !filterNavigationPending && !pendingDestination() && !searchTimer &&
-      search.value === displayedSearch && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
+    ready: () => !transfers.open && !transfers.dirty && !categoryBatch.dirty && !streamPaused && !disposed && !filterNavigationPending && !pendingDestination() && !searchTimer &&
+      search.value === displayedSearch && !searchPicker?.open && accountPopup?.hidden !== false && periodPopup?.hidden !== false &&
       !creating && (!draft || draft.hidden) && !bulkBusy && !receiptBusy && !timers.size &&
       !rows.some(row => row.hasDraft()) && ![...editors.values()].some(writer => writer.dirty),
     changed: () => {

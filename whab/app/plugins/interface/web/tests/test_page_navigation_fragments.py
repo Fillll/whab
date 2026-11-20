@@ -73,7 +73,8 @@ def fragment(client, path, **headers):
     assert len(markup.fragments) == 1
     assert not [tag for tag, _ in markup.tags if tag in {"html", "head", "body", "main", "aside", "script"}]
     assert not [attrs for _, attrs in markup.tags if attrs.get("class") in {"sidebar", "topbar", "app-shell"}]
-    assert not [attrs for tag, attrs in markup.tags if tag == "dialog" and "data-transaction-receipt-dialog" not in attrs]
+    register_dialogs = {"data-transaction-receipt-dialog", "data-transfer-panel"}
+    assert not [attrs for tag, attrs in markup.tags if tag == "dialog" and not register_dialogs.intersection(attrs)]
     assert 'id="whab-context"' not in response.text and "<!DOCTYPE" not in response.text
     for name in ("settings-dialog", "transaction-dialog", "category-dialog", "account-dialog", "account-classification-dialog", "account-currency-choices"):
         assert f'id="{name}"' not in response.text

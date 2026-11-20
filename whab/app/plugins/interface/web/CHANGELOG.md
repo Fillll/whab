@@ -1,5 +1,13 @@
 # Web interface plugin changelog
 
+## 1.66.0 — 2026-11-19
+
+PR: [#219](https://github.com/Fillll/whab/pull/219)
+
+- Put Search, filters, matching count, Transfers and Add transaction in one desktop toolbar. Open search on demand and use the space below the table for more rows. Remove the register's Export button.
+- Compare suggested or manually selected transfer entries in one workspace, with one-entry counterpart lookup across accounts, exact confirmation amounts, and separate transaction review.
+- Start manual and connected account additions from Accounts. Keep account ordering in the sidebar.
+
 ## 1.65.0 — 2026-11-15
 
 PR: [#216](https://github.com/Fillll/whab/pull/216)

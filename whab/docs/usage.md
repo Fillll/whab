@@ -366,6 +366,11 @@ current browser session and offers an explicit retry of the same request.
 
 ## Reviewed transfer matching
 
+In Web Transactions, open **Transfers** for suggested pairs. You can also select
+two known rows and choose **Match transfer**, or select one to **Find transfer match**
+across accounts. Compare both sides and confirm, then review the saved entries in
+the register. If an entry is missing, record it with **Add transaction** before matching.
+
 Use `whab "My budget" trnx transfers` to inspect suggestions. Merchant text and bank
 hints do not prove a transfer. A valid transfer has exactly two reciprocal posted
 legs, equal opposite amounts in different accounts of one currency, and

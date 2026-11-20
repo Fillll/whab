@@ -14,16 +14,20 @@
 {% macro resize_handle(field, label) %}<button type="button" class="transaction-column-resize" data-resize-column="{{ field }}" role="separator" aria-orientation="vertical" aria-label="Resize {{ label }} column" aria-valuemin="100" aria-valuemax="1000" aria-describedby="transaction-resize-help" title="Drag to resize {{ label }} · Double-click to reset"></button>{% endmacro %}
 {% set month_links = transaction_month_links(request, month) %}
 <section data-transaction-register data-private-currency="{{ currency }}" data-workspace="{{ workspace }}" data-transaction-paged="true" data-transaction-page="{{ register.page }}" data-transaction-requested-page="{{ register.requested_page }}" data-stream-next="{{ register.next or '' }}" data-stream-previous="{{ register.previous or '' }}" data-stream-revision="{{ register.revision|default('') }}" data-stream-count="{{ register.count }}">
-<div class="page-title-row transaction-toolbar">
-  <h1 id="transaction-title"{% if not selected_account %} class="sr-only"{% endif %} tabindex="-1">{{ selected_account.name if selected_account else 'Transactions' }}</h1>
-  <div class="button-group">{% if selected_account %}<button class="button secondary" type="button" data-dialog="account-classification-dialog" data-edit-account="{{ selected_account.id }}" aria-label="Account settings for {{ selected_account.name }}">{{ icon('settings', 16) }}Account settings</button>{% endif %}<button class="button secondary" type="button" data-transfer-find>Suggest transfers</button><a class="button secondary" href="{{ api_prefix }}/export?workspace={{ workspace }}&amp;currency={{ currency|lower }}" download>{{ icon('download', 16) }}Export</a><button class="button primary" data-add-transaction {% if selected_account and selected_account.closed|default(false) %}disabled title="Reopen this archived account before adding transactions" {% elif not active_transaction_accounts %}disabled title="{{ 'Add or reopen an account in Accounts first' if transaction_accounts else 'Add an account in Accounts first' }}" {% endif %}>{{ icon('plus', 16) }}Add transaction</button></div>
-</div>
+<h1 id="transaction-title" class="{{ 'transaction-account-title' if selected_account else 'sr-only' }}" tabindex="-1">{{ selected_account.name if selected_account else 'Transactions' }}</h1>
+<div class="transaction-toolbar">
 <div class="transaction-filters">
-  <form method="get" action="{{ request.url.path }}" data-transaction-search-form>
-    {% for key,value in register.search_params %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
-    <label class="search-input">{{ icon('search', 17) }}<input type="search" name="q" aria-label="Search transactions" id="transaction-search" value="{{ register.search }}" placeholder="Search all transactions…" maxlength="2000"></label>
-    <noscript><button class="button secondary" type="submit">Search</button></noscript>
-  </form>
+  <details class="transaction-search" data-transaction-search-picker>
+    <summary class="button secondary transaction-search-toggle{% if register.search %} has-search{% endif %}" aria-label="Search transactions{% if register.search %}, active filter{% endif %}" title="Search transactions{% if register.search %}, active filter{% endif %}">
+      {{ icon('search', 17) }}
+    </summary>
+    <form class="transaction-search-form" method="get" action="{{ request.url.path }}" role="search" data-transaction-search-form>
+      {% for key,value in register.search_params %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+      <input type="search" name="q" aria-label="Search transactions" id="transaction-search" value="{{ register.search }}" placeholder="Search payees and memos…" maxlength="2000" autocomplete="off">
+      <button class="button secondary" type="button" data-transaction-search-clear hidden>Clear</button>
+      <button class="button primary" type="submit">Search</button>
+    </form>
+  </details>
   <div class="transaction-account-filter">
     <select aria-label="Filter by account" id="account-filter" multiple size="1">
       <option value="all"{% if not selected_ids %} selected{% endif %}>All accounts</option>
@@ -74,16 +78,31 @@
   </div>
   <button class="filter-button transaction-review-filter" id="review-filter" type="button" data-review-state="{{ review_state }}" aria-label="Review status: {{ review_labels[review_state] }}. Click for {{ next_review_labels[review_state] }}."><span class="transaction-review-letter" data-review-letter aria-hidden="true">R</span><span data-review-label>{{ review_labels[review_state] }}</span></button>
 </div>
-<section class="transfer-matches" data-transfer-panel hidden tabindex="-1" aria-labelledby="transfer-matches-title">
-  <div class="page-title-row"><h2 id="transfer-matches-title">Review transfer matches</h2><button class="text-link" type="button" data-transfer-close>Close suggestions</button></div>
-  <p>Possible pairs for this date/account selection. Counterparts may be outside the range. Search and review filters do not hide counterparts. Nothing changes until you confirm a pair. Both transactions still need review afterward.</p>
-  <p data-transfer-message role="status" aria-live="polite"></p>
+<span id="transaction-count" class="transaction-count" role="status">{{ '{:,}'.format(register.count) }}{% if register.count != register.total %} of {{ '{:,}'.format(register.total) }}{% endif %} {{ 'transaction' if register.count == register.total == 1 else 'transactions' }}</span>
+<span class="sr-only" data-stream-loaded>{{ register.rows|length }} loaded</span>
+<div class="button-group transaction-toolbar-actions">
+  {% if selected_account %}<button class="button secondary" type="button" data-dialog="account-classification-dialog" data-edit-account="{{ selected_account.id }}" aria-label="Account settings for {{ selected_account.name }}" title="Account settings">{{ icon('settings', 16) }}<span>Account settings</span></button>{% endif %}
+  <button class="button secondary" type="button" data-transfer-find aria-haspopup="dialog">Transfers</button>
+  <button class="button primary" type="button" data-add-transaction {% if selected_account and selected_account.closed|default(false) %}disabled title="Reopen this archived account before adding transactions" {% elif not active_transaction_accounts %}disabled title="{{ 'Add or reopen an account in Accounts first' if transaction_accounts else 'Add an account in Accounts first' }}" {% endif %}>{{ icon('plus', 16) }}Add transaction</button>
+</div>
+</div>
+<dialog class="modal transfer-workspace" data-transfer-panel aria-labelledby="transfer-matches-title">
+  <header class="modal-heading">
+    <h2 id="transfer-matches-title" tabindex="-1">Transfers</h2>
+    <button class="icon-button" type="button" data-transfer-close aria-label="Close transfers">{{ icon('close', 18) }}</button>
+  </header>
+  <div class="transfer-modes" role="group" aria-label="Transfer workflow">
+    <button class="button secondary" type="button" data-transfer-suggestions aria-pressed="true">Suggestions</button>
+    <button class="button secondary" type="button" data-transfer-manual aria-pressed="false">Match existing</button>
+  </div>
+  <p class="transfer-message" data-transfer-message role="status"></p>
   <div data-transfer-list></div>
-  <button class="button secondary" type="button" data-transfer-more hidden>Show more possible pairs</button>
-</section>
+  <button class="button secondary" type="button" data-transfer-more hidden>Show more pairs</button>
+</dialog>
 <div class="transaction-selection-bar" data-transaction-selection-bar hidden>
   <span class="transaction-selection-count" data-transaction-selection-count></span>
   <span class="transaction-selection-help">Category changes on a selected row apply to the selection (up to 100) in one save.</span>
+  <button class="button secondary" type="button" data-transfer-selected aria-haspopup="dialog" hidden>Match transfer</button>
   <button class="button secondary" type="button" data-bulk-reviewed="true">Mark reviewed</button>
   <button class="button secondary" type="button" data-bulk-reviewed="false">Mark unreviewed</button>
   <button class="text-link" type="button" data-clear-selection>Clear selection</button>
@@ -126,7 +145,7 @@
       {% set suggestion = none if transaction.transferPeerId|default(none) else (category_suggestions|default({})).get(transaction.id) %}
       {% set selected_category = transaction.categoryId or (suggestion.categoryId if suggestion else none) %}
       {% set valid_transfer = transaction.transferPairValid|default(false) %}
-      <tr class="transaction-row" data-transaction-id="{{ transaction.id }}" data-private-currency="{{ account.currency|default(currency) if account else currency }}"{% if suggestion %} data-suggestion-id="{{ suggestion.id }}" data-suggestion-plugin="{{ suggestion.pluginId }}"{% endif %} data-merchant="{{ transaction.merchant }}" data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}" data-account="{{ transaction.accountId }}" data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}" data-review-classified="{{ 'true' if review_status[transaction.id].eligible else 'false' }}" data-pending="{{ 'true' if transaction.pending else 'false' }}" data-amount="{{ transaction.amount }}" data-transfer-pair-valid="{{ 'true' if valid_transfer else 'false' }}" data-inferred-transfer="{{ 'true' if transaction.inferredTransfer else 'false' }}" data-transfer="{{ 'true' if transaction.isTransfer else 'false' }}">
+      <tr class="transaction-row" data-transaction-id="{{ transaction.id }}" data-transaction-date="{{ transaction.date }}" data-private-currency="{{ account.currency|default(currency) if account else currency }}"{% if suggestion %} data-suggestion-id="{{ suggestion.id }}" data-suggestion-plugin="{{ suggestion.pluginId }}"{% endif %} data-merchant="{{ transaction.merchant }}" data-payee="{{ (transaction.merchant+' '+transaction.note)|lower }}" data-account="{{ transaction.accountId }}" data-reviewed="{{ 'true' if transaction.reviewed else 'false' }}" data-review-classified="{{ 'true' if review_status[transaction.id].eligible else 'false' }}" data-pending="{{ 'true' if transaction.pending else 'false' }}" data-amount="{{ transaction.amount }}" data-transfer-pair-valid="{{ 'true' if valid_transfer else 'false' }}" data-inferred-transfer="{{ 'true' if transaction.inferredTransfer else 'false' }}" data-transfer="{{ 'true' if transaction.isTransfer else 'false' }}">
         <td class="transaction-select-cell"><input type="checkbox" data-select-transaction aria-label="Select {{ transaction.merchant }} on {{ date_label(transaction.date) }}"></td>
         <td class="date-cell">{% if client_context.transactionDetails %}<input type="date" data-transaction-detail="date"{% if transaction.transferPeerId|default(none) %} disabled title="Unmatch this confirmed transfer before changing financial fields"{% endif %} value="{{ transaction.date }}" min="1900-01-01" max="2200-12-31" required aria-label="Date for {{ transaction.merchant }}">{% else %}{{ date_label(transaction.date) }}{% endif %}</td>
         {% if show_account_column %}<td class="account-cell" title="{{ account.name if account else 'Disconnected account' }}"><div class="transaction-account-value">
@@ -158,10 +177,6 @@
   <div class="transaction-stream-status" data-transaction-stream role="status" aria-live="polite"><span data-stream-status></span><button class="text-link" type="button" data-stream-retry hidden>Retry loading</button></div>
 </div>
 {% if not register.count %}<div class="empty-state"><span>{{ icon('transactions', 28) }}</span><h2>{{ 'No matching transactions' if register.total else 'No transactions here yet' }}</h2><p>{{ 'Try another search or review filter.' if register.total else 'This account has no transactions.' if transaction_all_dates and selected_account else 'No transactions match these filters.' if transaction_all_dates else 'Try another month.' if data.accounts else 'Connect a bank account to import transactions.' }}</p></div>{% endif %}
-<div class="table-footer transaction-pagination">
-  <span id="transaction-count" data-period="{{ transaction_count_period|default(period_label) }}">{{ register.count }} {% if register.count != register.total %}matching {% endif %}{{ 'transaction' if register.count == 1 else 'transactions' }}{% if register.count != register.total %} of {{ register.total }}{% endif %} · {{ transaction_count_period|default(period_label) }}</span>
-  <span data-stream-loaded>{{ register.rows|length }} loaded</span>
-</div>
 <dialog class="modal transaction-receipt-dialog" data-transaction-receipt-dialog aria-labelledby="receipt-title">
   <div class="modal-heading"><h2 id="receipt-title">Receipt</h2><button class="icon-button" type="button" data-receipt-close aria-label="Close receipt">{{ icon('close', 16) }}</button></div>
   <p class="settings-notice" data-receipt-payee></p>

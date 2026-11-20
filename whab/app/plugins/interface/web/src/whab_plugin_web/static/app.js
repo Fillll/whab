@@ -193,7 +193,7 @@ for (const button of document.querySelectorAll('[data-close-dialog]')) button.ad
   if (!dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy], [data-budget-history][data-busy]')) dialog.close();
 });
 for (const dialog of document.querySelectorAll('dialog')) {
-  if (dialog.hasAttribute('data-transaction-receipt-dialog')) continue;
+  if (dialog.hasAttribute('data-transaction-receipt-dialog') || dialog.hasAttribute('data-transfer-panel')) continue;
   dialog.addEventListener('click', event => {
     if (event.target === dialog && !dialog.querySelector('[data-budget-new][data-busy], [data-budget-open][data-busy], [data-budget-switch][data-busy], [data-account-classification][data-busy], [data-budget-history][data-busy]')) dialog.close();
   });
