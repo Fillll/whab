@@ -30,7 +30,7 @@ def test_opening_category_picker_zero_review_and_signed_funding(client, store, c
         assert client.patch('/api/transactions/' + identifier,
             json={'workspace': 'personal', 'categoryId': category}).status_code == 200
     page = client.get('/budgets/home/transactions/2026-10?review=all').text
-    assert 'Finance &gt; Initial 🍏 (Opening Balance)' in page
+    assert 'Finance ⟩ Initial 🍏 (Opening Balance)' in page
     assert '(Opening_Balance)' not in page
     assert '<option value="opening_balance">Opening Balance · existing cash or debt</option>' in page
     zero_row = re.search(r'<tr class="transaction-row" data-transaction-id="zero".*?</tr>', page, re.S)[0]

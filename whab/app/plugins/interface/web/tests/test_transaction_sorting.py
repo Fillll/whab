@@ -55,7 +55,7 @@ def test_sorted_rendering_labels_and_canonical_address(client, store):
     response = client.get('/budgets/home/transactions/2026-11/usd?sort=date:asc&sort=amount:desc')
     assert response.status_code == 200
     text = unescape(response.text)
-    assert 'Everyday > Public Transport' in text
+    assert 'Everyday ⟩ Public Transport' in text
     assert 'priority 1' in text and 'priority 2' in text
     assert 'transaction-sort-indicator' in text and '<small>1</small>' in text
     assert 'data-transaction-month' in text

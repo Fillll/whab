@@ -395,7 +395,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "period_months": [period["month"] for period in periods],
         "category_path": lambda identifier: quote(identifier, safe=""),
         "category_names": category_names,
-        "category_labels": {row["id"]: (f"{row['group']} > {row['name']}" if row.get("group") else row["name"]) + (" (" + row["kind"].replace("_", " ").title() + ")" if row.get("kind", "expense") != "expense" else "") for row in categories},
+        "category_labels": {row["id"]: (f"{row['group']} ⟩ {row['name']}" if row.get("group") else row["name"]) + (" (" + row["kind"].replace("_", " ").title() + ")" if row.get("kind", "expense") != "expense" else "") for row in categories},
         "category_parents": category_parents,
         "category_kinds": {row["id"]: row.get("kind", "expense") for row in categories},
         "review_status": {row["id"]: review_status(row, category_map) for row in transactions},
