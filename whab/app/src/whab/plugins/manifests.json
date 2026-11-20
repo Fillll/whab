@@ -102,6 +102,12 @@
     },
     {
       "schema_version": 1,
+      "id": "monthly-spending",
+      "category": "insight",
+      "dependencies": []
+    },
+    {
+      "schema_version": 1,
       "id": "plaid",
       "category": "ingestion",
       "dependencies": []

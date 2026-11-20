@@ -62,7 +62,7 @@ finally:
 ''')
     assert {"sqlite", "json", "web", "plaid", "server", "cli", "client", "ynab", "bank-logos",
             "subscriptions", "subscriptions-ai", "ai-credentials", "llm-categorization",
-            "random-forest-categorization"} <= set(result["plugins"])
+            "random-forest-categorization", "monthly-spending"} <= set(result["plugins"])
 
 
 def test_discarding_an_unused_descriptor_reaps_its_idle_discovery_process():

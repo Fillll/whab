@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.87.0 — 2026-11-19
+
+PR: [#220](https://github.com/Fillll/whab/pull/220)
+
+- Add a typed monthly chart contract for Insights plugins and a scoped net-spending projection. Preserve the original text-only hook for existing reports.
+- Include the optional Monthly spending plugin in the supported bundle.
+
 ## 2.86.0 — 2026-11-18
 
 PR: [#218](https://github.com/Fillll/whab/pull/218)

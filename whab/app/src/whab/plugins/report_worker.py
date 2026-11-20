@@ -23,21 +23,24 @@ from whab import __version__
 
 from .bank_adapter import BankAdapter, ProviderFailure
 from .categorization_worker import CategorizationDispatcher
-from .contracts import contract_for
+from .contracts import contract_for, host_accepts_capability_version
 from .effect_store import decode, encode
 from .https_transport import broker, command, deliver
+from .insight_wire import insight_data, read_insight
 from .process_environment import process_environment
 from .provider_worker import MAX_PROVIDER_BYTES, ProviderDispatcher, read_provider_result
 from .remote_client_adapter import supports_remote_client
 from .runtime import PluginError, load_plugins
 from .sdk import (
     API_VERSION,
+    MAX_INSIGHT_MONTHS,
     AccountSnapshot,
     BudgetSnapshot,
     CategorySnapshot,
     ExportTable,
-    Insight,
     LogoImage,
+    SpendingCategory,
+    SpendingMonth,
     TransactionSnapshot,
     valid_plugin_name,
 )
@@ -75,22 +78,40 @@ def _error(code, plugin_id):
 
 
 def _snapshot(value):
-    if type(value) is not dict or set(value) != {"workspace", "month", "currency", "accounts", "categories", "transactions"}:
+    fields = {"workspace", "month", "currency", "accounts", "categories", "transactions"}
+    if type(value) is not dict or set(value) not in (fields, fields | {"spending", "spending_by"}):
         raise WireError()
     values = dict(value)
     for name, record in (("accounts", AccountSnapshot), ("categories", CategorySnapshot), ("transactions", TransactionSnapshot)):
         if type(values[name]) is not list or any(type(row) is not dict for row in values[name]):
             raise WireError()
         values[name] = tuple(record(**row) for row in values[name])
+    if "spending" in values:
+        months = values["spending"]
+        if type(months) is not list or len(months) > MAX_INSIGHT_MONTHS:
+            raise WireError()
+        for month in months:
+            if (type(month) is not dict or month.keys() != {"month", "uncategorized_cents", "categories"}
+                    or type(month["categories"]) is not list or len(month["categories"]) > 10000):
+                raise WireError()
+        values["spending"] = tuple(SpendingMonth(
+            month["month"], month["uncategorized_cents"],
+            tuple(SpendingCategory(**row) for row in month["categories"]),
+        ) for month in months)
     return BudgetSnapshot(**values)
 
 
-def _snapshot_data(snapshot):
+def _snapshot_data(snapshot, *, include_spending=False):
     if type(snapshot) is not BudgetSnapshot:
         raise WireError()
     value = {"workspace": snapshot.workspace, "month": snapshot.month, "currency": snapshot.currency}
     for name in ("accounts", "categories", "transactions"):
         value[name] = [asdict(row) for row in getattr(snapshot, name)]
+    if include_spending:
+        value.update(spending_by=snapshot.spending_by, spending=[{
+            "month": row.month, "uncategorized_cents": row.uncategorized_cents,
+            "categories": [asdict(category) for category in row.categories],
+        } for row in snapshot.spending])
     _snapshot(value)
     return value
 
@@ -224,7 +245,7 @@ def _serve_requests(registry, descriptor, source, send, categorization, provider
                 results = registry.insights(snapshot)
                 if descriptor.insights is None or len(results) != 1 or results[0].error:
                     raise WireError()
-                output = [asdict(row) for row in results[0].insights]
+                output = [insight_data(row) for row in results[0].insights]
             else:
                 table = registry.export(descriptor.id, snapshot)
                 output = {"columns": list(table.columns), "rows": [list(row) for row in table.rows]}
@@ -310,7 +331,7 @@ class ReportWorker:
             if type(value["distribution"]) is not str or not value["distribution"] or type(value["version"]) is not str or not value["version"]:
                 raise WireError()
             expected_capabilities = sorted(
-                [{"name": name, "version": 1} for name, enabled in (
+                [name for name, enabled in (
                     ("reporting.insights", value["insights"]), ("reporting.export", value["export"]),
                     ("branding.bank", adapters["bank_logos"] is not None),
                     ("branding.merchant", adapters["merchant_logos"]),
@@ -323,17 +344,19 @@ class ReportWorker:
                     ('ingestion.bank', adapters['bank'] is not None),
                     ('lifecycle.background', adapters['bank'] is not None),
                 ) if enabled],
-                key=lambda item: item["name"],
             )
             if type(value["host"]) is not str or not value["host"] or type(value["live"]) is not bool or type(value["capabilities"]) is not list or any(type(item) is not dict or set(item) != {"name", "version"} or type(item["version"]) is not int for item in value["capabilities"]):
                 raise WireError()
-            if not expected_capabilities or sorted(value["capabilities"], key=lambda item: item["name"]) != expected_capabilities:
+            if (not expected_capabilities
+                    or any(type(item["name"]) is not str or not host_accepts_capability_version(item["name"], item["version"]) for item in value["capabilities"])
+                    or sorted(item["name"] for item in value["capabilities"]) != expected_capabilities):
                 raise WireError()
             if (adapters["interface"] is not None or adapters["ui"] is not None or adapters["categorization"] or adapters["remote_client"] is not None) and value["host"] != __version__:
                 raise WireError()
             if adapters["ui"] is not None and (value["insights"] or value["export"]):
                 raise WireError()
             self.contract = read_contract(value["contract"], value["capabilities"])
+            self._visual_insights = any(row.name == "reporting.insights" and row.version == 2 for row in self.contract.provides)
             if adapters["remote_client"] is not None:
                 from .remote_client_adapter import read_client_record
                 from .sdk import Plugin
@@ -414,7 +437,8 @@ class ReportWorker:
                 if operation in OPERATIONS:
                     request["arguments"] = {} if arguments is None else arguments
                 else:
-                    request["snapshot"] = _snapshot_data(snapshot) if snapshot is not None else None
+                    request["snapshot"] = (_snapshot_data(snapshot, include_spending=operation == "insights" and self._visual_insights)
+                                           if snapshot is not None else None)
                     if snapshot is not None and Version(self.info['host']) < Version('2.79'):
                         if any(row['kind'] != 'expense' for row in request['snapshot']['categories']):
                             raise _error('worker_classification_unsupported', self.plugin_id)
@@ -462,7 +486,7 @@ class ReportWorker:
         try:
             if type(value) is not list or len(value) > 50 or any(type(row) is not dict for row in value):
                 raise WireError()
-            return tuple(Insight(**row) for row in value)
+            return tuple(read_insight(row, include_chart=self._visual_insights) for row in value)
         except Exception:
             self._stop()
             raise _error("worker_protocol", self.plugin_id) from None

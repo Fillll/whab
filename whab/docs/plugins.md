@@ -229,6 +229,31 @@ def insights(snapshot: BudgetSnapshot) -> tuple[Insight, ...]:
 
 `Insight(title: str, value: str, detail: str = "")` is plain text. Return a tuple of at most 50 insights. Maximum lengths are 120 characters for titles, 160 for values, and 2,000 for details. WHAB escapes the text in its HTML templates; plugins cannot return raw HTML, HTML-aware string subclasses, scripts, or templates. A plugin whose insight hook raises an ordinary exception or returns invalid data gets an error panel; other enabled insight plugins continue rendering.
 
+#### Visual Insights
+
+WHAB 2.87 adds the live `Capability("reporting.insights", version=2)` to
+SDK v1. An opted-in hook receives `snapshot.spending`, a tuple of up to 24
+consecutive `SpendingMonth(month, uncategorized_cents, categories)` records.
+Each `categories` tuple contains nonzero `SpendingCategory(category_id,
+amount_cents)` records for assignable expense categories in `snapshot.categories`.
+`snapshot.spending_by` is `"group"` or `"category"`. Each month is included, even
+when it has no eligible rows. The host computes posted, on-budget net expense
+activity in the selected currency, including categorized refunds and positive
+uncategorized outflows. Transfers, income, opening balances, pending and deleted
+transactions are excluded. A range containing more than 30,000 transaction rows
+must be narrowed. An empty `spending` tuple indicates that a range was unavailable.
+Raw transactions in the snapshot still belong to its selected month.
+Version 1 Insights and exports continue receiving only their selected-month data.
+
+One returned `Insight` may include `chart=StackedMonthlyChart(currency, months,
+series)`. Its currency and consecutive `YYYY-MM` months must match the supplied
+range. It accepts up to 100 `ChartSeries(id, label, values)` records with unique
+IDs of up to 200 characters, plain-text labels of up to 403 characters, and one
+signed integer minor-unit value per month. Amounts and each month's positive
+and negative stacks must fit within the safe integer range. These immutable
+records cross the worker boundary as validated data. The active visual interface
+owns layout, controls, and formatting.
+
 ### Export hook
 
 ```python

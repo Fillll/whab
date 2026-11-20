@@ -12,6 +12,7 @@ from whab.domain.dates import current_month
 from whab.plugins import PluginError
 from whab.plugins.sdk import valid_merchant_logo_key
 from whab.services.ledger import LedgerService
+from whab.web.insight_options import visual_insight_snapshot
 from whab.web.navigation import PAGES, budget_key, page_url
 from whab.web.plugin_snapshot import build_snapshot
 from whab.web.schemas import valid_month
@@ -350,11 +351,14 @@ def create_router(
         context["plugin_management"] = (
             plugin_manager.projection() if plugin_manager is not None else None
         )
-        context["plugin_insights"] = (
-            plugins.insights(build_snapshot(workspace, data))
-            if page == "insights" and any(p.has_insights for p in context["plugins"])
-            else ()
-        )
+        insight_plugins = tuple(p for p in context["plugins"] if p.has_insights) if page == "insights" else ()
+        context["plugin_insights"] = ()
+        if insight_plugins:
+            snapshot = build_snapshot(workspace, data)
+            if any(capability.name == "reporting.insights" and capability.version == 2
+                   for plugin in insight_plugins for capability in plugin.capabilities):
+                snapshot, context["insight_options"] = visual_insight_snapshot(snapshot, request.query_params, service)
+            context["plugin_insights"] = plugins.insights(snapshot)
         try:
             response = templates.TemplateResponse(request=request, name="base.html", context=context)
             if ui_generation:

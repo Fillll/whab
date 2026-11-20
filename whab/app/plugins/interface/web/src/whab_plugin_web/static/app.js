@@ -12,6 +12,7 @@ import {initAccountList} from './account-list.js';
 import {initSidebarOrder} from './sidebar-order.js';
 import {bindLogos} from './logo-images.js';
 import {initAiCredentials} from './ai-credentials-settings.js';
+import {initMonthlyInsights} from './monthly-insights.js';
 import {initSubscriptions} from './subscriptions.js';
 import {initCategorizationSettings} from './categorization-settings.js';
 import {initStorageCopies} from './storage-copies.js';
@@ -619,6 +620,9 @@ for (const dialog of document.querySelectorAll('[data-settings-page][data-plugin
 
 const pageControls = new WeakSet();
 function initPageControls(root = document) {
+  initMonthlyInsights({root, navigate: url => accountNavigation.navigate(url, {
+    focus: '[data-monthly-insight-filters] button[type="submit"]',
+  })});
   currentAccounts = initAccountList({root, api, updateFields: updateAccountFields, onDraft: () => accountNavigation.cancelPending()});
   monthRange = initMonthRange({root, async navigate(url, cancel, handle) {
     const handled = await accountNavigation.navigate(url, {onCancel: cancel, focus: `[data-range-handle="${handle}"]`});

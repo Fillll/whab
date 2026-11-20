@@ -5,7 +5,14 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .bank_adapter import BankAdapter
-from .contracts import Capability, PluginContract, Requirement, contract_for
+from .contracts import (
+    Capability,
+    PluginContract,
+    Requirement,
+    contract_for,
+    host_accepts_capability_version,
+)
+from .insight_wire import insight_data, read_insight
 from .interface_adapter import interface_record, read_interface_record
 from .remote_client_adapter import (
     RemoteLedgerClient,
@@ -15,7 +22,6 @@ from .remote_client_adapter import (
 )
 from .sdk import (
     BankLogos,
-    Insight,
     PluginAction,
     WorkspaceImport,
     valid_merchant_logo_key,
@@ -65,7 +71,7 @@ def supports_live_plugin(plugin):
     return (
         plugin.contract is not None and contract.lifecycle == "live"
         and bool(capabilities) and capabilities <= LIVE_CAPABILITIES - {'categorization', 'ingestion.bank', 'lifecycle.background'}
-        and all(row.version == 1 for row in contract.provides)
+        and all(host_accepts_capability_version(row.name, row.version) for row in contract.provides)
         and contract.state_version == 1 and not contract.state_upgrades
         and (plugin.branding_factory is None or capabilities <= {"branding.bank", "branding.merchant"})
         and all(getattr(plugin, name) is None for name in (
@@ -231,7 +237,7 @@ def dispatch(registry, plugin, operation, arguments, payload):
         if arguments or plugin.settings is None:
             raise WireError()
         output = registry.settings(plugin.id)
-        return {"insights": [asdict(row) for row in output["insights"]], "actions": [asdict(row) for row in output["actions"]]}, b""
+        return {"insights": [insight_data(row) for row in output["insights"]], "actions": [asdict(row) for row in output["actions"]]}, b""
     if operation == "settings.act":
         if set(arguments) != {"action"} or plugin.settings is None:
             raise WireError()
@@ -255,5 +261,5 @@ def dispatch(registry, plugin, operation, arguments, payload):
 def read_settings(value):
     if type(value) is not dict or set(value) != {"insights", "actions"} or type(value["insights"]) is not list or len(value["insights"]) > 50 or type(value["actions"]) is not list or len(value["actions"]) > 50:
         raise WireError()
-    return {"insights": tuple(Insight(**row) for row in value["insights"]),
+    return {"insights": tuple(read_insight(row) for row in value["insights"]),
             "actions": tuple(PluginAction(**row) for row in value["actions"])}

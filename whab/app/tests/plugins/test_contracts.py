@@ -129,8 +129,9 @@ def test_explicit_contract_preserves_lifecycle_and_authority():
 ])
 def test_host_consumed_contracts_cannot_override_the_hosts_supported_version(name):
     composition = "singleton" if name == "ledger.mutate" else "additive"
-    descriptor = plugin("future", provides=(Capability(name, 2, composition),))
-    with pytest.raises(CapabilityError, match="supports version 1") as raised:
+    unsupported = 3 if name == "reporting.insights" else 2
+    descriptor = plugin("future", provides=(Capability(name, unsupported, composition),))
+    with pytest.raises(CapabilityError, match="supports version") as raised:
         resolve_plugins((descriptor,))
     assert raised.value.code == "incompatible_host_contract"
     assert raised.value.plugin_id == "future"
@@ -154,7 +155,7 @@ def test_bind_only_future_contract_is_rejected_before_binding():
         pytest.fail("An incompatible bound contract must fail before binding")
 
     descriptor = Plugin("future", "Future", bind=forbidden, contract=PluginContract(
-        provides=(Capability("reporting.insights", 2),),
+        provides=(Capability("reporting.insights", 3),),
     ))
     with pytest.raises(PluginError) as raised:
         PluginRegistry((descriptor,))

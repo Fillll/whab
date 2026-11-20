@@ -16,7 +16,7 @@ from whab.domain.accounts import is_on_budget
 from whab.domain.categories import category_group_id, validate_child_category
 from whab.domain.file_imports import WorkspaceImport
 from whab.domain.imports import ImportedAccount, SyncChanges
-from whab.domain.money import currency_code
+from whab.domain.money import MAX_SAFE_INTEGER, currency_code
 from whab.domain.transactions import UNSET
 
 from .bank_adapter import BankAdapter as BankAdapter
@@ -189,6 +189,96 @@ def _records(value: object, record_type: type, label: str) -> None:
         raise ValueError(f"{label} must have unique IDs.")
 
 
+MAX_INSIGHT_MONTHS = 24
+MAX_CHART_SERIES = 100
+
+
+def _insight_month(value: str) -> int:
+    _text(value, "Insight month", limit=7, empty=False)
+    if re.fullmatch(r"[0-9]{4}-(?:0[1-9]|1[0-2])", value) is None or not "1900-01" <= value <= "2200-12":
+        raise ValueError("Insight months must use YYYY-MM from 1900-01 through 2200-12.")
+    return int(value[:4]) * 12 + int(value[5:])
+
+
+def _consecutive_months(months: tuple[str, ...], *, empty: bool = False) -> None:
+    if type(months) is not tuple or len(months) > MAX_INSIGHT_MONTHS or not empty and not months:
+        raise ValueError(f"Provide between {0 if empty else 1} and {MAX_INSIGHT_MONTHS} insight months.")
+    indices = tuple(_insight_month(month) for month in months)
+    if any(following != previous + 1 for previous, following in zip(indices, indices[1:])):
+        raise ValueError("Insight months must be consecutive and in increasing order.")
+
+
+def _insight_amount(value: int) -> None:
+    _integer(value, "Insight amount")
+    if abs(value) > MAX_SAFE_INTEGER:
+        raise ValueError("Insight amounts exceed the supported integer range.")
+
+
+@dataclass(frozen=True, slots=True)
+class SpendingCategory:
+    category_id: str
+    amount_cents: int
+
+    def __post_init__(self) -> None:
+        _identifier(self.category_id, "Spending category ID")
+        _insight_amount(self.amount_cents)
+
+
+@dataclass(frozen=True, slots=True)
+class SpendingMonth:
+    month: str
+    uncategorized_cents: int
+    categories: tuple[SpendingCategory, ...]
+
+    def __post_init__(self) -> None:
+        _insight_month(self.month)
+        _insight_amount(self.uncategorized_cents)
+        if self.uncategorized_cents < 0:
+            raise ValueError("Uncategorized spending cannot be negative.")
+        if type(self.categories) is not tuple or len(self.categories) > 10000 or any(type(row) is not SpendingCategory for row in self.categories):
+            raise ValueError("Provide a tuple of at most 10,000 spending category records.")
+        if len({row.category_id for row in self.categories}) != len(self.categories):
+            raise ValueError("Spending category IDs must be unique within each month.")
+        for row in self.categories:
+            row.__post_init__()
+
+
+@dataclass(frozen=True, slots=True)
+class ChartSeries:
+    id: str
+    label: str
+    values: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        _identifier(self.id, "Chart series ID")
+        _text(self.label, "Chart series label", limit=403, empty=False)
+        if type(self.values) is not tuple or not 1 <= len(self.values) <= MAX_INSIGHT_MONTHS:
+            raise ValueError(f"Chart values must be a tuple of 1 to {MAX_INSIGHT_MONTHS} amounts.")
+        for amount in self.values:
+            _insight_amount(amount)
+
+
+@dataclass(frozen=True, slots=True)
+class StackedMonthlyChart:
+    currency: str
+    months: tuple[str, ...]
+    series: tuple[ChartSeries, ...]
+
+    def __post_init__(self) -> None:
+        currency_code(self.currency)
+        _consecutive_months(self.months)
+        if type(self.series) is not tuple or len(self.series) > MAX_CHART_SERIES:
+            raise ValueError(f"A chart needs a tuple of at most {MAX_CHART_SERIES} series.")
+        _records(self.series, ChartSeries, "Chart series")
+        for row in self.series:
+            row.__post_init__()
+            if len(row.values) != len(self.months):
+                raise ValueError("Each series must contain an amount for every chart month.")
+        for values in zip(*(row.values for row in self.series)):
+            _insight_amount(sum(max(0, value) for value in values))
+            _insight_amount(sum(min(0, value) for value in values))
+
+
 @dataclass(frozen=True, slots=True)
 class BudgetSnapshot:
     workspace: str
@@ -197,6 +287,8 @@ class BudgetSnapshot:
     categories: tuple[CategorySnapshot, ...]
     transactions: tuple[TransactionSnapshot, ...]
     currency: str = "USD"
+    spending: tuple[SpendingMonth, ...] = ()
+    spending_by: str = "group"
 
     def __post_init__(self) -> None:
         if type(self.workspace) is not str or self.workspace not in {"demo", "personal"}:
@@ -221,6 +313,17 @@ class BudgetSnapshot:
                 raise ValueError("Snapshot transaction account must belong to its workspace.")
             if transaction.category_id is not None and transaction.category_id not in category_ids:
                 raise ValueError("Snapshot transaction category must belong to its workspace.")
+        if type(self.spending_by) is not str or self.spending_by not in {"category", "group"}:
+            raise ValueError("Spending breakdown must be by category or group.")
+        if type(self.spending) is not tuple or len(self.spending) > MAX_INSIGHT_MONTHS or any(type(row) is not SpendingMonth for row in self.spending):
+            raise ValueError("Spending must contain bounded monthly spending records.")
+        _consecutive_months(tuple(row.month for row in self.spending), empty=True)
+        if self.spending:
+            expenses = {row.id for row in self.categories if row.kind == "expense"}
+            for month in self.spending:
+                month.__post_init__()
+                if any(row.category_id not in expenses for row in month.categories):
+                    raise ValueError("Spending must reference expense categories in its snapshot.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,11 +331,16 @@ class Insight:
     title: str
     value: str
     detail: str = ""
+    chart: StackedMonthlyChart | None = None
 
     def __post_init__(self) -> None:
         _text(self.title, "Insight title", limit=120, empty=False)
         _text(self.value, "Insight value", limit=160)
         _text(self.detail, "Insight detail", limit=2000)
+        if self.chart is not None:
+            if type(self.chart) is not StackedMonthlyChart:
+                raise ValueError("Insight chart must use the documented chart record.")
+            self.chart.__post_init__()
 
 
 ExportCell: TypeAlias = str | int | bool | None

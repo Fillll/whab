@@ -197,15 +197,17 @@ def descriptor_metadata(module_path, attribute, root):
     state_version = _literal(contract["state_version"]) if "state_version" in contract else 1
     upgrades = _literal(contract["state_upgrades"]) if "state_upgrades" in contract else ()
     unsupported = present - {"id", "display_name", "api_version", "contract", "insights", "export"}
+    optional_versions = all(row["version"] == 1 or (row["name"], row["version"]) == ("reporting.insights", 2)
+                            for row in capabilities.values())
     live = (not legacy and lifecycle == "live" and bool({"insights", "export"} & present)
             and not unsupported and state_version == 1 and not upgrades
             and set(capabilities) <= {"reporting.insights", "reporting.export"}
-            and all(row["version"] == 1 for row in capabilities.values()))
+            and optional_versions)
     optional_hooks = {"insights", "export", "bank_logos", "merchant_logos", "file_import", "settings", "branding_factory", "interface"}
     optional = (
         not legacy and lifecycle == "live" and state_version == 1 and not upgrades
         and bool(capabilities) and set(capabilities) <= {"reporting.insights", "reporting.export", "branding.bank", "branding.merchant", "ingestion.file", "interface.api"}
-        and all(row["version"] == 1 for row in capabilities.values())
+        and optional_versions
         and not (present - {"id", "display_name", "api_version", "contract"} - optional_hooks)
         and ("branding_factory" not in present or set(capabilities) <= {"branding.bank", "branding.merchant"})
         and ("settings" not in present or "file_import" not in present and bool({"bank_logos", "merchant_logos"} & present))

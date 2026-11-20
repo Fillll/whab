@@ -10,10 +10,10 @@ from starlette.requests import Request
 from whab.web.navigation import page_url
 
 from .contracts import Capability, Requirement
-from .sdk import Insight, PluginDescription, PluginInsightResult
+from .sdk import ChartSeries, Insight, PluginDescription, PluginInsightResult, StackedMonthlyChart
 from .wire import MAX_METADATA_BYTES, Frame, WireError
 
-_RECORDS = (PluginDescription, PluginInsightResult, Insight, Capability, Requirement)
+_RECORDS = (PluginDescription, PluginInsightResult, Insight, Capability, Requirement, StackedMonthlyChart, ChartSeries)
 _HEADERS = frozenset({"x-whab-page-fragment", "x-whab-budget-fragment",
                       "x-whab-transactions-fragment", "x-whab-transactions-sidebar"})
 _ROUTING = frozenset({"key", "personal_key", "workspace", "page", "month_token", "currency", "account_slugs"})

@@ -492,6 +492,26 @@ The [AI credentials plugin](../../automation/ai-credentials/README.md) has a sep
 
 Subscription classification uses the Subscriptions plugin 1.1+ background job API. A sticky workspace progress panel shows committed transaction counts, reused decisions and skipped changes, with a separate **Stop classification** control. Leaving the page and browser navigation leave the server job running. Lightweight polling updates the Running badge without loading ledger history on every tick; returning to the page reconnects to the current job. Closing the browser stops observation only. Completed results refresh the open view while retaining payment filters/search. Other feature settings remain in the existing single Settings window.
 
+## Monthly spending charts
+
+With a compatible host and an enabled visual Insights plugin, open **Insights**
+to see **Monthly spending**. Choose inclusive **From** and **To** months, select
+**Groups** or **Categories**, then select **Apply**. The initial range is six
+months, and a custom range can contain up to 24. The address keeps the selection
+for bookmarking and Back/Forward.
+
+Each column is one month in the view's currency, including months with no
+spending. The colors identify series across months. Negative net amounts extend
+below zero and the line shows the monthly net across all series. Use a legend
+button to emphasize a series, or open **Monthly breakdown** for the same values
+in a navigable table. Long ranges scroll horizontally. **Hide amounts** conceals
+the plot, legend, breakdown and report detail while the date controls remain
+available.
+
+The Web interface renders typed, escaped report results from the host. It keeps
+the existing six-month trend when no visual report is available. Older hosts and
+plain-text Insights plugins keep their normal views.
+
 ## Operation documentation
 
 The packaged [operations.json](src/whab_plugin_web/operations.json) documents this plugin's public operations, input/output schemas, fictional examples, effects, access, scope, errors and retries. Read it offline with `whab-cli describe --plugin web`, add `--json` for structured metadata, or use operation-specific `--help` for public CLI commands. Local-only settings and SDK callbacks are explicitly labeled and are not made remotely callable by documentation. Delegated ledger operations are described by `whab-cli describe --plugin core`.

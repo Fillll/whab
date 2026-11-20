@@ -33,7 +33,7 @@ def test_all_installed_plugins_have_complete_nonexecuting_documents(monkeypatch)
     for entry in entries:
         monkeypatch.setattr(type(entry), "load", lambda self: calls.append(self.name))
     catalog = docs.installed_catalog()
-    assert not calls and len(catalog["plugins"]) == 23
+    assert not calls and len(catalog["plugins"]) == 24
     assert all(row["documented"] and row["enabled"] is None for row in catalog["plugins"])
     assert len([row for row in catalog["core"]["operations"] if row["kind"] in {"query", "command"}]) == 55
     assert {"change_transactions", "preview_transaction_changes", "transaction_change_policy",
@@ -194,7 +194,7 @@ def test_source_check_rejects_omitted_and_unshipped_resources(tmp_path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     paths, errors = module.check()
-    assert len(paths) == 24 and not errors
+    assert len(paths) == 25 and not errors
     assert module.main([]) == 0
 
     import shutil

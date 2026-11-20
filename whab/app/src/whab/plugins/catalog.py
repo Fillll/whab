@@ -6,6 +6,8 @@ from datetime import date
 from importlib.resources import files
 from urllib.parse import urlsplit
 
+from .contracts import host_accepts_capability_version
+
 MAX_CATALOG_BYTES = 2 * 1024 * 1024
 _VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:[a-zA-Z0-9.+-]*)\Z")
 _NAME = re.compile(r"[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\Z")
@@ -140,7 +142,7 @@ def validate_catalog(value):
                 _require(not row["legacy"] and support in {"local-storage-worker", "declarative-remote-client-worker", "stateless-report-worker", "stateless-optional-worker", "declarative-api-worker", "categorization-host", "categorization-worker", "visual-ui-worker", "bank-provider-worker"}
                          and (support == "categorization-host" or row["state_version"] == 1)
                          and not row["state_upgrades"] and bool(capability_names)
-                         and capability_names <= allowed and all(capability["version"] == 1 for capability in row["capabilities"]))
+                         and capability_names <= allowed and all(host_accepts_capability_version(capability["name"], capability["version"]) for capability in row["capabilities"]))
             else:
                 _require(row["live_support"] == "restart-required")
             _require(row["support"] in {"maintained", "teaching"})

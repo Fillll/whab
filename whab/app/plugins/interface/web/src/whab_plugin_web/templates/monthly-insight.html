@@ -1,0 +1,70 @@
+{% set chart = insight.chart %}
+<article class="monthly-insight">
+  {% if show_chart_heading %}<h3>{{ insight.title }}</h3>{% endif %}
+  <div data-private-content="Chart and amounts hidden">
+  {% if chart.series %}
+  {% set plot = stacked_monthly_plot(chart.months, chart.series|map(attribute='values'), chart.currency) %}
+    <div class="monthly-chart-scroll" role="region" aria-label="Chart for {{ insight.title }}" tabindex="0">
+      <svg id="{{ chart_id }}" class="monthly-chart" style="--plot-width:{{ plot.width }}px" width="{{ plot.width }}" height="280" viewBox="0 0 {{ plot.width }} 280"
+           data-monthly-plot role="img" aria-labelledby="{{ chart_id }}-title {{ chart_id }}-description">
+        <title id="{{ chart_id }}-title">{{ insight.title }} · {{ chart.currency }}</title>
+        <desc id="{{ chart_id }}-description">Each month is one column. Refunds that exceed purchases in a series extend below zero. The line traces net spending. Amounts are also available in the breakdown table.</desc>
+        {% for tick in plot.ticks %}
+        <line class="{{ 'monthly-chart-zero' if tick.amount == 0 else 'monthly-chart-grid' }}" x1="{{ plot.left }}" x2="{{ plot.right }}" y1="{{ tick.y }}" y2="{{ tick.y }}"/>
+        <text x="{{ plot.left - 9 }}" y="{{ tick.y + 4 }}" text-anchor="end">{{ currency_money(tick.amount, chart.currency) }}</text>
+        {% endfor %}
+        {% for column in plot.columns %}
+          {% for segment in column.segments %}
+          {% set series = chart.series[segment.series] %}
+          <rect data-chart-series="{{ segment.series }}" x="{{ column.bar_x }}" y="{{ segment.y }}" width="{{ plot.bar_width }}" height="{{ segment.height }}"
+                fill="{{ series_color(series.id) }}">
+            <title>{{ month_label(column.month) }} · {{ series.label }} · {{ currency_money(segment.amount, chart.currency) }}</title>
+          </rect>
+          {% endfor %}
+          <text x="{{ column.x }}" y="268" text-anchor="middle">{{ month_label(column.month, true) }} ’{{ column.month[2:4] }}</text>
+        {% endfor %}
+        <polyline class="monthly-chart-net" points="{% for column in plot.columns %}{{ column.x }},{{ column.net_y }} {% endfor %}"/>
+        {% for column in plot.columns %}
+        <circle class="monthly-chart-point" cx="{{ column.x }}" cy="{{ column.net_y }}" r="4.5">
+          <title>{{ month_label(column.month) }} · Net spending {{ currency_money(column.net, chart.currency) }}</title>
+        </circle>
+        {% endfor %}
+      </svg>
+    </div>
+    <div class="monthly-chart-keys">
+      <span class="monthly-chart-total-key">Net spending</span>
+      <ul class="monthly-chart-legend" aria-label="Spending series">
+        {% for series in chart.series %}
+        <li><button type="button" data-chart-emphasis="{{ loop.index0 }}" aria-controls="{{ chart_id }}" aria-pressed="false" disabled>
+          <span class="monthly-chart-swatch" style="--series-color:{{ series_color(series.id) }}" aria-hidden="true"></span>{{ series.label }}
+        </button></li>
+        {% endfor %}
+      </ul>
+    </div>
+    <details data-monthly-breakdown>
+      <summary>Monthly breakdown</summary>
+      <div class="table-scroll monthly-chart-table" tabindex="0" role="region" aria-label="Monthly spending table">
+        <table>
+          <caption class="sr-only">{{ insight.title }} · {{ chart.currency }}</caption>
+          <thead><tr><th scope="col">{{ 'Category' if insight_options.group_by == 'category' else 'Group' }}</th>
+            {% for month in chart.months %}<th scope="col">{{ month_label(month) }}</th>{% endfor %}
+          </tr></thead>
+          <tbody>
+            {% for series in chart.series %}
+            <tr><th scope="row">{{ series.label }}</th>
+              {% for amount in series['values'] %}<td>{{ currency_money(amount, chart.currency) }}</td>{% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot><tr><th scope="row">Net spending</th>
+            {% for column in plot.columns %}<td>{{ currency_money(column.net, chart.currency) }}</td>{% endfor %}
+          </tr></tfoot>
+        </table>
+      </div>
+    </details>
+  {% else %}
+  <p class="empty-inline">No spending in the selected months.</p>
+  {% endif %}
+  {% if insight.detail %}<p class="monthly-insight-detail">{{ insight.detail }}</p>{% endif %}
+  </div>
+</article>

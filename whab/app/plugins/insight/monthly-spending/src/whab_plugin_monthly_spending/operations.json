@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "plugin_id": "monthly-spending",
+  "summary": "View monthly net spending by category or parent group as a stacked chart, in one budget and currency.",
+  "delegates": ["core"],
+  "operations": [
+    {
+      "name": "insights",
+      "kind": "sdk",
+      "summary": "Turn the host's monthly spending totals into a structured chart. Dates and categories with net refunds retain their original signed amounts.",
+      "input": {
+        "type": "object",
+        "description": "Host-provided immutable reporting.insights v2 snapshot.",
+        "required": ["snapshot"],
+        "additionalProperties": false,
+        "properties": {
+          "snapshot": {
+            "type": "object",
+            "description": "BudgetSnapshot with category metadata and a selected monthly spending projection. During an initial lifecycle probe spending can be empty.",
+            "required": ["workspace", "month", "currency", "categories", "spending_by", "spending"],
+            "properties": {
+              "workspace": {"enum": ["personal", "demo"], "description": "One host-scoped workspace."},
+              "month": {"$ref": "#/$defs/month", "description": "Current Insights page month."},
+              "currency": {"$ref": "#/$defs/currency", "description": "One ISO currency. Values use its exact minor units."},
+              "accounts": {"type": "array", "description": "Other BudgetSnapshot account metadata, unused by this hook."},
+              "transactions": {"type": "array", "description": "Other BudgetSnapshot transactions, unused by this hook."},
+              "categories": {
+                "type": "array",
+                "description": "Current CategorySnapshot records for naming and grouping series.",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "name", "group"],
+                  "properties": {
+                    "id": {"type": "string", "description": "Stable category ID."},
+                    "name": {"type": "string", "description": "Category name."},
+                    "group": {"type": "string", "description": "Current parent group name."}
+                  }
+                }
+              },
+              "spending_by": {
+                "enum": ["category", "group"],
+                "default": "group",
+                "description": "Chart grouping selected in the visual interface."
+              },
+              "spending": {
+                "type": "array",
+                "maxItems": 24,
+                "description": "Consecutive selected months in chronological order, including months without spending.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["month", "uncategorized_cents", "categories"],
+                  "properties": {
+                    "month": {"$ref": "#/$defs/month", "description": "Calendar month."},
+                    "uncategorized_cents": {"type": "integer", "minimum": 0, "description": "Posted uncategorized outflows in minor units."},
+                    "categories": {
+                      "type": "array",
+                      "description": "Posted on-budget Expense totals in minor units, signed net of categorized refunds.",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["category_id", "amount_cents"],
+                        "properties": {
+                          "category_id": {"type": "string", "description": "ID referencing the current categories."},
+                          "amount_cents": {"type": "integer", "description": "Signed net amount in the snapshot currency's minor units."}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "$defs": {
+          "month": {"type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"},
+          "currency": {"type": "string", "pattern": "^[A-Z]{3}$"}
+        }
+      },
+      "output": {
+        "type": "array",
+        "maxItems": 1,
+        "description": "A structured Insight for the selected chart, or an empty tuple during a lifecycle probe.",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "value", "detail", "chart"],
+          "properties": {
+            "title": {"type": "string", "description": "Chart heading."},
+            "value": {"const": "", "description": "Empty because the insight displays a chart."},
+            "detail": {"type": "string", "description": "Short description of spending and refund scope."},
+            "chart": {
+              "type": "object",
+              "description": "StackedMonthlyChart with exact signed values.",
+              "additionalProperties": false,
+              "required": ["currency", "months", "series"],
+              "properties": {
+                "currency": {"type": "string", "pattern": "^[A-Z]{3}$", "description": "Currency for every series amount."},
+                "months": {"type": "array", "minItems": 1, "maxItems": 24, "items": {"type": "string"}, "description": "Selected calendar months in order."},
+                "series": {
+                  "type": "array",
+                  "maxItems": 100,
+                  "description": "One series per active category or group, including Uncategorized and a bounded Other rollup when needed.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "label", "values"],
+                    "properties": {
+                      "id": {"type": "string", "description": "Stable chart series key for color identity."},
+                      "label": {"type": "string", "description": "Display name. Individual categories are qualified by their parent group."},
+                      "values": {"type": "array", "minItems": 1, "maxItems": 24, "items": {"type": "integer"}, "description": "One signed integer currency amount for each of the selected months in order."}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "input": {
+            "snapshot": {
+              "workspace": "demo",
+              "month": "2026-03",
+              "currency": "USD",
+              "accounts": [],
+              "transactions": [],
+              "categories": [{"id": "grocery", "name": "Groceries", "group": "Home", "assigned_cents": 0, "activity_cents": 0, "available_cents": 0, "kind": "expense"}],
+              "spending_by": "category",
+              "spending": [
+                {"month": "2026-01", "uncategorized_cents": 900, "categories": [{"category_id": "grocery", "amount_cents": 12999}]},
+                {"month": "2026-02", "uncategorized_cents": 0, "categories": []},
+                {"month": "2026-03", "uncategorized_cents": 0, "categories": [{"category_id": "grocery", "amount_cents": -1200}]}
+              ]
+            }
+          },
+          "output": [
+            {
+              "title": "Monthly spending",
+              "value": "",
+              "detail": "Posted on-budget spending by month. Refunds reduce spending in their posting month.",
+              "chart": {
+                "currency": "USD",
+                "months": ["2026-01", "2026-02", "2026-03"],
+                "series": [
+                  {"id": "category:7aa5eb472a5562e3b021b5421bfaff3c23eff0b2b38d49246bafde16d637e789", "label": "Home / Groceries", "values": [12999, 0, -1200]},
+                  {"id": "system:uncategorized", "label": "Uncategorized", "values": [900, 0, 0]}
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "side_effects": "Read-only. Builds a chart in memory from the host projection. No writes, persistent settings or provider requests.",
+      "permissions": "Host-scoped SDK callback for an active Insights plugin. No access to provider credentials or backend handles.",
+      "scope": "One budget, environment, workspace and currency, with an inclusive selection of up to 24 consecutive calendar months.",
+      "errors": [
+        "Invalid scope, period or projection is rejected by the host.",
+        "Invalid chart results or failed callbacks produce a safe report error; other Insights remain available."
+      ],
+      "retry": "Read again by reloading the Insights page or choosing a valid period. No mutation takes place.",
+      "availability": "WHAB 2.87.0 or later, Monthly spending enabled, and a compatible visual interface."
+    }
+  ]
+}

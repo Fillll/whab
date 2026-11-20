@@ -94,6 +94,7 @@ function harness(initial = 'budget') {
     updateAccountFields() {},
     initAccountList() {return {dirty: false, flush: async () => true, dispose() {}};},
     initMonthRange() {return {dispose() {}};},
+    initMonthlyInsights() {},
     initAccountNavigation(options) {navigationOptions = options; return navigator;},
     initTransactionRegister() {
       const register = {dirty: false, disposed: false, flushes: 0,

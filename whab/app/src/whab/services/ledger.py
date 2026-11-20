@@ -6,7 +6,7 @@ than risking duplicate writes after losing its in-memory idempotency receipts.
 """
 
 from calendar import monthrange
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from contextlib import nullcontext
 from copy import deepcopy
@@ -38,6 +38,10 @@ class RevisionConflict(StoreError):
 
 class RequestConflict(StoreError):
     """An idempotency key was reused for a different command."""
+
+
+class InsightRangeTooLarge(StoreError):
+    """A report must request fewer months to fit its bounded read."""
 
 
 class CommandSavePending(RuntimeError):
@@ -1058,6 +1062,61 @@ class LedgerService:
                 page=page, page_size=page_size, sort=sort,
             )
             return {**data, "transactionPage": {**data["transactionPage"], "revision": self._revision}}
+
+    def insight_spending(self, workspace, start_month, end_month, currency):
+        """Read only scoped register rows and return monthly aggregates for Insight hooks."""
+        from whab.domain.accounts import is_on_budget
+        from whab.domain.budget import posted_expense_amount
+        from whab.plugins.sdk import MAX_INSIGHT_MONTHS, SpendingCategory, SpendingMonth
+
+        self._workspace(workspace)
+        _month(start_month)
+        _month(end_month)
+        currency = currency_code(currency)
+        months = tuple(shift_month(start_month, offset) for offset in range(MAX_INSIGHT_MONTHS)
+                       if shift_month(start_month, offset) <= end_month)
+        if not months or months[-1] != end_month:
+            raise StoreError(f"Choose up to {MAX_INSIGHT_MONTHS} consecutive months.")
+        end_year, end_number = map(int, end_month.split("-"))
+        bounds = {"start_date": start_month + "-01", "end_date": f"{end_month}-{monthrange(end_year, end_number)[1]:02d}"}
+        totals = {month: defaultdict(int) for month in months}
+        limit = 30_000
+        remaining = limit
+
+        def collect(data):
+            nonlocal remaining
+            remaining -= len(data["transactions"])
+            if remaining < 0:
+                raise InsightRangeTooLarge(f"More than {limit:,} transactions in this range. Choose fewer months.")
+            eligible = {row["id"] for row in data["accounts"] if is_on_budget(row)}
+            kinds = {row["id"]: row.get("kind", "expense") for row in data["categories"]}
+            for row in data["transactions"]:
+                if row["accountId"] in eligible:
+                    category_id = row["categoryId"]
+                    month = row["date"][:7]
+                    amount = posted_expense_amount(row, kinds.get(category_id, "expense"))
+                    if amount:
+                        totals[month][category_id] += amount
+
+        with self._lock:
+            if callable(getattr(self._store, "transaction_register_page", None)):
+                size = 1000
+                first = self._transaction_page(workspace, None, currency, page_size=size, **bounds)
+                window = first["transactionPage"]
+                if window["total"] > limit:
+                    raise InsightRangeTooLarge(f"More than {limit:,} transactions in this range. Choose fewer months.")
+                collect(first)
+                for page in range(2, window["pages"] + 1):
+                    data = self._transaction_page(workspace, None, currency, page=page, page_size=size, **bounds)
+                    if data["transactionPage"]["page"] != page or data["transactionPage"]["total"] != window["total"]:
+                        raise StoreError("Transaction data changed while reading the report. Refresh Insights.")
+                    collect(data)
+            else:
+                for month in months:
+                    collect(self.transaction_register(workspace, month, currency))
+        return tuple(SpendingMonth(month, amounts.get(None, 0), tuple(
+            SpendingCategory(identifier, amount) for identifier, amount in amounts.items() if identifier is not None and amount
+        )) for month, amounts in totals.items())
 
     def _transaction_page(
         self, workspace, month, currency, account_id=None, *, account_ids=None,

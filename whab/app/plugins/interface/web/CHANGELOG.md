@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.67.0 — 2026-11-19
+
+PR: [#220](https://github.com/Fillll/whab/pull/220)
+
+- Show optional stacked monthly Insights charts with range and grouping controls, net total lines and accessible breakdowns. Apply the amount privacy preference to chart values.
+
 ## 1.66.0 — 2026-11-19
 
 PR: [#219](https://github.com/Fillll/whab/pull/219)
