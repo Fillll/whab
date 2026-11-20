@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.67.1 — 2026-11-19
+
+PR: [#221](https://github.com/Fillll/whab/pull/221)
+
+- Use `⟩` between the group and child category in transaction rows and pickers.
+
 ## 1.67.0 — 2026-11-19
 
 PR: [#220](https://github.com/Fillll/whab/pull/220)
