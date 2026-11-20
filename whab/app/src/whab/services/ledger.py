@@ -1073,8 +1073,8 @@ class LedgerService:
         _month(start_month)
         _month(end_month)
         currency = currency_code(currency)
-        months = tuple(shift_month(start_month, offset) for offset in range(MAX_INSIGHT_MONTHS)
-                       if shift_month(start_month, offset) <= end_month)
+        months = tuple(month for offset in range(MAX_INSIGHT_MONTHS)
+                       if (month := shift_month(start_month, offset)) <= end_month)
         if not months or months[-1] != end_month:
             raise StoreError(f"Choose up to {MAX_INSIGHT_MONTHS} consecutive months.")
         end_year, end_number = map(int, end_month.split("-"))
@@ -1082,6 +1082,7 @@ class LedgerService:
         totals = {month: defaultdict(int) for month in months}
         limit = 30_000
         remaining = limit
+        seen_ids = set()
 
         def collect(data):
             nonlocal remaining
@@ -1091,6 +1092,9 @@ class LedgerService:
             eligible = {row["id"] for row in data["accounts"] if is_on_budget(row)}
             kinds = {row["id"]: row.get("kind", "expense") for row in data["categories"]}
             for row in data["transactions"]:
+                if row["id"] in seen_ids:
+                    raise StoreError("Transaction data changed while reading the report. Refresh Insights.")
+                seen_ids.add(row["id"])
                 if row["accountId"] in eligible:
                     category_id = row["categoryId"]
                     month = row["date"][:7]

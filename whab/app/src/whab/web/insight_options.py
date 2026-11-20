@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from whab.domain.dates import shift_month
+from whab.domain.errors import StoreError
 from whab.plugins.sdk import MAX_INSIGHT_MONTHS, _insight_month
 from whab.services.ledger import InsightRangeTooLarge
 
@@ -26,6 +27,6 @@ def visual_insight_snapshot(snapshot, query, service):
         return replace(snapshot, spending=spending, spending_by=group), options
     except InsightRangeTooLarge as error:
         options["error"] = str(error)
-    except ValueError:
+    except (ValueError, StoreError):
         options["error"] = "Monthly spending is unavailable for this range. Try fewer months or refresh Insights."
     return snapshot, options

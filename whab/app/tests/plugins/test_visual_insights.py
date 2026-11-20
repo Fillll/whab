@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from starlette.datastructures import QueryParams
 
+from whab.domain.errors import StoreError
 from whab.plugins import (
     BudgetSnapshot,
     Capability,
@@ -139,4 +140,19 @@ def test_native_range_limit_rejects_instead_of_returning_a_partial_plot(monkeypa
     service = LedgerService(SimpleNamespace(transaction_register_page=lambda *_: {}))
     monkeypatch.setattr(service, "_transaction_page", lambda *_args, **_kwargs: {"transactionPage": {"total": 30_001}})
     with pytest.raises(InsightRangeTooLarge, match="30,000 transactions"):
+        service.insight_spending("personal", "2026-01", "2026-01", "USD")
+
+
+def test_report_rejects_repeated_transactions_across_pages(monkeypatch):
+    service = LedgerService(SimpleNamespace(transaction_register_page=lambda *_: {}))
+
+    def register(*_args, page=1, **_kwargs):
+        return {
+            "transactionPage": {"page": page, "pages": 2, "total": 1001},
+            "accounts": [], "categories": [],
+            "transactions": [{"id": "repeated", "accountId": "not-on-budget"}],
+        }
+
+    monkeypatch.setattr(service, "_transaction_page", register)
+    with pytest.raises(StoreError, match="Transaction data changed"):
         service.insight_spending("personal", "2026-01", "2026-01", "USD")
