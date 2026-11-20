@@ -28,7 +28,7 @@ def test_duplicate_transactions_heading_is_only_hidden_for_all_accounts(client, 
     assert '<h1 id="transaction-title" class="sr-only" tabindex="-1">Transactions</h1>' in text
     account = store.add_account('personal', {'name': 'Fictional wallet', 'type': 'depository', 'balance': 0})
     text = client.get('/budgets/home/transactions/current-month', params={'accounts':account}).text
-    assert '<h1 id="transaction-title" tabindex="-1">Fictional wallet</h1>' in text
+    assert '<h1 id="transaction-title" class="transaction-account-title" tabindex="-1">Fictional wallet</h1>' in text
     fragment = client.get('/budgets/home/transactions/current-month', headers={'X-WHAB-Transactions-Fragment':'1'}).text
     assert 'class="sr-only"' in fragment and '/static/sidebar.js' not in fragment
 
