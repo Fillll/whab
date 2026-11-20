@@ -281,6 +281,11 @@ def test_captured_bank_bundle_renders_through_visual_projection_and_versioned_di
     with TestClient(app, base_url='https://127.0.0.1:5173') as client:
         page = client.get('/budgets/home/accounts/current-month/usd')
         assert page.status_code == 200 and 'data-fictional-bank' in page.text
+        assert 'data-dialog="plugin-options-fictional">Connect bank</button>' in page.text
+        assert 'data-dialog="account-dialog"' in page.text
+        register = client.get('/budgets/home/transactions/current-month')
+        assert register.status_code == 200 and 'aria-label="Add bank account"' not in register.text
+        assert 'data-account-reorder' in register.text
         source = re.search(r'/budgets/home/banks/fictional/[a-f0-9]{32}/static/connect.js', page.text)[0]
         assert client.get(source).content == resources.files['static/connect.js']
         assert client.get('/plugins/fictional/static/connect.js').content == resources.files['static/connect.js']

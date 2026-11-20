@@ -1,6 +1,6 @@
 {% set logos = account_logos|default({}) %}
 <div data-sidebar-order data-budget-id="{{ client_context.get('budgetId', budget_id|default('default')) }}" data-workspace="{{ workspace }}" data-environment="{{ status.environment }}" data-default-order="{{ all_accounts|map(attribute='id')|list|tojson|forceescape }}">
-<div class="nav-label">ACCOUNTS <span class="sidebar-account-heading-actions"><button type="button" data-account-reorder aria-label="Reorder accounts" title="Reorder accounts in this browser" aria-expanded="false" hidden><span aria-hidden="true">↕</span></button><a href="{{ url('accounts') }}" aria-label="Add bank account">{{ icon('plus', 15) }}</a></span></div>
+<div class="nav-label">ACCOUNTS <button type="button" data-account-reorder aria-label="Reorder accounts" title="Reorder accounts in this browser" aria-expanded="false" hidden><span aria-hidden="true">↕</span></button></div>
 <div class="sidebar-account-order-tools" data-account-order-tools hidden>
   <p>Drag or use arrows. Saved in this browser.</p>
   <div><button type="button" class="text-link" data-account-order-reset>Reset order</button><button type="button" class="button secondary" data-account-order-done>Done</button></div>
