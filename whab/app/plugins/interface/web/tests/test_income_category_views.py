@@ -14,7 +14,7 @@ def test_income_categories_are_pickable_but_not_expense_envelopes(client, store)
         'merchant': 'Fictional employer', 'amount': -500000, 'categoryId': category})
     store.edit_transaction('personal', transaction, reviewed=True)
     page = client.get('/budgets/home/transactions/2026-10?review=all').text
-    assert 'Finance &gt; Salary (Income)' in page
+    assert 'Finance ⟩ Salary (Income)' in page
     row = re.search(r'<tr class="transaction-row" data-transaction-id="' + transaction + r'".*?</tr>', page, re.S)[0]
     assert 'Reviewed: Fictional employer' in row
     budget = client.get('/budgets/home/budget/2026-10/usd').text
@@ -57,7 +57,7 @@ def test_classification_required_controls_and_explicit_transfer(client, store):
     assert not re.search(r'data-transaction-field="categoryId"[^>]* disabled', row)
     assert client.patch(f'/api/transactions/{transaction}',json={'workspace':'personal','categoryId':category}).status_code==200
     row=markup()
-    assert 'Technical &gt; Move money (Transfer)' in row and 'data-category-kind="transfer"' in row
+    assert 'Technical ⟩ Move money (Transfer)' in row and 'data-category-kind="transfer"' in row
     assert 'data-review-classified="true"' in row
     assert not re.search(r'data-transaction-reviewed[^>]* disabled',row)
     assert client.patch(f'/api/transactions/{transaction}',json={'workspace':'personal','reviewed':True}).status_code==200

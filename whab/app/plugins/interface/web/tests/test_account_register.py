@@ -111,10 +111,12 @@ def test_account_register_skips_envelope_projection_and_reuses_category_choices(
     assert text.count('<template data-transaction-categories>') == 1
     assert text.count('<optgroup label="Everyday">') == 1
     assert text.count('data-category-options-lazy') == 13
+    options = re.search(r'<template data-transaction-categories>(.*?)</template>', text, re.S)[1]
+    assert '<option value="groceries" data-category-kind="expense">Everyday ⟩ Groceries</option>' in options
     for row in register_rows(text):
         category = re.search(r'<select name="categoryId"[^>]*>(.*?)</select>', row, re.S)[1]
         assert len(re.findall(r'<option\b', category)) == 2
-        assert '<option data-category-kind="expense" value="groceries" selected>Everyday &gt; Groceries</option>' in category
+        assert '<option data-category-kind="expense" value="groceries" selected>Everyday ⟩ Groceries</option>' in category
 
 
 def test_large_register_searches_unrendered_transactions_and_preserves_page_filters(client, store):
