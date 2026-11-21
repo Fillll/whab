@@ -327,8 +327,21 @@ with TestClient(create_app(settings=chart_settings), base_url="https://127.0.0.1
         "merchant": "Fictional chart purchase", "amount": 12300, "categoryId": None,
     })
     assert transaction.status_code == 200
-    page = client.get("/budgets/home/insights/2026-03/usd", params={
-        "insight_from": "2026-02", "insight_to": "2026-03", "insight_group": "category",
+    second = client.post("/api/accounts", json={
+        "workspace": "personal", "name": "Fictional savings", "type": "depository", "balance": 20000,
+    })
+    assert second.status_code == 200
+    purchase = client.post("/api/transactions", json={
+        "workspace": "personal", "accountId": second.json()["accountId"], "date": "2026-02-11",
+        "merchant": "Fictional grocery shop", "amount": 7000, "categoryId": "groceries",
+    })
+    assert purchase.status_code == 200
+    route = "/budgets/home/insights/2026-03/usd"
+    options = {"insight_from": "2026-02", "insight_to": "2026-03", "insight_group": "category"}
+    all_spending = client.get(route, params=options)
+    assert all_spending.status_code == 200 and "February 2026 · Net spending $193" in all_spending.text
+    page = client.get(route, params={
+        **options, "insight_account": account.json()["accountId"], "insight_category": "uncategorized",
     })
     assert page.status_code == 200 and "data-monthly-plot" in page.text
     assert "February 2026 · Net spending $123" in page.text

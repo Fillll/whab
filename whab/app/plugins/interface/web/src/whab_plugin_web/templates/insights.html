@@ -16,6 +16,16 @@
   {% set metrics = result.insights|rejectattr('chart')|list %}
   {% if metrics or result.error %}{% set reports.text = reports.text + [(result, metrics)] %}{% endif %}
 {% endfor %}
+{% macro monthly_filter(label, name, choices, selected, all_label) -%}
+  <label class="monthly-insight-select">{{ label }}
+    <select name="{{ name }}">
+      <option value="">{{ all_label }}</option>
+      {% for choice in choices %}
+      <option value="{{ choice.id }}"{% if choice.id == selected %} selected{% endif %}>{{ choice.label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+{%- endmacro %}
 {% if insight_options is defined and insight_options is not none %}
 <section class="monthly-insights" data-monthly-chart aria-labelledby="monthly-insights-title">
   <header class="monthly-insights-heading">
@@ -23,18 +33,27 @@
     <span class="subtle-label">{{ currency }}</span>
   </header>
   <form action="{{ request.url.path }}" method="get" class="monthly-insight-filters" data-monthly-insight-filters>
-    <label>From <input type="month" name="insight_from" min="1900-01" max="2200-12" required
-                       pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM" value="{{ insight_options.start_month }}"></label>
-    <label>To <input type="month" name="insight_to" min="1900-01" max="2200-12" required
-                     pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM" value="{{ insight_options.end_month }}"></label>
-    <fieldset class="monthly-insight-mode">
-      <legend>Show by</legend>
-      <div>
-        <label><input class="sr-only" type="radio" name="insight_group" value="group"{% if insight_options.group_by == 'group' %} checked{% endif %}><span>Groups</span></label>
-        <label><input class="sr-only" type="radio" name="insight_group" value="category"{% if insight_options.group_by == 'category' %} checked{% endif %}><span>Categories</span></label>
-      </div>
-    </fieldset>
-    <button class="button secondary" type="submit">Apply</button>
+    <div class="monthly-insight-dates">
+      <label>From <input type="month" name="insight_from" min="1900-01" max="2200-12" required
+                         pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM" value="{{ insight_options.start_month }}"></label>
+      <label>To <input type="month" name="insight_to" min="1900-01" max="2200-12" required
+                       pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM" value="{{ insight_options.end_month }}"></label>
+    </div>
+    {% if insight_options.accounts is defined %}
+      {{ monthly_filter('Account', 'insight_account', insight_options.accounts, insight_options.account_id, 'All accounts') }}
+      {{ monthly_filter('Category group', 'insight_category_group', insight_options.category_groups, insight_options.category_group_id, 'All groups') }}
+      {{ monthly_filter('Category', 'insight_category', insight_options.categories, insight_options.category_id, 'All categories') }}
+    {% endif %}
+    <div class="monthly-insight-actions">
+      <fieldset class="monthly-insight-mode">
+        <legend>Show by</legend>
+        <div>
+          <label><input class="sr-only" type="radio" name="insight_group" value="group"{% if insight_options.group_by == 'group' %} checked{% endif %}><span>Groups</span></label>
+          <label><input class="sr-only" type="radio" name="insight_group" value="category"{% if insight_options.group_by == 'category' %} checked{% endif %}><span>Categories</span></label>
+        </div>
+      </fieldset>
+      <button class="button secondary" type="submit">Apply</button>
+    </div>
   </form>
   {% if insight_options.error %}<p class="field-error" data-monthly-insight-error role="status">{{ insight_options.error }}</p>{% endif %}
   {% for insight in reports.charts %}

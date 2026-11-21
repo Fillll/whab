@@ -245,6 +245,15 @@ must be narrowed. An empty `spending` tuple indicates that a range was unavailab
 Raw transactions in the snapshot still belong to its selected month.
 Version 1 Insights and exports continue receiving only their selected-month data.
 
+When a visual interface narrows Monthly spending by account, category group, or
+category, the host applies those selections together to the monthly aggregates.
+Accounts include closed on-budget accounts with historical transactions.
+Category choices cover expense categories and an explicit Uncategorized option.
+Selections resolve in the current budget and currency, using the current category
+hierarchy. The date range and selected-month snapshot records retain their
+existing meanings. An account filter narrows the register read before the row
+limit. Category and group filters apply to the rows inside that bounded read.
+
 One returned `Insight` may include `chart=StackedMonthlyChart(currency, months,
 series)`. Its currency and consecutive `YYYY-MM` months must match the supplied
 range. It accepts up to 100 `ChartSeries(id, label, values)` records with unique

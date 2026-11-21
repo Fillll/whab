@@ -1725,6 +1725,9 @@ strong {
   border-bottom: 1px solid var(--line);
 }
 .monthly-insights {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
   min-width: 0;
   margin-bottom: 34px;
   padding-bottom: 23px;
@@ -1735,35 +1738,51 @@ strong {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 9px;
 }
 .monthly-insights-heading h2 {
   margin: 0;
   font-size: 22px;
   letter-spacing: -.035em;
 }
-.monthly-insight + .monthly-insight { margin-top: 22px; }
 .monthly-insight h3 { font-size: 14px; margin: 0 0 10px; }
 .monthly-insight-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
   gap: 9px 12px;
-  margin-bottom: 18px;
 }
-.monthly-insight-filters > label,
+.monthly-insight-filters :is(.monthly-insight-dates label, .monthly-insight-select),
 .monthly-insight-mode legend {
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
 }
-.monthly-insight-filters > label { display: grid; gap: 5px; }
-.monthly-insight-filters input[name='insight_from'],
-.monthly-insight-filters input[name='insight_to'] {
-  width: min(164px, 100%);
+.monthly-insight-dates,
+.monthly-insight-actions {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+}
+.monthly-insight-dates { flex: 0 1 300px; flex-wrap: wrap; min-width: 0; }
+.monthly-insight-dates label,
+.monthly-insight-select {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.monthly-insight-dates label { flex: 1 1 135px; }
+.monthly-insight-select { flex: 1 1 122px; max-width: 200px; }
+.monthly-insight-dates input,
+.monthly-insight-select select {
+  width: 100%;
+  min-width: 0;
   min-height: 36px;
   padding: 6px 9px;
   font-size: 12px;
+}
+.monthly-insight-select select {
+  padding-inline-end: 28px;
+  text-overflow: ellipsis;
 }
 .monthly-insight-mode { min-width: 0; padding: 0; margin: 0; border: 0; }
 .monthly-insight-mode legend { padding: 0; margin-bottom: 5px; }
@@ -1797,7 +1816,7 @@ strong {
   outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
-.monthly-insight-filters > button { min-height: 36px; }
+.monthly-insight-actions > button { min-height: 36px; }
 .monthly-chart-scroll {
   overflow: auto;
   border: 1px solid var(--line);
@@ -1915,9 +1934,8 @@ strong {
   line-height: 1.6;
 }
 @media (max-width: 550px) {
-  .monthly-insight-filters > label { flex: 1 1 112px; min-width: 0; }
-  .monthly-insight-filters input[name='insight_from'],
-  .monthly-insight-filters input[name='insight_to'] { width: 100%; }
+  .monthly-insight-dates { flex-basis: 100%; }
+  .monthly-insight-select { max-width: none; }
   .monthly-chart { height: 248px; }
 }
 @media (prefers-reduced-motion: reduce) {

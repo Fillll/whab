@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.68.0 — 2026-11-20
+
+PR: [#222](https://github.com/Fillll/whab/pull/222)
+
+- Add account, category group and category filters to Monthly spending and increase the space above its chart.
+
 ## 1.67.1 — 2026-11-19
 
 PR: [#221](https://github.com/Fillll/whab/pull/221)

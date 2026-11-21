@@ -5,9 +5,13 @@ from types import SimpleNamespace
 
 import pytest
 from starlette.datastructures import QueryParams
+from whab_plugin_json import Store as JsonStore
+from whab_plugin_sqlite import Store as SqliteStore
 
+from whab.domain.categories import category_group_id
 from whab.domain.errors import StoreError
 from whab.plugins import (
+    AccountSnapshot,
     BudgetSnapshot,
     Capability,
     CategorySnapshot,
@@ -92,7 +96,8 @@ def test_month_range_controls_validate_and_keep_legacy_snapshot_available(snapsh
     service.insight_spending = bounded
     data, options = visual_insight_snapshot(base, selected, service)
     assert data == snapshot
-    assert options == {"start_month": "2026-09", "end_month": "2026-10", "group_by": "category"}
+    assert (options["start_month"], options["end_month"], options["group_by"]) == ("2026-09", "2026-10", "category")
+    assert (options["account_id"], options["category_group_id"], options["category_id"]) == ("", "", "")
 
     def too_many(*args):
         raise InsightRangeTooLarge("Choose fewer months.")
@@ -100,6 +105,118 @@ def test_month_range_controls_validate_and_keep_legacy_snapshot_available(snapsh
     service.insight_spending = too_many
     data, options = visual_insight_snapshot(base, selected, service)
     assert data is base and options["error"] == "Choose fewer months."
+
+
+def test_filter_controls_offer_only_scoped_and_spend_eligible_choices(snapshot):
+    base = replace(snapshot, accounts=(
+        AccountSnapshot("cash", "Wallet", "depository", "checking", 100),
+        AccountSnapshot("archive", "古い口座", "depository", "checking", 100, closed=True),
+        AccountSnapshot("tracking", "Tracking", "depository", "checking", 100, on_budget=False),
+    ), categories=snapshot.categories + (
+        CategorySnapshot("uncategorized", "Épicerie", "Travel", 0, 0, 0),
+        CategorySnapshot("salary", "Salary", "Income", 0, 0, 0, kind="income"),
+    ))
+    group = category_group_id("Living")
+    selected = {"insight_account": "archive", "insight_category_group": group, "insight_category": "category:food"}
+    calls = []
+
+    def project(*args, **filters):
+        calls.append((args, filters))
+        return snapshot.spending
+
+    service = SimpleNamespace(insight_spending=project)
+    _, options = visual_insight_snapshot(base, QueryParams(selected), service)
+    assert calls == [(('personal', '2026-05', '2026-10', 'USD'),
+                      {"account_id": "archive", "group_id": group, "category_id": "food"})]
+    assert options["account_id"] == "archive" and options["category_group_id"] == group
+    assert options["category_id"] == "category:food"
+    assert options["accounts"] == [{"id": "cash", "label": "Wallet"}, {"id": "archive", "label": "古い口座 (closed)"}]
+    assert options["categories"] == [
+        {"id": "category:food", "label": "Living / Épicerie", "group_id": group},
+        {"id": "category:uncategorized", "label": "Travel / Épicerie", "group_id": category_group_id("Travel")},
+        {"id": "uncategorized", "label": "Uncategorized", "group_id": ""},
+    ]
+    assert options["category_groups"] == [
+        {"id": group, "label": "Living"}, {"id": category_group_id("Travel"), "label": "Travel"},
+    ]
+    for value, resolved in (("uncategorized", None), ("category:uncategorized", "uncategorized")):
+        visual_insight_snapshot(base, QueryParams({"insight_category": value}), service)
+        assert calls[-1][1] == {"category_id": resolved}
+
+    for query in ("insight_account=tracking", "insight_account=missing", "insight_category=category:salary",
+                  f"insight_category_group={category_group_id('Income')}", "insight_category=food",
+                  "insight_account=archive&insight_account=cash"):
+        data, options = visual_insight_snapshot(base, QueryParams(query), service)
+        assert data is base and options["error"]
+    assert len(calls) == 3
+
+
+@pytest.fixture(params=("sqlite", "json"))
+def insight_ledger(tmp_path, request):
+    storage = (SqliteStore(":memory:", month="2026-04") if request.param == "sqlite"
+               else JsonStore(tmp_path / "fictional.json", month="2026-04"))
+    try:
+        yield LedgerService(storage)
+    finally:
+        storage.close()
+
+
+def test_spending_filters_intersect_before_aggregating_on_each_backend(insight_ledger):
+    service = insight_ledger
+
+    def account(name, **fields):
+        return service.add_account("personal", {"name": name, "type": "depository", "balance": 0, **fields})
+
+    def category(name, group, **fields):
+        return service.add_category("personal", {"name": name, "group": group, "target": 0, **fields})
+
+    def add(identifier, amount, category_id, date="2026-04-15"):
+        service.add_transaction("personal", {
+            "accountId": identifier, "amount": amount, "categoryId": category_id, "date": date, "merchant": "Fictional",
+        })
+
+    archived = account("Archived spending")
+    active = account("Active spending")
+    tracking = account("Tracking", onBudget=False)
+    euro = account("Euros", currency="EUR")
+    food = category("友人", "Food")
+    drinks = category("Drinks", "Food")
+    travel = category("友人", "Travel")
+    euro_food = category("Euros", "Foreign", currency="EUR")
+    income = category("Pay", "Income", kind="income")
+    add(archived, 500, food, "2026-04-01")
+    add(archived, -100, food, "2026-04-30")
+    add(archived, 200, drinks)
+    add(archived, 100, travel)
+    add(archived, 75, None)
+    add(archived, -50, None)
+    add(archived, -1000, income)
+    add(active, 1000, food)
+    add(tracking, 250, food)
+    add(euro, 999, euro_food)
+    service.update_account("personal", archived, {"closed": True})
+    revision = service.revision
+
+    def result(workspace="personal", currency="USD", **filters):
+        first, second = service.insight_spending(workspace, "2026-04", "2026-05", currency, **filters)
+        assert first.month == "2026-04" and second == SpendingMonth("2026-05", 0, ())
+        return first.uncategorized_cents, {row.category_id: row.amount_cents for row in first.categories}
+
+    food_group = category_group_id("Food")
+    assert result() == (75, {food: 1400, drinks: 200, travel: 100})
+    assert result(account_id=archived) == (75, {food: 400, drinks: 200, travel: 100})
+    assert result(group_id=food_group) == (0, {food: 1400, drinks: 200})
+    assert result(category_id=food) == (0, {food: 1400})
+    assert result(account_id=archived, group_id=food_group, category_id=food) == (0, {food: 400})
+    assert result(account_id=archived, group_id=food_group, category_id=travel) == (0, {})
+    assert result(group_id=food_group, category_id=None) == (0, {})
+    assert result(account_id=archived, category_id=None) == (75, {})
+    assert result(currency="EUR", account_id=euro, category_id=euro_food) == (0, {euro_food: 999})
+    for filters in ({"workspace": "demo", "account_id": archived}, {"account_id": tracking}, {"account_id": euro},
+                    {"category_id": euro_food}, {"category_id": income}, {"group_id": category_group_id("Foreign")}):
+        with pytest.raises(StoreError, match="unavailable for this budget and currency"):
+            result(**filters)
+    assert service.revision == revision
 
 
 def test_atomic_read_projects_on_budget_categorized_refunds_and_empty_months(store):

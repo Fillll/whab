@@ -10,7 +10,17 @@ from whab_plugin_sqlite import Store
 from tests.support.ui import make_ui
 from whab.app import create_app
 from whab.config import Settings
-from whab.plugins import ExportTable, Insight, Plugin, PluginRegistry
+from whab.domain.categories import category_group_id
+from whab.plugins import (
+    Capability,
+    ExportTable,
+    Insight,
+    Plugin,
+    PluginContract,
+    PluginRegistry,
+    SpendingCategory,
+    SpendingMonth,
+)
 
 
 def make_client(store, registry, home):
@@ -74,6 +84,48 @@ def test_plugin_gets_only_selected_workspace_month_without_connection_secrets(tm
             assert all(a.id != account for a in seen[-1].accounts)
     finally:
         store.close()
+
+
+def test_visual_report_filters_scope_the_aggregate_without_changing_legacy_inputs(store, tmp_path):
+    categories = (store.add_category("personal", {"name": "Fuel", "group": "Travel"}),
+                  store.add_category("personal", {"name": "Fuel", "group": "Home"}))
+    accounts = tuple(store.add_account("personal", {"name": name, "type": "depository", "balance": 0})
+                     for name in ("Fictional checking", "Fictional savings"))
+    for account, category, month, amount in (
+        (accounts[0], categories[0], "2026-09", 100),
+        (accounts[0], categories[1], "2026-10", 200),
+        (accounts[1], categories[0], "2026-10", 300),
+    ):
+        store.add_transaction("personal", {"accountId": account, "categoryId": category,
+                                           "date": month + "-20", "merchant": "Fictional", "amount": amount})
+    captured = {"visual": [], "legacy": []}
+
+    def observe(kind):
+        def report(snapshot):
+            captured[kind].append(snapshot)
+            return ()
+        return report
+
+    reports = PluginRegistry((
+        Plugin("visual", "Visual", insights=observe("visual"),
+               contract=PluginContract(provides=(Capability("reporting.insights", 2),))),
+        Plugin("legacy", "Legacy", insights=observe("legacy")),
+    ))
+    selection = {"insight_from": "2026-09", "insight_to": "2026-10", "insight_account": accounts[0],
+                 "insight_category_group": category_group_id("Travel"), "insight_category": f"category:{categories[0]}"}
+    with make_client(store, reports, tmp_path) as client:
+        path = "/budgets/home/insights/2026-10/usd"
+        assert client.get(path, params=selection).status_code == 200
+        visual = captured["visual"][-1]
+        legacy = captured["legacy"][-1]
+        assert visual.spending == (SpendingMonth("2026-09", 0, (SpendingCategory(categories[0], 100),)),
+                                   SpendingMonth("2026-10", 0, ()))
+        assert not legacy.spending and visual.transactions == legacy.transactions
+        assert [row.date for row in legacy.transactions] == ["2026-10-20", "2026-10-20"]
+        assert client.get(path, params={**selection, "insight_account": "absent"}).status_code == 200
+        assert not captured["visual"][-1].spending
+        assert client.get(path.replace("/home/", "/demo/"), params=selection).status_code == 200
+        assert captured["visual"][-1].workspace == "demo" and not captured["visual"][-1].spending
 
 
 def test_plugin_csv_is_scoped_escaped_and_guarded_like_core_routes(tmp_path):

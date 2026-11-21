@@ -495,8 +495,10 @@ Subscription classification uses the Subscriptions plugin 1.1+ background job AP
 ## Monthly spending charts
 
 With a compatible host and an enabled visual Insights plugin, open **Insights**
-to see **Monthly spending**. Choose inclusive **From** and **To** months, select
-**Groups** or **Categories**, then select **Apply**. The initial range is six
+to see **Monthly spending**. Choose inclusive **From** and **To** months, and
+optionally choose an **Account**, **Category group**, or **Category**. The chart
+uses spending that matches every selected filter. Choose **Groups** or
+**Categories** under **Show by**, then select **Apply**. The initial range is six
 months, and a custom range can contain up to 24. The address keeps the selection
 for bookmarking and Back/Forward.
 
@@ -506,7 +508,7 @@ below zero and the line shows the monthly net across all series. Use a legend
 button to emphasize a series, or open **Monthly breakdown** for the same values
 in a navigable table. Long ranges scroll horizontally. **Hide amounts** conceals
 the plot, legend, breakdown and report detail while the date controls remain
-available.
+available along with the other chart filters.
 
 The Web interface renders typed, escaped report results from the host. It keeps
 the existing six-month trend when no visual report is available. Older hosts and

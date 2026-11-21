@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from whab.plugins import (
     PluginContract,
     StackedMonthlyChart,
 )
+from whab.services.ledger import LedgerService
 
 
 def test_stacked_monthly_geometry_keeps_zero_months_and_separates_refund_stack():
@@ -107,3 +109,51 @@ def test_range_and_group_filters_preserve_useful_fallbacks(store, tmp_path, clie
         invalid = client.get(route, params={**selection, "insight_from": "2026-12"})
         assert invalid.status_code == 200 and 'data-monthly-insight-error' in invalid.text
         assert 'data-monthly-plot' not in invalid.text and 'Spending over time' in invalid.text
+
+
+def test_scoped_picker_choices_render_and_filter_the_chart(store, tmp_path, client_for):
+    ledger = LedgerService(store)
+    account = ledger.add_account("personal", {"name": "Café & cash", "type": "depository", "balance": 0})
+    other = ledger.add_account("personal", {"name": "Other wallet", "type": "depository", "balance": 0})
+    foreign = ledger.add_account("personal", {
+        "name": "Euro wallet", "type": "depository", "currency": "EUR", "balance": 0,
+    })
+    category = ledger.add_category("personal", {"name": "Café", "group": "Food & drink", "target": 0})
+    for account_id, amount, category_id in ((account, 133700, category), (other, 88800, category), (account, 25200, None)):
+        ledger.add_transaction("personal", {
+            "accountId": account_id, "date": "2026-11-01", "amount": amount, "categoryId": category_id,
+            "merchant": "Fictional cafe",
+        })
+
+    def fictional_chart(snapshot):
+        values = tuple(month.uncategorized_cents + sum(item.amount_cents for item in month.categories)
+                       for month in snapshot.spending)
+        if not values:
+            return ()
+        series = (ChartSeries("testing", "Test spending", values),) if any(values) else ()
+        chart = StackedMonthlyChart(snapshot.currency, tuple(month.month for month in snapshot.spending), series)
+        return (Insight("Fictional report", "", chart=chart),)
+
+    visual = Plugin("fictional-chart", "Fictional chart", insights=fictional_chart,
+                    contract=PluginContract(provides=(Capability("reporting.insights", 2, "additive"),)))
+    route = "/budgets/home/insights/2026-11/usd"
+    with client_for(store, tmp_path, visual) as client:
+        initial = client.get(route)
+        assert initial.status_code == 200
+        form = re.search(r'<form [^>]*data-monthly-insight-filters[^>]*>(.*?)</form>', initial.text, re.S)[1]
+        assert f'<option value="{account}">Café &amp; cash</option>' in form
+        assert f'<option value="{foreign}">' not in form
+        assert f'<option value="category:{category}">Food &amp; drink / Café</option>' in form
+        group = re.search(r'<option value="([^"]+)">Food &amp; drink</option>', form)[1]
+        params = {
+            "insight_from": "2026-11", "insight_to": "2026-11", "insight_group": "category",
+            "insight_account": account, "insight_category_group": group, "insight_category": f"category:{category}",
+        }
+        response = client.get(route, params=params, headers={"X-WHAB-Page-Fragment": "1"})
+        assert response.status_code == 200 and response.headers["X-WHAB-Page-Fragment"] == "1"
+        assert f'<option value="{account}" selected>' in response.text and f'<option value="{group}" selected>' in response.text
+        assert f'<option value="category:{category}" selected>' in response.text
+        assert '<td>$1,337</td>' in response.text and '<td>$2,477</td>' not in response.text
+        empty = client.get(route, params={**params, "insight_category": "uncategorized"})
+        assert empty.status_code == 200 and 'No spending matches these filters.' in empty.text
+        assert '<option value="uncategorized" selected>' in empty.text

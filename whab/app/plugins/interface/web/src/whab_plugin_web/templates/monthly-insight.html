@@ -63,7 +63,7 @@
       </div>
     </details>
   {% else %}
-  <p class="empty-inline">No spending in the selected months.</p>
+  <p class="empty-inline">{{ 'No spending matches these filters.' if insight_options.account_id or insight_options.category_group_id or insight_options.category_id else 'No spending in the selected months.' }}</p>
   {% endif %}
   {% if insight.detail %}<p class="monthly-insight-detail">{{ insight.detail }}</p>{% endif %}
   </div>
