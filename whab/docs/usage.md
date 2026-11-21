@@ -303,7 +303,7 @@ Enable **Monthly spending** in **Settings → Plugins**, then open **Insights**.
 The graph has one column per month. Choose the first and last months to compare
 an inclusive range of up to 24 months. Switch between **Groups** for the broad
 breakdown and **Categories** for the individual budget categories.
-Choose any number of values in **Account**, **Category group**, and **Category**,
+Choose one or more values in **Accounts**, **Category groups**, and **Categories**,
 then select **Apply**. Transactions can match any chosen value within a filter
 and must match each filter in use. Clear a filter to include all its values.
 Your selection stays in the address when you reload or share the report link.

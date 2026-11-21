@@ -336,16 +336,35 @@ with TestClient(create_app(settings=chart_settings), base_url="https://127.0.0.1
         "merchant": "Fictional grocery shop", "amount": 7000, "categoryId": "groceries",
     })
     assert purchase.status_code == 200
+    outside = client.post("/api/accounts", json={
+        "workspace": "personal", "name": "Fictional card", "type": "depository", "balance": 20000,
+    })
+    assert outside.status_code == 200
+    for account_id, category, amount in (
+        (second.json()["accountId"], "utilities", 5500),
+        (outside.json()["accountId"], "groceries", 6800),
+    ):
+        excluded = client.post("/api/transactions", json={
+            "workspace": "personal", "accountId": account_id, "date": "2026-02-12",
+            "merchant": "Fictional purchase outside filters", "amount": amount, "categoryId": category,
+        })
+        assert excluded.status_code == 200
     route = "/budgets/home/insights/2026-03/usd"
     options = {"insight_from": "2026-02", "insight_to": "2026-03", "insight_group": "category"}
     all_spending = client.get(route, params=options)
-    assert all_spending.status_code == 200 and "February 2026 · Net spending $193" in all_spending.text
+    assert all_spending.status_code == 200 and "February 2026 · Net spending $316" in all_spending.text
     page = client.get(route, params={
         **options, "insight_account": account.json()["accountId"], "insight_category": "uncategorized",
     })
     assert page.status_code == 200 and "data-monthly-plot" in page.text
     assert "February 2026 · Net spending $123" in page.text
     assert "March 2026 · Net spending $0" in page.text
+    multiple = client.get(route, params=[
+        *options.items(), ("insight_account", account.json()["accountId"]),
+        ("insight_account", second.json()["accountId"]), ("insight_category", "uncategorized"),
+        ("insight_category", "category:groceries"),
+    ])
+    assert multiple.status_code == 200 and "February 2026 · Net spending $193" in multiple.text
 print("Installed wheels: curated catalog resource/contracts, independent versions, MIT licenses, pages, assets and plugin discovery passed.")
 """
 

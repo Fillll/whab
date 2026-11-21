@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.89.0 — 2026-11-20
+
+PR: [#223](https://github.com/Fillll/whab/pull/223)
+
+- Accept multiple account, category group and category selections in Monthly spending. Keep existing single-selection links working.
+
 ## 2.88.0 — 2026-11-20
 
 PR: [#222](https://github.com/Fillll/whab/pull/222)

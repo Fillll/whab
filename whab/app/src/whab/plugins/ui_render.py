@@ -13,6 +13,8 @@ from .contracts import Capability, Requirement
 from .sdk import ChartSeries, Insight, PluginDescription, PluginInsightResult, StackedMonthlyChart
 from .wire import MAX_METADATA_BYTES, Frame, WireError
 
+MAX_UI_QUERY_FIELDS = 128
+
 _RECORDS = (PluginDescription, PluginInsightResult, Insight, Capability, Requirement, StackedMonthlyChart, ChartSeries)
 _HEADERS = frozenset({"x-whab-page-fragment", "x-whab-budget-fragment",
                       "x-whab-transactions-fragment", "x-whab-transactions-sidebar"})
@@ -101,7 +103,7 @@ def read_arguments(value, *, workspace_pages=()):
     if (type(request["path"]) is not str or not request["path"].startswith("/") or len(request["path"]) > 4096
             or type(request["headers"]) is not dict or request["headers"].keys() - _HEADERS
             or any(type(item) is not str or len(item) > 100 for item in request["headers"].values())
-            or type(request["query"]) is not list or len(request["query"]) > 128
+            or type(request["query"]) is not list or len(request["query"]) > MAX_UI_QUERY_FIELDS
             or any(type(pair) is not list or len(pair) != 2 or any(type(item) is not str or len(item) > 4096 for item in pair)
                    for pair in request["query"])):
         raise WireError()

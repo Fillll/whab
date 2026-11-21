@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.69.0 — 2026-11-20
+
+PR: [#223](https://github.com/Fillll/whab/pull/223)
+
+- Choose several accounts, category groups and categories with searchable checkboxes in Monthly spending.
+
 ## 1.68.0 — 2026-11-20
 
 PR: [#222](https://github.com/Fillll/whab/pull/222)

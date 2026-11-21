@@ -34,7 +34,9 @@ test('applying date, grouping, account and category selections navigates without
     action: 'https://localhost:5173/budgets/fictional/insights/current-month/eur',
     fields: [
       ['insight_from', '2026-08'], ['insight_to', '2026-11'], ['insight_group', 'category'],
-      ['insight_account', 'café-wallet'], ['insight_category_group', ''], ['insight_category', 'category:market'],
+      ['insight_account', 'café-wallet'], ['insight_account', 'cash'],
+      ['insight_category_group', 'living'], ['insight_category_group', 'transit'],
+      ['insight_category', 'category:market'], ['insight_category', 'category:metro'],
     ],
     addEventListener(event, submit) {assert.equal(event, 'submit'); this.submit = submit;},
   };
@@ -48,11 +50,105 @@ test('applying date, grouping, account and category selections navigates without
   assert.deepEqual([...calls[0].searchParams], form.fields);
 });
 
+test('too many fields keep the draft and explain how to apply it', async () => {
+  const {initMonthlyInsights} = harness();
+  const error = {hidden: true};
+  const form = {
+    action: 'https://localhost:5173/budgets/fictional/insights/current-month/usd',
+    dataset: {monthlyFilterMaxFields: '128'},
+    fields: [
+      ['insight_from', '2026-08'], ['insight_to', '2026-11'], ['insight_group', 'category'],
+      ...Array.from({length: 126}, (_, index) => ['insight_category', `category:${index}`]),
+    ],
+    addEventListener(event, submit) { this.submit = submit; },
+    querySelector() { return error; },
+  };
+  const report = {querySelector: () => form, querySelectorAll: () => []};
+  const requests = [];
+  initMonthlyInsights({root: {querySelector: () => report}, navigate: async url => { requests.push(url); return true; }});
+  const event = {preventDefault() {}};
+  await form.submit(event);
+  assert.equal(error.hidden, false);
+  assert.equal(requests.length, 0);
+  assert.equal(form.fields.length, 129);
+  form.fields.pop();
+  await form.submit(event);
+  assert.equal(error.hidden, true);
+  assert.equal(requests[0].searchParams.size, 128);
+});
+
+test('search preserves selections and the picker clears to All without submitting', () => {
+  const {initMonthlyFilter} = harness();
+  const control = props => ({
+    ...props,
+    events: {},
+    addEventListener(type, listener) { this.events[type] = listener; },
+  });
+  const options = ['Café', '日本旅行'].map(textContent => ({
+    textContent, checkbox: {checked: true}, querySelector() { return this.checkbox; },
+  }));
+  const summary = {focused: false, focus() { this.focused = true; }};
+  const label = {textContent: '2 selected'};
+  const search = control({value: 'initial'});
+  const clear = control({});
+  const tools = {hidden: true};
+  const empty = {};
+  const children = {
+    summary, '[data-monthly-filter-label]': label,
+    '[data-monthly-filter-panel]': {getBoundingClientRect: () => ({right: 410})},
+    '[data-monthly-filter-search]': search, '[data-monthly-filter-clear]': clear,
+    '[data-monthly-filter-tools]': tools, '[data-monthly-filter-empty]': empty,
+  };
+  const attrs = new Set();
+  const picker = control({
+    open: true, ownerDocument: {documentElement: {clientWidth: 400}}, dataset: {allLabel: 'All categories'},
+    querySelector: selector => children[selector],
+    querySelectorAll: () => options,
+    contains: target => Object.values(children).includes(target),
+    setAttribute: name => attrs.add(name),
+    removeAttribute: name => attrs.delete(name),
+    toggleAttribute: (name, enabled) => enabled ? attrs.add(name) : attrs.delete(name),
+  });
+  initMonthlyFilter(picker);
+  picker.events.toggle();
+  assert.equal(tools.hidden, false);
+  assert.equal(search.value, '');
+  assert.equal(attrs.has('data-monthly-filter-align-end'), true);
+  search.value = 'CAFE';
+  search.events.input();
+  assert.deepEqual(options.map(option => option.hidden), [false, true]);
+  assert.deepEqual(options.map(option => option.checkbox.checked), [true, true]);
+  options[0].checkbox.checked = false;
+  picker.events.change();
+  assert.equal(label.textContent, '1 selected');
+
+  function keystroke(key) {
+    const event = {key, target: search, prevented: false, preventDefault() { this.prevented = true; }};
+    picker.events.keydown(event);
+    return event.prevented;
+  }
+  assert.equal(keystroke('Enter'), true);
+  assert.equal(picker.open, true);
+  assert.equal(keystroke('Escape'), true);
+  assert.equal(picker.open, false);
+  assert.equal(summary.focused, true);
+  assert.equal(options[1].checkbox.checked, true);
+
+  picker.open = true;
+  clear.events.click();
+  assert.deepEqual(options.map(option => option.checkbox.checked), [false, false]);
+  assert.equal(label.textContent, 'All categories');
+  assert.equal(picker.open, false);
+});
+
 test('emphasizing a series is local to its chart and reversible', () => {
   const {initMonthlyInsights} = harness();
   const main = legend();
   const second = legend();
-  const report = {querySelector: () => ({addEventListener() {}}), querySelectorAll: () => [main, second]};
+  const report = {
+    querySelector: () => ({addEventListener() {}}),
+    querySelectorAll: selector => selector === '.monthly-insight' ? [main, second] : [],
+  };
   initMonthlyInsights({root:{querySelector: () => report}});
   assert.equal(main.controls[0].disabled, false);
   main.controls[0].click();

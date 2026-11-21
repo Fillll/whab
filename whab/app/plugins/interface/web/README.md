@@ -495,12 +495,14 @@ Subscription classification uses the Subscriptions plugin 1.1+ background job AP
 ## Monthly spending charts
 
 With a compatible host and an enabled visual Insights plugin, open **Insights**
-to see **Monthly spending**. Choose inclusive **From** and **To** months, and
-optionally choose an **Account**, **Category group**, or **Category**. The chart
-uses spending that matches every selected filter. Choose **Groups** or
-**Categories** under **Show by**, then select **Apply**. The initial range is six
-months, and a custom range can contain up to 24. The address keeps the selection
-for bookmarking and Back/Forward.
+to see **Monthly spending**. Choose inclusive **From** and **To** months.
+In **Accounts**, **Category groups**, or **Categories**, search and check as many
+options as needed. The chart includes transactions matching any checked option
+within each filter and combines the three filters. **Use all** clears that
+filter's selections. Choose **Groups** or **Categories** under **Show by**, then
+select **Apply**. The initial range is six months, and a custom range can
+contain up to 24. Apply up to 125 choices across the three filters. The address
+keeps the selection for bookmarking and Back/Forward.
 
 Each column is one month in the view's currency, including months with no
 spending. The colors identify series across months. Negative net amounts extend
@@ -511,8 +513,8 @@ the plot, legend, breakdown and report detail while the date controls remain
 available along with the other chart filters.
 
 The Web interface renders typed, escaped report results from the host. It keeps
-the existing six-month trend when no visual report is available. Older hosts and
-plain-text Insights plugins keep their normal views.
+the existing six-month trend when no visual report is available. A host that
+supports single-choice filters continues to display them as standard selects.
 
 ## Operation documentation
 
