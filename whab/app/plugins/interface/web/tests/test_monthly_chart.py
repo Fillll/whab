@@ -115,11 +115,17 @@ def test_scoped_picker_choices_render_and_filter_the_chart(store, tmp_path, clie
     ledger = LedgerService(store)
     account = ledger.add_account("personal", {"name": "Café & cash", "type": "depository", "balance": 0})
     other = ledger.add_account("personal", {"name": "Other wallet", "type": "depository", "balance": 0})
+    extra = ledger.add_account("personal", {"name": "Extra wallet", "type": "depository", "balance": 0})
     foreign = ledger.add_account("personal", {
         "name": "Euro wallet", "type": "depository", "currency": "EUR", "balance": 0,
     })
     category = ledger.add_category("personal", {"name": "Café", "group": "Food & drink", "target": 0})
-    for account_id, amount, category_id in ((account, 133700, category), (other, 88800, category), (account, 25200, None)):
+    transit = ledger.add_category("personal", {"name": "Train", "group": "Travel", "target": 0})
+    dessert = ledger.add_category("personal", {"name": "Dessert", "group": "Food & drink", "target": 0})
+    for account_id, amount, category_id in (
+        (account, 133700, category), (other, 88800, category), (other, 42100, transit),
+        (account, 25200, None), (extra, 99900, category), (account, 20000, dessert),
+    ):
         ledger.add_transaction("personal", {
             "accountId": account_id, "date": "2026-11-01", "amount": amount, "categoryId": category_id,
             "merchant": "Fictional cafe",
@@ -140,20 +146,29 @@ def test_scoped_picker_choices_render_and_filter_the_chart(store, tmp_path, clie
     with client_for(store, tmp_path, visual) as client:
         initial = client.get(route)
         assert initial.status_code == 200
+        assert 'data-monthly-filter-max-fields="128"' in initial.text
+        assert 'Choose up to 125 options across Accounts, Category groups, and Categories.' in initial.text
         form = re.search(r'<form [^>]*data-monthly-insight-filters[^>]*>(.*?)</form>', initial.text, re.S)[1]
-        assert f'<option value="{account}">Café &amp; cash</option>' in form
-        assert f'<option value="{foreign}">' not in form
-        assert f'<option value="category:{category}">Food &amp; drink / Café</option>' in form
-        group = re.search(r'<option value="([^"]+)">Food &amp; drink</option>', form)[1]
+        assert re.search(rf'name="insight_account" value="{account}">\s*<span>Café &amp; cash</span>', form)
+        assert f'name="insight_account" value="{foreign}"' not in form
+        assert re.search(rf'value="category:{category}">\s*<span>Food &amp; drink / Café</span>', form)
+        assert "All accounts" in form and "All groups" in form and "All categories" in form
+        group = re.search(r'name="insight_category_group" value="([^"]+)">\s*<span>Food &amp; drink</span>', form)[1]
+        travel = re.search(r'name="insight_category_group" value="([^"]+)">\s*<span>Travel</span>', form)[1]
+        selected = {
+            "insight_account": [account, other], "insight_category_group": [group, travel],
+            "insight_category": [f"category:{category}", f"category:{transit}"],
+        }
         params = {
             "insight_from": "2026-11", "insight_to": "2026-11", "insight_group": "category",
-            "insight_account": account, "insight_category_group": group, "insight_category": f"category:{category}",
+            **selected,
         }
         response = client.get(route, params=params, headers={"X-WHAB-Page-Fragment": "1"})
         assert response.status_code == 200 and response.headers["X-WHAB-Page-Fragment"] == "1"
-        assert f'<option value="{account}" selected>' in response.text and f'<option value="{group}" selected>' in response.text
-        assert f'<option value="category:{category}" selected>' in response.text
-        assert '<td>$1,337</td>' in response.text and '<td>$2,477</td>' not in response.text
+        for name, choices in selected.items():
+            assert all(f'name="{name}" value="{choice}" checked>' in response.text for choice in choices)
+        assert response.text.count('data-monthly-filter-label>2 selected') == 3
+        assert '<td>$2,646</td>' in response.text
         empty = client.get(route, params={**params, "insight_category": "uncategorized"})
         assert empty.status_code == 200 and 'No spending matches these filters.' in empty.text
-        assert '<option value="uncategorized" selected>' in empty.text
+        assert 'name="insight_category" value="uncategorized" checked>' in empty.text

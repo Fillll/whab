@@ -246,13 +246,18 @@ Raw transactions in the snapshot still belong to its selected month.
 Version 1 Insights and exports continue receiving only their selected-month data.
 
 When a visual interface narrows Monthly spending by account, category group, or
-category, the host applies those selections together to the monthly aggregates.
+category, the host matches any selection within each filter. The monthly
+aggregates include only activity that matches every selected filter.
 Accounts include closed on-budget accounts with historical transactions.
 Category choices cover expense categories and an explicit Uncategorized option.
 Selections resolve in the current budget and currency, using the current category
 hierarchy. The date range and selected-month snapshot records retain their
 existing meanings. An account filter narrows the register read before the row
 limit. Category and group filters apply to the rows inside that bounded read.
+An empty selection leaves a filter open. The Web URL can repeat each of
+`insight_account`, `insight_category_group`, and `insight_category`. Single values
+and legacy blank values still work. Duplicate selections count once. The visual
+worker transport accepts up to 128 query fields per request, including repeats.
 
 One returned `Insight` may include `chart=StackedMonthlyChart(currency, months,
 series)`. Its currency and consecutive `YYYY-MM` months must match the supplied

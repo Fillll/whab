@@ -303,9 +303,10 @@ Enable **Monthly spending** in **Settings → Plugins**, then open **Insights**.
 The graph has one column per month. Choose the first and last months to compare
 an inclusive range of up to 24 months. Switch between **Groups** for the broad
 breakdown and **Categories** for the individual budget categories.
-Narrow the chart with **Account**, **Category group**, and **Category**, then
-select **Apply**. The chart uses transactions that match all selected filters.
-Select **All** in a filter to remove that restriction.
+Choose one or more values in **Accounts**, **Category groups**, and **Categories**,
+then select **Apply**. Transactions can match any chosen value within a filter
+and must match each filter in use. Clear a filter to include all its values.
+Your selection stays in the address when you reload or share the report link.
 
 Stacks show net posted spending from on-budget accounts in the selected currency.
 Refunds reduce their category's spending. Months with a net refund for a series

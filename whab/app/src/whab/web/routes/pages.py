@@ -12,7 +12,7 @@ from whab.domain.dates import current_month
 from whab.plugins import PluginError
 from whab.plugins.sdk import valid_merchant_logo_key
 from whab.services.ledger import LedgerService
-from whab.web.insight_options import visual_insight_snapshot
+from whab.web.insight_options import insight_selections, visual_insight_snapshot
 from whab.web.navigation import PAGES, budget_key, page_url
 from whab.web.plugin_snapshot import build_snapshot
 from whab.web.schemas import valid_month
@@ -246,6 +246,8 @@ def create_router(
         canonical_filters = dict(request.query_params)
         if request.query_params.getlist("sort"):
             canonical_filters["sort"] = request.query_params.getlist("sort")
+        if page == "insights":
+            canonical_filters.update(insight_selections(request.query_params))
         canonical_filters.pop("account", None)
         canonical_filters.pop("accounts", None)
         if selected_ids and len(selected_ids) > 1:

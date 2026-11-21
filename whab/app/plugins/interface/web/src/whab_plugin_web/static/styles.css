@@ -1725,6 +1725,7 @@ strong {
   border-bottom: 1px solid var(--line);
 }
 .monthly-insights {
+  container: monthly-insights / inline-size;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
@@ -1751,6 +1752,7 @@ strong {
   align-items: end;
   gap: 9px 12px;
 }
+.monthly-insight-filter-limit { flex-basis: 100%; margin: 0; }
 .monthly-insight-filters :is(.monthly-insight-dates label, .monthly-insight-select),
 .monthly-insight-mode legend {
   color: var(--muted);
@@ -1783,6 +1785,91 @@ strong {
 .monthly-insight-select select {
   padding-inline-end: 28px;
   text-overflow: ellipsis;
+}
+.monthly-insight-multiselect {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.monthly-insight-multiselect > legend { padding: 0 0 5px; }
+.monthly-insight-multiselect details { position: relative; }
+.monthly-insight-multiselect summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 9px;
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: var(--field);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+  list-style: none;
+}
+.monthly-insight-multiselect summary::-webkit-details-marker { display: none; }
+.monthly-insight-multiselect summary:focus-visible,
+.monthly-insight-multiselect details[open] summary { border-color: var(--focus); }
+.monthly-insight-multiselect summary svg { flex: none; color: var(--muted); }
+.monthly-insight-filter-panel {
+  position: absolute;
+  z-index: 20;
+  inset-block-start: calc(100% + 5px);
+  inset-inline-start: 0;
+  inline-size: 100%;
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 6px 18px var(--shadow-toast);
+}
+[data-monthly-filter-enhanced] > .monthly-insight-filter-panel { inline-size: min(280px, calc(100vw - 32px)); }
+[data-monthly-filter-align-end] > .monthly-insight-filter-panel { inset-inline: auto 0; }
+.monthly-insight-filter-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
+  border-bottom: 1px solid var(--line);
+}
+.monthly-insight-filter-tools input {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 400;
+}
+.monthly-insight-filter-tools button { flex: none; }
+.monthly-insight-filter-options {
+  max-block-size: min(265px, 45vh);
+  overflow-y: auto;
+  padding: 4px;
+}
+.monthly-insight-filter-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 35px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.monthly-insight-filter-options label:is(:hover, :focus-within) { background: var(--current); }
+.monthly-insight-filter-options input { flex: none; margin: 0; }
+.monthly-insight-filter-options .empty-inline { margin: 7px; }
+@container monthly-insights (max-width: 940px) {
+  .monthly-insight-filters { position: relative; }
+  .monthly-insight-multiselect details { position: static; }
+  [data-monthly-filter] > .monthly-insight-filter-panel {
+    inset-inline: 0;
+    inline-size: 100%;
+  }
 }
 .monthly-insight-mode { min-width: 0; padding: 0; margin: 0; border: 0; }
 .monthly-insight-mode legend { padding: 0; margin-bottom: 5px; }

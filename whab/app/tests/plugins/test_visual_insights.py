@@ -88,8 +88,9 @@ def test_month_range_controls_validate_and_keep_legacy_snapshot_available(snapsh
         data, options = visual_insight_snapshot(base, QueryParams(query), service)
         assert data is base and options["error"]
 
-    def bounded(workspace, start, end, currency):
+    def bounded(workspace, start, end, currency, **filters):
         assert (workspace, start, end, currency) == ("personal", "2026-09", "2026-10", "USD")
+        assert filters == {"account_ids": [], "group_ids": [], "category_ids": ()}
         return snapshot.spending
 
     selected = QueryParams("insight_from=2026-09&insight_to=2026-10&insight_group=category")
@@ -97,9 +98,9 @@ def test_month_range_controls_validate_and_keep_legacy_snapshot_available(snapsh
     data, options = visual_insight_snapshot(base, selected, service)
     assert data == snapshot
     assert (options["start_month"], options["end_month"], options["group_by"]) == ("2026-09", "2026-10", "category")
-    assert (options["account_id"], options["category_group_id"], options["category_id"]) == ("", "", "")
+    assert (options["account_ids"], options["category_group_ids"], options["category_ids"]) == ([], [], [])
 
-    def too_many(*args):
+    def too_many(*args, **filters):
         raise InsightRangeTooLarge("Choose fewer months.")
 
     service.insight_spending = too_many
@@ -127,9 +128,10 @@ def test_filter_controls_offer_only_scoped_and_spend_eligible_choices(snapshot):
     service = SimpleNamespace(insight_spending=project)
     _, options = visual_insight_snapshot(base, QueryParams(selected), service)
     assert calls == [(('personal', '2026-05', '2026-10', 'USD'),
-                      {"account_id": "archive", "group_id": group, "category_id": "food"})]
-    assert options["account_id"] == "archive" and options["category_group_id"] == group
-    assert options["category_id"] == "category:food"
+                      {"account_ids": ["archive"], "group_ids": [group], "category_ids": ("food",)})]
+    assert options["account_ids"] == ["archive"] and options["category_group_ids"] == [group]
+    assert options["category_ids"] == ["category:food"]
+    assert (options["account_id"], options["category_group_id"], options["category_id"]) == ("archive", group, "category:food")
     assert options["accounts"] == [{"id": "cash", "label": "Wallet"}, {"id": "archive", "label": "古い口座 (closed)"}]
     assert options["categories"] == [
         {"id": "category:food", "label": "Living / Épicerie", "group_id": group},
@@ -141,14 +143,31 @@ def test_filter_controls_offer_only_scoped_and_spend_eligible_choices(snapshot):
     ]
     for value, resolved in (("uncategorized", None), ("category:uncategorized", "uncategorized")):
         visual_insight_snapshot(base, QueryParams({"insight_category": value}), service)
-        assert calls[-1][1] == {"category_id": resolved}
+        assert calls[-1][1]["category_ids"] == (resolved,)
 
-    for query in ("insight_account=tracking", "insight_account=missing", "insight_category=category:salary",
-                  f"insight_category_group={category_group_id('Income')}", "insight_category=food",
-                  "insight_account=archive&insight_account=cash"):
+    second_group = category_group_id("Travel")
+    repeated = QueryParams([
+        ("insight_account", "archive"), ("insight_account", ""), ("insight_account", "cash"), ("insight_account", "archive"),
+        ("insight_category_group", group), ("insight_category_group", second_group), ("insight_category_group", group),
+        ("insight_category", "category:food"), ("insight_category", "uncategorized"),
+        ("insight_category", "category:uncategorized"), ("insight_category", "uncategorized"),
+    ])
+    _, options = visual_insight_snapshot(base, repeated, service)
+    assert options["account_ids"] == ["archive", "cash"]
+    assert options["category_group_ids"] == [group, second_group]
+    assert options["category_ids"] == ["category:food", "uncategorized", "category:uncategorized"]
+    assert calls[-1][1] == {"account_ids": ["archive", "cash"], "group_ids": [group, second_group],
+                            "category_ids": ("food", None, "uncategorized")}
+    _, options = visual_insight_snapshot(base, QueryParams("insight_account=&insight_category_group=&insight_category="), service)
+    assert options["account_ids"] == options["category_group_ids"] == options["category_ids"] == []
+    assert calls[-1][1] == {"account_ids": [], "group_ids": [], "category_ids": ()}
+
+    for query in ("insight_account=archive&insight_account=tracking", "insight_account=missing", "insight_category=category:salary",
+                  f"insight_category_group={group}&insight_category_group={category_group_id('Income')}",
+                  "insight_category=category:food&insight_category=food"):
         data, options = visual_insight_snapshot(base, QueryParams(query), service)
         assert data is base and options["error"]
-    assert len(calls) == 3
+    assert len(calls) == 5
 
 
 @pytest.fixture(params=("sqlite", "json"))
@@ -177,11 +196,13 @@ def test_spending_filters_intersect_before_aggregating_on_each_backend(insight_l
 
     archived = account("Archived spending")
     active = account("Active spending")
+    reserve = account("Reserve spending")
     tracking = account("Tracking", onBudget=False)
     euro = account("Euros", currency="EUR")
     food = category("友人", "Food")
     drinks = category("Drinks", "Food")
     travel = category("友人", "Travel")
+    electric = category("Electricity", "Utilities")
     euro_food = category("Euros", "Foreign", currency="EUR")
     income = category("Pay", "Income", kind="income")
     add(archived, 500, food, "2026-04-01")
@@ -192,6 +213,8 @@ def test_spending_filters_intersect_before_aggregating_on_each_backend(insight_l
     add(archived, -50, None)
     add(archived, -1000, income)
     add(active, 1000, food)
+    add(active, 33, electric)
+    add(reserve, 55, food)
     add(tracking, 250, food)
     add(euro, 999, euro_food)
     service.update_account("personal", archived, {"closed": True})
@@ -203,17 +226,19 @@ def test_spending_filters_intersect_before_aggregating_on_each_backend(insight_l
         return first.uncategorized_cents, {row.category_id: row.amount_cents for row in first.categories}
 
     food_group = category_group_id("Food")
-    assert result() == (75, {food: 1400, drinks: 200, travel: 100})
-    assert result(account_id=archived) == (75, {food: 400, drinks: 200, travel: 100})
-    assert result(group_id=food_group) == (0, {food: 1400, drinks: 200})
-    assert result(category_id=food) == (0, {food: 1400})
-    assert result(account_id=archived, group_id=food_group, category_id=food) == (0, {food: 400})
-    assert result(account_id=archived, group_id=food_group, category_id=travel) == (0, {})
-    assert result(group_id=food_group, category_id=None) == (0, {})
-    assert result(account_id=archived, category_id=None) == (75, {})
-    assert result(currency="EUR", account_id=euro, category_id=euro_food) == (0, {euro_food: 999})
-    for filters in ({"workspace": "demo", "account_id": archived}, {"account_id": tracking}, {"account_id": euro},
-                    {"category_id": euro_food}, {"category_id": income}, {"group_id": category_group_id("Foreign")}):
+    travel_group = category_group_id("Travel")
+    assert result() == (75, {food: 1455, drinks: 200, travel: 100, electric: 33})
+    assert result(account_ids=[archived, active, active]) == (75, {food: 1400, drinks: 200, travel: 100, electric: 33})
+    assert result(group_ids=(food_group, travel_group)) == (0, {food: 1455, drinks: 200, travel: 100})
+    assert result(category_ids=(food, None)) == (75, {food: 1455})
+    assert result(account_ids=(archived, active), group_ids=(food_group, travel_group),
+                  category_ids=(food, travel, electric, None)) == (0, {food: 1400, travel: 100})
+    assert result(account_ids=(archived,), group_ids=(food_group,), category_ids=(travel, None)) == (0, {})
+    assert result(account_ids=(archived,), category_ids=(None,)) == (75, {})
+    assert result(currency="EUR", account_ids=(euro,), category_ids=(euro_food,)) == (0, {euro_food: 999})
+    for filters in ({"workspace": "demo", "account_ids": (archived,)}, {"account_ids": (archived, tracking)},
+                    {"account_ids": (archived, euro)}, {"category_ids": (food, euro_food)},
+                    {"category_ids": (food, income)}, {"group_ids": (food_group, category_group_id("Foreign"))}):
         with pytest.raises(StoreError, match="unavailable for this budget and currency"):
             result(**filters)
     assert service.revision == revision

@@ -3,6 +3,7 @@
 import csv
 import io
 from dataclasses import asdict
+from urllib.parse import parse_qs, urlsplit
 
 from fastapi.testclient import TestClient
 from whab_plugin_sqlite import Store
@@ -122,10 +123,30 @@ def test_visual_report_filters_scope_the_aggregate_without_changing_legacy_input
                                    SpendingMonth("2026-10", 0, ()))
         assert not legacy.spending and visual.transactions == legacy.transactions
         assert [row.date for row in legacy.transactions] == ["2026-10-20", "2026-10-20"]
-        assert client.get(path, params={**selection, "insight_account": "absent"}).status_code == 200
+        combined = {**selection, "insight_account": [accounts[0], "", accounts[1], accounts[0]],
+                    "insight_category_group": [category_group_id("Travel"), category_group_id("Home")],
+                    "insight_category": [f"category:{identifier}" for identifier in categories]}
+        response = client.get(path, params=combined)
+        assert response.status_code == 200
+        visual = captured["visual"][-1]
+        assert visual.spending[0] == SpendingMonth("2026-09", 0, (SpendingCategory(categories[0], 100),))
+        assert {row.category_id: row.amount_cents for row in visual.spending[1].categories} == {
+            categories[0]: 300, categories[1]: 200,
+        }
+        canonical = response.context["client_context"]["canonicalUrl"]
+        parameters = parse_qs(urlsplit(canonical).query)
+        assert parameters["insight_account"] == list(accounts)
+        for key in ("insight_category_group", "insight_category"):
+            assert parameters[key] == combined[key]
+        assert client.get(canonical).status_code == 200
+        assert captured["visual"][-1].spending == visual.spending
+        assert client.get(path, params={**selection, "insight_account": [accounts[0], "absent"]}).status_code == 200
         assert not captured["visual"][-1].spending
-        assert client.get(path.replace("/home/", "/demo/"), params=selection).status_code == 200
+        assert client.get(path.replace("/home/", "/demo/"), params=combined).status_code == 200
         assert captured["visual"][-1].workspace == "demo" and not captured["visual"][-1].spending
+        oversized = client.get(path, params={**selection, "insight_account": [accounts[0]] * 126})
+        assert oversized.status_code == 400
+        assert "Too many choices in this Monthly spending link." in oversized.json()["error"]
 
 
 def test_plugin_csv_is_scoped_escaped_and_guarded_like_core_routes(tmp_path):

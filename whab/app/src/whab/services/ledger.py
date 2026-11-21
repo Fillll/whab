@@ -1064,8 +1064,8 @@ class LedgerService:
             return {**data, "transactionPage": {**data["transactionPage"], "revision": self._revision}}
 
     def insight_spending(self, workspace, start_month, end_month, currency, *,
-                         account_id=None, category_id=UNSET, group_id=None):
-        """Return monthly spending for intersecting filters. None selects uncategorized."""
+                         account_ids=(), category_ids=(), group_ids=()):
+        """Return aggregates for any selected value in each active filter."""
         from whab.domain.accounts import is_on_budget
         from whab.domain.budget import posted_expense_amount
         from whab.domain.categories import category_group_id
@@ -1075,10 +1075,18 @@ class LedgerService:
         _month(start_month)
         _month(end_month)
         currency = currency_code(currency)
-        for identifier in (account_id, group_id, None if category_id is UNSET else category_id):
-            if identifier is not None:
-                _identifier(identifier)
-        account_ids = (account_id,) if account_id is not None else None
+        def selection(values, *, allow_uncategorized=False):
+            if type(values) not in (tuple, list):
+                raise StoreError("Invalid spending filter selection.")
+            for value in values:
+                if value is not None or not allow_uncategorized:
+                    _identifier(value)
+            return tuple(dict.fromkeys(values))
+
+        account_ids = selection(account_ids) or None
+        selected_accounts = set(account_ids or ())
+        category_ids = set(selection(category_ids, allow_uncategorized=True))
+        group_ids = set(selection(group_ids))
         months = tuple(month for offset in range(MAX_INSIGHT_MONTHS)
                        if (month := shift_month(start_month, offset)) <= end_month)
         if not months or months[-1] != end_month:
@@ -1099,24 +1107,22 @@ class LedgerService:
             if remaining < 0:
                 raise InsightRangeTooLarge(f"More than {limit:,} transactions in this range. Choose fewer months.")
             eligible = {row["id"] for row in data["accounts"] if is_on_budget(row)}
-            if account_id is not None:
-                if account_id not in eligible:
-                    raise StoreError("The spending account is unavailable for this budget and currency.")
-                eligible = {account_id}
-            categories = {row["id"]: row for row in data["categories"]}
-            if category_id is not UNSET and category_id is not None and (
-                category_id not in categories or categories[category_id].get("kind", "expense") != "expense"
-            ):
-                raise StoreError("The spending category is unavailable for this budget and currency.")
-            group_categories = None
-            if group_id is not None:
-                group_categories = {
-                    identifier for identifier, category in categories.items()
+            if not selected_accounts <= eligible:
+                raise StoreError("A spending account is unavailable for this budget and currency.")
+            if selected_accounts:
+                eligible = selected_accounts
+            kinds = {row["id"]: row.get("kind", "expense") for row in data["categories"]}
+            if any(identifier is not None and kinds.get(identifier) != "expense" for identifier in category_ids):
+                raise StoreError("A spending category is unavailable for this budget and currency.")
+            group_by_category = {}
+            if group_ids:
+                group_by_category = {
+                    category["id"]: category.get("parentId") or category_group_id(category["group"])
+                    for category in data["categories"]
                     if category.get("kind", "expense") == "expense"
-                    and (category.get("parentId") or category_group_id(category["group"])) == group_id
                 }
-                if not group_categories:
-                    raise StoreError("The spending category group is unavailable for this budget and currency.")
+                if not group_ids.issubset(group_by_category.values()):
+                    raise StoreError("A spending category group is unavailable for this budget and currency.")
             for row in data["transactions"]:
                 if row["id"] in seen_ids:
                     raise StoreError("Transaction data changed while reading the report. Refresh Insights.")
@@ -1124,10 +1130,10 @@ class LedgerService:
                 if row["accountId"] not in eligible:
                     continue
                 identifier = row["categoryId"]
-                if (category_id is not UNSET and identifier != category_id
-                        or group_categories is not None and identifier not in group_categories):
+                if (category_ids and identifier not in category_ids
+                        or group_ids and group_by_category.get(identifier) not in group_ids):
                     continue
-                amount = posted_expense_amount(row, categories.get(identifier, {}).get("kind", "expense"))
+                amount = posted_expense_amount(row, kinds.get(identifier, "expense"))
                 if amount:
                     totals[row["date"][:7]][identifier] += amount
 
@@ -1147,8 +1153,8 @@ class LedgerService:
                     collect(data)
             else:
                 for month in months:
-                    selection = {"account_ids": account_ids, **dates(month, month)} if account_ids else {}
-                    collect(self.transaction_register(workspace, month, currency, **selection))
+                    scope = {"account_ids": account_ids, **dates(month, month)} if account_ids else {}
+                    collect(self.transaction_register(workspace, month, currency, **scope))
         return tuple(SpendingMonth(month, amounts.get(None, 0), tuple(
             SpendingCategory(identifier, amount) for identifier, amount in amounts.items() if identifier is not None and amount
         )) for month, amounts in totals.items())
