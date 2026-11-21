@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.88.0 — 2026-11-20
+
+PR: [#222](https://github.com/Fillll/whab/pull/222)
+
+- Scope the Monthly spending report by account, category group and category using the existing currency-scoped spending projection.
+
 ## 2.87.0 — 2026-11-19
 
 PR: [#220](https://github.com/Fillll/whab/pull/220)

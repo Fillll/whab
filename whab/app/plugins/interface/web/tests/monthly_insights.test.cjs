@@ -28,11 +28,14 @@ function legend() {
   }};
 }
 
-test('applying a date and group selection navigates to the same scoped report without posting', async () => {
+test('applying date, grouping, account and category selections navigates without posting', async () => {
   const {initMonthlyInsights} = harness();
   const form = {
     action: 'https://localhost:5173/budgets/fictional/insights/current-month/eur',
-    fields: [['insight_from','2026-08'], ['insight_to','2026-11'], ['insight_group','category']],
+    fields: [
+      ['insight_from', '2026-08'], ['insight_to', '2026-11'], ['insight_group', 'category'],
+      ['insight_account', 'café-wallet'], ['insight_category_group', ''], ['insight_category', 'category:market'],
+    ],
     addEventListener(event, submit) {assert.equal(event, 'submit'); this.submit = submit;},
   };
   const report = {querySelector: () => form, querySelectorAll: () => []};
