@@ -98,6 +98,9 @@ def test_range_and_group_filters_preserve_useful_fallbacks(store, tmp_path, clie
         assert gallery.text.count('data-insight-tile') == 5
         assert 'data-insight-preview-chart' in gallery.text and 'Fictional metric' in gallery.text
         assert 'data-monthly-insight-filters' not in gallery.text
+        assert 'aria-label="Insights month"' in gallery.text
+        overview = client.get(route, params={"insight_report": "overview"})
+        assert overview.status_code == 200 and 'aria-label="Insights month"' in overview.text
         report = client.get(route, params={"insight_report": "plugin:fictional-chart"})
         assert report.status_code == 200 and 'data-insight-back' in report.text
         assert 'name="insight_report" value="plugin:fictional-chart"' in report.text
@@ -117,6 +120,11 @@ def test_range_and_group_filters_preserve_useful_fallbacks(store, tmp_path, clie
         text = client.get(route, params={"insight_report": "plugin:fictional-text"})
         assert text.status_code == 200 and 'Fictional metric' in text.text and 'Expected' in text.text
         assert 'data-monthly-plot' not in text.text and 'data-insight-gallery' not in text.text
+        assert 'aria-label="Insights month"' in text.text
+        for ranged in (report, fragment, invalid):
+            assert 'aria-label="Insights month"' not in ranged.text
+            assert 'name="insight_from"' in ranged.text and 'name="insight_to"' in ranged.text
+            assert '<span class="subtle-label">USD</span>' in ranged.text
         unavailable = client.get(route, params={"insight_report": "plugin:disabled"})
         assert unavailable.status_code == 200 and 'data-insight-back' in unavailable.text
         assert 'data-monthly-plot' not in unavailable.text
