@@ -51,7 +51,8 @@
   {% else %}
   {% set filtered = insight_options.account_ids|default(insight_options.account_id)
     or insight_options.category_group_ids|default(insight_options.category_group_id)
-    or insight_options.category_ids|default(insight_options.category_id) %}
+    or insight_options.category_ids|default(insight_options.category_id)
+    or insight_options.account_none or insight_options.category_group_none or insight_options.category_none %}
   <p class="empty-inline">{{ 'No spending matches these filters.' if filtered else 'No spending in the selected months.' }}</p>
   {% endif %}
   {% if insight.detail %}<p class="monthly-insight-detail">{{ insight.detail }}</p>{% endif %}

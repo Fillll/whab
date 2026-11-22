@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "host_version": "2.90.0",
+  "host_version": "2.91.0",
   "plugins": [
     {
       "api_version": 1,
@@ -1042,7 +1042,7 @@
       "state_version": 1,
       "support": "maintained",
       "verifications": [],
-      "version": "1.71.0"
+      "version": "1.72.0"
     },
     {
       "api_version": 1,

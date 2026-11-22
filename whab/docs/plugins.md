@@ -254,10 +254,13 @@ Selections resolve in the current budget and currency, using the current categor
 hierarchy. The date range and selected-month snapshot records retain their
 existing meanings. An account filter narrows the register read before the row
 limit. Category and group filters apply to the rows inside that bounded read.
-An empty selection leaves a filter open. The Web URL can repeat each of
-`insight_account`, `insight_category_group`, and `insight_category`. Single values
-and legacy blank values still work. Duplicate selections count once. The visual
-worker transport accepts up to 128 query fields per request, including repeats.
+The Web URL can repeat each of `insight_account`, `insight_category_group`, and
+`insight_category`. Single and legacy blank values still work. An absent or
+blank selection leaves the filter open. Since WHAB 2.91, the UI may explicitly
+request zero matches with one `_none=1` flag for that filter, for example
+`insight_category_none=1`. A flag cannot accompany selected values for the same
+filter. Explicitly selecting everything in Web omits that filter from the URL.
+The visual worker transport accepts up to 128 query fields, including repeats.
 
 WHAB 2.90 adds opt-in `reporting.insights` version 3. It supplies the same
 aggregates plus up to five `SpendingContributor(category_id, account_id, payee,

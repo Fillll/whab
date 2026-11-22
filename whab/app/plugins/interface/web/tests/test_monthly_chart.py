@@ -208,6 +208,11 @@ def test_scoped_picker_choices_render_and_filter_the_chart(store, tmp_path, clie
         assert 'data-monthly-filter-max-fields="128"' in initial.text
         assert 'Choose up to 124 options across Accounts, Category groups, and Categories.' in initial.text
         form = re.search(r'<form [^>]*data-monthly-insight-filters[^>]*>(.*?)</form>', initial.text, re.S)[1]
+        assert form.count("data-monthly-filter-all>") == 3
+        assert form.count("data-monthly-filter-select-all>") == 3
+        assert form.count("data-monthly-filter-deselect-all>") == 3
+        assert not re.search(r'type="checkbox"[^>]* checked', form)
+        assert '<td>$4,097</td>' in initial.text
         assert re.search(rf'name="insight_account" value="{account}">\s*<span>Café &amp; cash</span>', form)
         assert f'name="insight_account" value="{foreign}"' not in form
         assert re.search(rf'value="category:{category}">\s*<span>Food &amp; drink / Café</span>', form)
@@ -231,3 +236,10 @@ def test_scoped_picker_choices_render_and_filter_the_chart(store, tmp_path, clie
         empty = client.get(route, params={**params, "insight_category": "uncategorized"})
         assert empty.status_code == 200 and 'No spending matches these filters.' in empty.text
         assert 'name="insight_category" value="uncategorized" checked>' in empty.text
+        for name in ("insight_account", "insight_category_group", "insight_category"):
+            restored = client.get(route, params={name + "_none": "1"})
+            assert restored.status_code == 200 and 'No spending matches these filters.' in restored.text
+            assert 'data-insight-report="plugin:fictional-chart"' in restored.text
+            assert restored.text.count('data-monthly-filter-label>None selected') == 1
+            assert f'<noscript><label><input type="checkbox" name="{name}_none" value="1" checked> Match none</label></noscript>' in restored.text
+            assert not re.search(rf'type="checkbox" name="{name}"[^>]* checked', restored.text)

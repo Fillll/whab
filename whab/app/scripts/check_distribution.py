@@ -356,6 +356,11 @@ with TestClient(create_app(settings=chart_settings), base_url="https://127.0.0.1
     options = {"insight_from": "2026-02", "insight_to": "2026-03", "insight_group": "category"}
     all_spending = client.get(route, params=options)
     assert all_spending.status_code == 200 and "February 2026 · Net spending $316" in all_spending.text
+    assert all_spending.text.count("data-monthly-filter-select-all") == 3
+    assert all_spending.text.count("data-monthly-filter-deselect-all") == 3
+    none_selected = client.get(route, params={**options, "insight_category_none": "1"})
+    assert none_selected.status_code == 200 and "None selected" in none_selected.text
+    assert "No spending matches these filters." in none_selected.text
     page = client.get(route, params={
         **options, "insight_account": account.json()["accountId"], "insight_category": "uncategorized",
     })

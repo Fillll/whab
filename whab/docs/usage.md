@@ -314,8 +314,11 @@ an inclusive range of up to 24 months. Switch between **Groups** for the broad
 breakdown and **Categories** for the individual budget categories.
 Choose one or more values in **Accounts**, **Category groups**, and **Categories**,
 then select **Apply**. Transactions can match any chosen value within a filter
-and must match each filter in use. Clear a filter to include all its values.
-Your selection stays in the address when you reload or share the report link.
+and must match each filter in use. Use **Select all** or **Deselect all** in any
+dropdown to change every option, including choices hidden by the dropdown search.
+The default is all selected. Deselecting everything shows no matches after
+you select **Apply**. Your selections stay in the address when you reload or
+share the report link.
 
 Stacks show net posted spending from on-budget accounts in the selected currency.
 Refunds reduce their category's spending. Months with a net refund for a series

@@ -12,18 +12,29 @@
     </select>
   </label>
 {%- endmacro %}
-{% macro monthly_multiselect(label, name, choices, selected, all_label) -%}
+{% macro monthly_multiselect(label, name, choices, selected, all_label, explicit_empty, none_selected) -%}
+  {% set implicit_all = explicit_empty and not none_selected and not selected %}
   <fieldset class="monthly-insight-select monthly-insight-multiselect">
     <legend id="{{ name }}-label">{{ label }}</legend>
-    <details name="monthly-spending-picker" data-monthly-filter="{{ name }}" data-all-label="{{ all_label }}">
+    <details name="monthly-spending-picker" data-monthly-filter="{{ name }}" data-all-label="{{ all_label }}"{% if explicit_empty %} data-monthly-filter-none="{{ '1' if none_selected else '0' }}"{% endif %}{% if implicit_all %} data-monthly-filter-all{% endif %}>
       <summary aria-labelledby="{{ name }}-label {{ name }}-value">
-        <span id="{{ name }}-value" data-monthly-filter-label>{{ (selected|length ~ ' selected') if selected else all_label }}</span>
+        <span id="{{ name }}-value" aria-live="polite" data-monthly-filter-label>{{ 'None selected' if none_selected else (selected|length ~ ' selected') if selected else all_label }}</span>
         {{ icon('chevron-down', 12) }}
       </summary>
       <div class="monthly-insight-filter-panel" data-monthly-filter-panel>
+        {% if explicit_empty and none_selected %}
+        <noscript><label><input type="checkbox" name="{{ name }}_none" value="1" checked> Match none</label></noscript>
+        {% endif %}
         <div class="monthly-insight-filter-tools" data-monthly-filter-tools hidden>
           <input type="search" aria-label="Search {{ label|lower }}" placeholder="Search" autocomplete="off" data-monthly-filter-search>
+          {% if explicit_empty %}
+          <div class="monthly-insight-filter-actions">
+            <button class="text-link" type="button" aria-label="Select all {{ label|lower }}" data-monthly-filter-select-all{% if not choices %} disabled{% endif %}>Select all</button>
+            <button class="text-link" type="button" aria-label="Deselect all {{ label|lower }}" data-monthly-filter-deselect-all{% if not choices %} disabled{% endif %}>Deselect all</button>
+          </div>
+          {% else %}
           <button class="text-link" type="button" aria-label="Use all {{ label|lower }}" data-monthly-filter-clear>Use all</button>
+          {% endif %}
         </div>
         <div class="monthly-insight-filter-options">
           {% for choice in choices %}
@@ -52,9 +63,10 @@
                        pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM" value="{{ insight_options.end_month }}"></label>
     </div>
     {% if insight_options.account_ids is defined %}
-      {{ monthly_multiselect('Accounts', 'insight_account', insight_options.accounts, insight_options.account_ids, 'All accounts') }}
-      {{ monthly_multiselect('Category groups', 'insight_category_group', insight_options.category_groups, insight_options.category_group_ids, 'All groups') }}
-      {{ monthly_multiselect('Categories', 'insight_category', insight_options.categories, insight_options.category_ids, 'All categories') }}
+      {% set explicit_empty = insight_options.explicit_empty_supported|default(false) %}
+      {{ monthly_multiselect('Accounts', 'insight_account', insight_options.accounts, insight_options.account_ids, 'All accounts', explicit_empty, insight_options.account_none|default(false)) }}
+      {{ monthly_multiselect('Category groups', 'insight_category_group', insight_options.category_groups, insight_options.category_group_ids, 'All groups', explicit_empty, insight_options.category_group_none|default(false)) }}
+      {{ monthly_multiselect('Categories', 'insight_category', insight_options.categories, insight_options.category_ids, 'All categories', explicit_empty, insight_options.category_none|default(false)) }}
     {% elif insight_options.accounts is defined %}
       {{ monthly_filter('Account', 'insight_account', insight_options.accounts, insight_options.account_id, 'All accounts') }}
       {{ monthly_filter('Category group', 'insight_category_group', insight_options.category_groups, insight_options.category_group_id, 'All groups') }}

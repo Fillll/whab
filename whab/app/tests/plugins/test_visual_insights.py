@@ -187,6 +187,35 @@ def test_month_range_controls_validate_and_keep_legacy_snapshot_available(snapsh
     assert data is base and options["error"] == "Choose fewer months."
 
 
+@pytest.mark.parametrize("facet", ["account", "category_group", "category"])
+def test_deselected_filter_keeps_period_and_short_circuits_the_register(snapshot, facet):
+    service = SimpleNamespace(insight_spending=lambda *args, **filters: pytest.fail("No rows can match."))
+    query = QueryParams({
+        "insight_from": "2026-09", "insight_to": "2026-10", "insight_group": "category",
+        f"insight_{facet}_none": "1",
+    })
+    result, options = visual_insight_snapshot(snapshot, query, service, include_contributors=True)
+    assert result.spending_by == "category"
+    assert result.spending == (SpendingMonth("2026-09", 0, ()), SpendingMonth("2026-10", 0, ()))
+    assert result.transactions == snapshot.transactions
+    assert options["explicit_empty_supported"]
+    assert options[f"{facet}_none"]
+    assert "error" not in options
+
+
+@pytest.mark.parametrize("query", [
+    "insight_category_none=0",
+    "insight_category_none=1&insight_category_none=1",
+    "insight_category_none=1&insight_category=category%3Afood",
+])
+def test_invalid_empty_selection_is_rejected(snapshot, query):
+    service = SimpleNamespace(insight_spending=lambda *args, **filters: pytest.fail("Invalid selection."))
+    result, options = visual_insight_snapshot(snapshot, QueryParams(query), service)
+    assert result is snapshot
+    assert not options["category_none"]
+    assert options["error"] == "Choose values or deselect all for categories."
+
+
 def test_filter_controls_offer_only_scoped_and_spend_eligible_choices(snapshot):
     base = replace(snapshot, accounts=(
         AccountSnapshot("cash", "Wallet", "depository", "checking", 100),

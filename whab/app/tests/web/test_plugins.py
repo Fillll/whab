@@ -140,6 +140,27 @@ def test_visual_report_filters_scope_the_aggregate_without_changing_legacy_input
             assert parameters[key] == combined[key]
         assert client.get(canonical).status_code == 200
         assert captured["visual"][-1].spending == visual.spending
+        none_selected = {key: value for key, value in combined.items() if key != "insight_category"}
+        none_selected["insight_category_none"] = "1"
+        response = client.get(path, params=none_selected)
+        assert response.status_code == 200
+        assert response.context["insight_options"]["category_none"]
+        assert captured["visual"][-1].spending == (
+            SpendingMonth("2026-09", 0, ()), SpendingMonth("2026-10", 0, ()),
+        )
+        assert not captured["legacy"][-1].spending
+        canonical = response.context["client_context"]["canonicalUrl"]
+        parameters = parse_qs(urlsplit(canonical).query)
+        assert parameters["insight_category_none"] == ["1"]
+        assert parameters["insight_account"] == list(accounts)
+        assert client.get(canonical).status_code == 200
+        assert captured["visual"][-1].spending[-1] == SpendingMonth("2026-10", 0, ())
+        invalid = client.get(path, params={"insight_category_none": ["0", "1"]})
+        assert invalid.status_code == 200
+        assert not captured["visual"][-1].spending
+        assert invalid.context["insight_options"]["error"] == "Choose values or deselect all for categories."
+        parameters = parse_qs(urlsplit(invalid.context["client_context"]["canonicalUrl"]).query)
+        assert parameters["insight_category_none"] == ["0", "1"]
         assert client.get(path, params={**selection, "insight_account": [accounts[0], "absent"]}).status_code == 200
         assert not captured["visual"][-1].spending
         assert client.get(path.replace("/home/", "/demo/"), params=combined).status_code == 200
