@@ -61,7 +61,8 @@ class MonetaryMarkup(HTMLParser):
 def test_rendered_money_is_protected_without_changing_financial_records(client, store, page, fragment):
     before = store.accounts("demo"), store.transactions("demo")
     response = client.get(
-        f"/budgets/demo/{page}/2026-10/usd?all_dates=true",
+        f"/budgets/demo/{page}/2026-10/usd",
+        params={"insight_report": "overview"} if page == "insights" else {"all_dates": "true"},
         headers={"X-WHAB-Page-Fragment": "1"} if fragment else {},
     )
     assert response.status_code == 200
@@ -97,7 +98,7 @@ def test_untyped_extension_report_values_and_details_are_shielded(store, tmp_pat
         return (Insight("Fictional report", "$918.27", "Projected reserve EUR 3,456.78"),)
 
     with client_for(store, tmp_path, Plugin("privacy-fixture", "Fictional report", insights=insights)) as client:
-        response = client.get("/budgets/demo/insights/2026-10/usd")
+        response = client.get("/budgets/demo/insights/2026-10/usd", params={"insight_report": "plugin:privacy-fixture"})
     assert response.status_code == 200
     markup = MonetaryMarkup(response.text)
     assert markup.unprotected == []

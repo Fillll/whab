@@ -61,20 +61,22 @@ export function initMonthlyInsights({root, navigate}) {
   const report = root.querySelector('[data-monthly-chart]');
   if (!report) return;
   const form = report.querySelector('[data-monthly-insight-filters]');
-  const maxFields = Number(form.dataset?.monthlyFilterMaxFields);
-  const limitError = maxFields && form.querySelector('[data-monthly-filter-limit-error]');
-  for (const picker of report.querySelectorAll('[data-monthly-filter]')) initMonthlyFilter(picker);
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    const filters = new URLSearchParams(new FormData(form));
-    if (limitError) {
-      limitError.hidden = filters.size <= maxFields;
-      if (!limitError.hidden) return;
-    }
-    const url = new URL(form.action);
-    url.search = filters;
-    if (!(await navigate(url))) location.assign(url);
-  });
+  if (form) {
+    const maxFields = Number(form.dataset?.monthlyFilterMaxFields);
+    const limitError = maxFields && form.querySelector('[data-monthly-filter-limit-error]');
+    for (const picker of report.querySelectorAll('[data-monthly-filter]')) initMonthlyFilter(picker);
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const filters = new URLSearchParams(new FormData(form));
+      if (limitError) {
+        limitError.hidden = filters.size <= maxFields;
+        if (!limitError.hidden) return;
+      }
+      const url = new URL(form.action);
+      url.search = filters;
+      if (!(await navigate(url))) location.assign(url);
+    });
+  }
 
   for (const plot of report.querySelectorAll('.monthly-insight')) {
     const controls = [...plot.querySelectorAll('[data-chart-emphasis]')];

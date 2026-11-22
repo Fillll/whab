@@ -23,7 +23,7 @@ def test_income_categories_are_pickable_but_not_expense_envelopes(client, store)
     assert 'legacy unclassified inflows' in budget
     income_details = client.get('/budgets/home/budget/2026-10/usd', params={'category': category})
     assert income_details.status_code == 200 and 'inspector-assignment:' + category not in income_details.text
-    insights = client.get('/budgets/home/insights/2026-10/usd').text
+    insights = client.get('/budgets/home/insights/2026-10/usd', params={'insight_report': 'overview'}).text
     assert 'Explicit Income <span data-private-amount>$5,000</span>' in insights
     # Clearing the classification also clears review.
     response = client.patch(f'/api/transactions/{transaction}', json={'workspace': 'personal', 'categoryId': None})

@@ -492,6 +492,15 @@ The [AI credentials plugin](../../automation/ai-credentials/README.md) has a sep
 
 Subscription classification uses the Subscriptions plugin 1.1+ background job API. A sticky workspace progress panel shows committed transaction counts, reused decisions and skipped changes, with a separate **Stop classification** control. Leaving the page and browser navigation leave the server job running. Lightweight polling updates the Running badge without loading ledger history on every tick; returning to the page reconnects to the current job. Closing the browser stops observation only. Completed results refresh the open view while retaining payment filters/search. Other feature settings remain in the existing single Settings window.
 
+## Insights gallery
+
+Insights shows previews for **Spending overview**, **By category**, **Top payees**,
+and enabled Insights plugins. Select a tile to open the full report. Use **All
+insights** or browser Back to return. Report links use the current budget, month,
+and currency. Existing filtered Monthly spending links continue to open that
+report, including links with multiple filter choices. Hide amounts also conceals
+financial values and chart shapes in tile previews.
+
 ## Monthly spending charts
 
 With a compatible host and an enabled visual Insights plugin, open **Insights**

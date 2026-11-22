@@ -22,6 +22,7 @@ from whab.plugins import (
 )
 
 from .icons import category_icon, icon
+from .insight_selection import insight_selection
 from .monthly_chart import series_color, stacked_monthly_plot
 
 WEB_ASSET_VERSION = package_version("whab_plugin_web")
@@ -383,6 +384,7 @@ def build_context(data, status, items, *, workspace, page, month, selected=None)
         "month_label": month_label,
         "series_color": series_color,
         "stacked_monthly_plot": stacked_monthly_plot,
+        "insight_selection": insight_selection,
         "shift_month": shift_month,
         "icon": icon,
         "category_icon": category_icon,

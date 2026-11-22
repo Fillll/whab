@@ -53,7 +53,7 @@ def test_opening_category_picker_zero_review_and_signed_funding(client, store, c
     assert ('Available to assign', equation(balance, '=', 'USD')) in terms(ready)
     following = disclosure(overview_cells(budget, 'Opening funding')[1][1], 'Opening funding', '2026-11')
     assert terms(following) == [('Opening funding', '0')]
-    insights = client.get('/budgets/home/insights/2026-10/usd').text
+    insights = client.get('/budgets/home/insights/2026-10/usd', params={'insight_report': 'overview'}).text
     assert f'Opening funding <span data-private-amount>{display_money(balance, "USD")}</span> · separate from income' in insights
     assert '<span class="summary-label">TRANSACTIONS</span><strong>0</strong>' in insights
     assert 'Existing cash correction' not in insights
@@ -71,5 +71,5 @@ def test_missing_opening_projection_is_not_invented(client, store, monkeypatch):
     page = client.get('/budgets/home/budget/2026-10/usd').text
     assert all(body.strip() == '<span data-private-amount>—</span>' for _, body in overview_cells(page, 'Opening funding'))
     assert 'Breakdown unavailable' in overview_cells(page, 'Available to assign')[0][1]
-    insights = client.get('/budgets/home/insights/2026-10/usd').text
+    insights = client.get('/budgets/home/insights/2026-10/usd', params={'insight_report': 'overview'}).text
     assert 'Opening funding <span data-private-amount>—</span> · separate from income' in insights

@@ -350,6 +350,9 @@ with TestClient(create_app(settings=chart_settings), base_url="https://127.0.0.1
         })
         assert excluded.status_code == 200
     route = "/budgets/home/insights/2026-03/usd"
+    gallery = client.get(route)
+    assert gallery.status_code == 200 and "data-insight-gallery" in gallery.text
+    assert "insight_report=plugin%3Amonthly-spending" in gallery.text and "data-insight-preview-chart" in gallery.text
     options = {"insight_from": "2026-02", "insight_to": "2026-03", "insight_group": "category"}
     all_spending = client.get(route, params=options)
     assert all_spending.status_code == 200 and "February 2026 · Net spending $316" in all_spending.text

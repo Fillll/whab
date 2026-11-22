@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.70.0 — 2026-11-21
+
+PR: [#224](https://github.com/Fillll/whab/pull/224)
+
+- Open Insights as a gallery of clickable chart and metric previews. Drill into reports without losing the budget, currency, month, or saved Monthly spending links.
+
 ## 1.69.0 — 2026-11-20
 
 PR: [#223](https://github.com/Fillll/whab/pull/223)

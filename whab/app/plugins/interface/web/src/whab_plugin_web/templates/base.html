@@ -1,3 +1,6 @@
+{% if page=='insights' and request.query_params.getlist('insight_report')|length > 1 %}
+{% set client_context = dict(client_context, canonicalUrl=none) %}
+{% endif %}
 {% if request.headers.get('X-WHAB-Page-Fragment')=='1' %}
 {% include "page-fragment.html" %}
 {% elif page=='budget' and request.headers.get('X-WHAB-Budget-Fragment')=='1' %}

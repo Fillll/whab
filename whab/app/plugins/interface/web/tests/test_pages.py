@@ -43,13 +43,17 @@ def test_extension_insights_render_and_escape_content(store, tmp_path, client_fo
         Plugin("test", "Test report", insights=insights),
         Plugin("broken", "Broken report", insights=fail),
     ) as client:
-        response = client.get("/budgets/demo/insights/2026-10/usd")
+        route = "/budgets/demo/insights/2026-10/usd"
+        response = client.get(route, params={"insight_report": "plugin:test"})
         assert response.status_code == 200
         assert 'class="plugin-metrics"' in response.text
         assert "&lt;script&gt;value&lt;/script&gt;" in response.text
         assert "<script>value</script>" not in response.text
-        assert "could not be generated" in response.text
-        assert "FICTIONAL_SECRET" not in response.text
+        assert "could not be generated" not in response.text
+        broken = client.get(route, params={"insight_report": "plugin:broken"})
+        assert broken.status_code == 200
+        assert "could not be generated" in broken.text
+        assert "FICTIONAL_SECRET" not in broken.text
 
 
 def test_default_formats_and_only_children_in_category_choices(client):
@@ -192,7 +196,7 @@ def test_off_budget_transactions_remain_visible_and_marked_excluded(client):
     text = client.get("/budgets/home/transactions/2026-10/usd").text
     assert "Investment fee" in text
     assert "Off-budget · excluded from budget" in text
-    insights = client.get("/budgets/home/insights/2026-10/usd").text
+    insights = client.get("/budgets/home/insights/2026-10/usd", params={"insight_report": "payees"}).text
     assert "Investment fee" not in insights
     assert "Insights use on-budget accounts" in insights
 
