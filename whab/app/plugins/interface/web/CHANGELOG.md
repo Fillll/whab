@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.72.1 — 2026-11-21
+
+PR: [#228](https://github.com/Fillll/whab/pull/228)
+
+- Show each contributing transaction's category in the Monthly spending popup and remove separate chart hover captions.
+
 ## 1.72.0 — 2026-11-21
 
 PR: [#227](https://github.com/Fillll/whab/pull/227)
