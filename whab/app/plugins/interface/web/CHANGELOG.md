@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.72.2 — 2026-11-21
+
+PR: [#229](https://github.com/Fillll/whab/pull/229)
+
+- Keep the Top transactions popup focused on each contributing transaction and its category.
+
 ## 1.72.1 — 2026-11-21
 
 PR: [#228](https://github.com/Fillll/whab/pull/228)
