@@ -369,6 +369,8 @@ with TestClient(create_app(settings=chart_settings), base_url="https://127.0.0.1
     assert "February 2026 · Net spending $123" in page.text
     assert "March 2026 · Net spending $0" in page.text
     assert "data-monthly-contributor-trigger" in page.text
+    assert "Payee / Category</th>" in page.text
+    assert "<title" not in page.text.split("data-monthly-plot", 1)[1].split("</svg>", 1)[0]
     assert "<p data-monthly-contributor-categories>Category filter · Uncategorized</p>" in page.text
     assert "Fictional chart purchase" in page.text and "Fictional checking" in page.text
     assert "Fictional purchase outside filters" not in page.text

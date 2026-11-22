@@ -293,7 +293,10 @@ test('contributor previews show safe text, stay in the viewport and support hove
     rows: [], replaceChildren() { this.rows = []; },
     insertRow() {
       const row = {cells: [], setAttribute() {}, insertCell() {
-        const cell = {setAttribute(name) { this.attribute = name; }};
+        const cell = {
+          setAttribute(name) { this.attribute = name; },
+          append(child) { this.child = child; },
+        };
         this.cells.push(cell);
         return cell;
       }};
@@ -313,10 +316,11 @@ test('contributor previews show safe text, stay in the viewport and support hove
   const page = eventTarget({
     documentElement: {dataset: {amounts: 'shown'}, clientWidth: 360, clientHeight: 320},
     defaultView: eventTarget({setTimeout, clearTimeout}),
+    createElement: tag => ({tag, setAttribute(name) { this.attribute = name; }}),
   });
   const triggers = ['Checking', 'Archive'].map(label => ({
     attributes: {'aria-label': label},
-    dataset: {monthlyContributorTrigger: JSON.stringify([[label, '<shop & café>', '-$29']])},
+    dataset: {monthlyContributorTrigger: JSON.stringify([[label, '<shop & café>', '-$29', label === 'Checking' ? 'market' : null]])},
     contains(target) { return target === this; },
     closest() { return this; },
     getAttribute(name) { return this.attributes[name]; },
@@ -334,12 +338,14 @@ test('contributor previews show safe text, stay in the viewport and support hove
   });
   const event = (target, fields = {}) => ({target, preventDefault() {}, ...fields});
   const [one, two] = triggers;
-  state.initContributorPreview(plot);
+  state.initContributorPreview(plot, new Map([['category:market', 'Home / <Market>']]));
   assert.equal(one.attributes.tabindex, '0');
   plot.events.pointerover(event(one, {pointerType: 'mouse'}));
   assert.equal(panel.open, true);
   assert.deepEqual(panel.style, {left: '32px', top: '72px'});
   assert.deepEqual(body.rows[0].cells.map(cell => cell.textContent), ['Checking', '<shop & café>', '-$29']);
+  assert.equal(body.rows[0].cells[1].child.textContent, 'Home / <Market>');
+  assert.equal(body.rows[0].cells[1].child.attribute, 'data-monthly-contributor-category');
   assert.equal(body.rows[0].cells[2].attribute, 'data-monthly-contributor-amount');
 
   one.focus();
@@ -347,6 +353,7 @@ test('contributor previews show safe text, stay in the viewport and support hove
   assert.equal(two.attributes.tabindex, '0');
   assert.equal(two.attributes['aria-describedby'], 'preview');
   assert.equal(caption.textContent, 'Archive');
+  assert.equal(body.rows[0].cells[1].child.textContent, 'Uncategorized');
   plot.events.keydown(event(two, {key: 'Enter'}));
   plot.events.pointerover(event(one, {pointerType: 'mouse'}));
   assert.equal(caption.textContent, 'Archive');

@@ -2022,6 +2022,7 @@ strong {
 .monthly-chart-zero { stroke: var(--control-border); }
 .monthly-chart-net { fill: none; stroke: var(--ink); stroke-width: 1.6; opacity: .72; }
 .monthly-chart-point { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.monthly-chart :is(.monthly-chart-net, .monthly-chart-point) { pointer-events: none; }
 .monthly-chart [data-chart-series] { transition: opacity 140ms ease; }
 .monthly-chart [data-chart-dimmed] { opacity: .22; }
 .monthly-chart [data-monthly-contributor-trigger] { cursor: pointer; }
@@ -2058,6 +2059,11 @@ html[data-amounts='hidden'] .monthly-chart-contributors { display: none !importa
   overflow-wrap: anywhere;
 }
 .monthly-chart-contributors th { color: var(--muted); }
+.monthly-chart-contributors [data-monthly-contributor-category] {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+}
 .monthly-chart-contributors :is(th, td):last-child {
   width: 7.5em;
   padding-inline-end: 0;

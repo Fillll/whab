@@ -2,8 +2,7 @@
       <svg class="insight-preview-chart" data-insight-preview-chart viewBox="0 0 {{ plot.width }} 280" role="img" aria-label="{{ insight.title }}">
       {% else %}
       <svg id="{{ chart_id }}" class="monthly-chart" style="--plot-width:{{ plot.width }}px" width="{{ plot.width }}" height="280" viewBox="0 0 {{ plot.width }} 280"
-           data-monthly-plot role="{{ 'group' if chart.series|selectattr('contributors')|list else 'img' }}" aria-labelledby="{{ chart_id }}-title" aria-describedby="{{ chart_id }}-description">
-        <title id="{{ chart_id }}-title">{{ insight.title }} · {{ chart.currency }}</title>
+           data-monthly-plot role="{{ 'group' if chart.series|selectattr('contributors')|list else 'img' }}" aria-label="{{ insight.title }} · {{ chart.currency }}" aria-describedby="{{ chart_id }}-description">
         <desc id="{{ chart_id }}-description">Each month is one column. Refunds that exceed purchases in a series extend below zero. The line traces net spending. Amounts are also available in the breakdown table.{% if chart.series|selectattr('contributors')|list %} Use the arrow keys to explore segments with top transactions. Press Enter to pin a preview or Escape to close it.{% endif %}</desc>
         {% endif %}
         {% for tick in plot.ticks %}
@@ -18,22 +17,19 @@
           {% set preview = namespace(rows=[]) %}
           {% for entry in entries %}
             {% set account = accounts_by_id.get(entry.account_id) %}
-            {% set preview.rows = preview.rows + [[account.name if account else 'Unknown account', entry.payee, currency_money(entry.amount_cents, chart.currency)]] %}
+            {% set preview.rows = preview.rows + [[account.name if account else 'Unknown account', entry.payee, currency_money(entry.amount_cents, chart.currency), entry.category_id]] %}
           {% endfor %}
           {% set description = month_label(column.month) ~ ' · ' ~ series.label ~ ' · ' ~ currency_money(segment.amount, chart.currency) %}
           <rect data-chart-series="{{ segment.series }}" x="{{ column.bar_x }}" y="{{ segment.y }}" width="{{ plot.bar_width }}" height="{{ segment.height }}"
-                fill="{{ series_color(series.id) }}"{% if preview.rows %}
+                fill="{{ series_color(series.id) }}" aria-label="{{ description }}"{% if preview.rows %}
                 data-monthly-contributor-trigger="{{ preview.rows|tojson|forceescape }}" data-contributor-month="{{ column.month }}"
-                role="button" tabindex="-1" aria-label="{{ description }}" aria-controls="{{ chart_id }}-contributors" aria-expanded="false"{% endif %}>
-            <title>{{ description }}</title>
-          </rect>
+                role="button" tabindex="-1" aria-controls="{{ chart_id }}-contributors" aria-expanded="false"{% else %} role="img"{% endif %}/>
           {% endfor %}
           <text x="{{ column.x }}" y="268" text-anchor="middle">{{ month_label(column.month, true) }}{% if not chart_preview %} ’{{ column.month[2:4] }}{% endif %}</text>
         {% endfor %}
         <polyline class="monthly-chart-net" points="{% for column in plot.columns %}{{ column.x }},{{ column.net_y }} {% endfor %}"/>
         {% for column in plot.columns %}
-        <circle class="monthly-chart-point" cx="{{ column.x }}" cy="{{ column.net_y }}" r="4.5">
-          <title>{{ month_label(column.month) }} · Net spending {{ currency_money(column.net, chart.currency) }}</title>
-        </circle>
+        <circle class="monthly-chart-point" cx="{{ column.x }}" cy="{{ column.net_y }}" r="4.5"
+                role="img" aria-label="{{ month_label(column.month) }} · Net spending {{ currency_money(column.net, chart.currency) }}"/>
         {% endfor %}
       </svg>
