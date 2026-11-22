@@ -544,7 +544,7 @@ def test_synthetic_saved_protocol1_environment_is_fenced_then_explicitly_reprepa
 
     class LegacyProbe(ReportWorker):
         """A report-only protocol-1 client used solely to publish the old fixture."""
-        _visual_insights = False
+        _insight_version = 1
 
         def __init__(self, plugin_id, *, python, timeout, expected_distribution, expected_version, on_create=None):
             self.plugin_id, self.timeout, self._lock, self._retiring = plugin_id, timeout, Lock(), None

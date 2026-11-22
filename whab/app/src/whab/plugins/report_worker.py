@@ -363,9 +363,9 @@ class ReportWorker:
             if adapters["ui"] is not None and (value["insights"] or value["export"]):
                 raise WireError()
             self.contract = read_contract(value["contract"], value["capabilities"])
-            versions = {row.version for row in self.contract.provides if row.name == "reporting.insights"}
-            self._visual_insights = bool(versions & {2, 3})
-            self._insight_contributors = 3 in versions
+            self._insight_version = next(
+                (row.version for row in self.contract.provides if row.name == "reporting.insights"), 0,
+            )
             if adapters["remote_client"] is not None:
                 from .remote_client_adapter import read_client_record
                 from .sdk import Plugin
@@ -447,8 +447,8 @@ class ReportWorker:
                     request["arguments"] = {} if arguments is None else arguments
                 else:
                     request["snapshot"] = (_snapshot_data(
-                        snapshot, include_spending=operation == "insights" and self._visual_insights,
-                        include_contributors=self._insight_contributors,
+                        snapshot, include_spending=operation == "insights" and self._insight_version >= 2,
+                        include_contributors=self._insight_version == 3,
                     ) if snapshot is not None else None)
                     if snapshot is not None and Version(self.info['host']) < Version('2.79'):
                         if any(row['kind'] != 'expense' for row in request['snapshot']['categories']):
@@ -458,7 +458,7 @@ class ReportWorker:
                 try:
                     raw = Frame(request, payload).encode()
                 except FrameMetadataTooLarge:
-                    if operation == "insights" and self._insight_contributors:
+                    if operation == "insights" and self._insight_version == 3:
                         raise _error("insight_range_too_large", self.plugin_id) from None
                     raise
                 payload_limit = {"bank.fetch": 128 * 1024, "merchant.fetch": 128 * 1024,
@@ -503,7 +503,7 @@ class ReportWorker:
             if type(value) is not list or len(value) > 50 or any(type(row) is not dict for row in value):
                 raise WireError()
             return tuple(read_insight(
-                row, include_chart=self._visual_insights, include_contributors=self._insight_contributors,
+                row, include_chart=self._insight_version >= 2, include_contributors=self._insight_version == 3,
             ) for row in value)
         except Exception:
             self._stop()
