@@ -268,8 +268,10 @@ and refunds negative. The host selects the largest magnitudes after applying the
 same filters as the totals. IDs refer to existing snapshot accounts and
 categories. Payee display text is limited to 200 characters. A v3 report can
 return optional `ChartSeries.contributors`, with one tuple per chart month and
-up to five contributors for each nonzero segment. Older reports receive the
-same snapshots and chart schema as before.
+up to five contributors for each nonzero segment. Large detail projections must
+fit the worker transport limits. Narrowing the range or filters brings the
+report back when that byte limit is exceeded. Older reports receive the same
+snapshots and chart schema as before.
 
 One returned `Insight` may include `chart=StackedMonthlyChart(currency, months,
 series)`. Its currency and consecutive `YYYY-MM` months must match the supplied

@@ -46,7 +46,7 @@ from .sdk import (
     valid_plugin_name,
 )
 from .ui_worker import read_html, snapshot_ui
-from .wire import HEADER, PROTOCOL_VERSION, Frame, WireError, frame_lengths
+from .wire import HEADER, PROTOCOL_VERSION, Frame, FrameMetadataTooLarge, WireError, frame_lengths
 from .worker_adapters import (
     BINARY_OPERATIONS,
     LIVE_CAPABILITIES,
@@ -70,6 +70,7 @@ _ERRORS = {
     "worker_protocol": "The plugin worker returned an invalid response.",
     "worker_hook_failed": "The plugin worker could not complete this operation.",
     "worker_closed": "The plugin worker has closed. Start a prepared replacement before using it.",
+    "insight_range_too_large": "Too much transaction detail in this range. Choose fewer months or narrow the filters.",
     "worker_classification_unsupported": "Update the report worker to WHAB 2.79 or later to report Income, Transfer and Opening Balance categories. No report was submitted.",
 }
 
@@ -454,7 +455,12 @@ class ReportWorker:
                             raise _error('worker_classification_unsupported', self.plugin_id)
                         for row in request['snapshot']['categories']:
                             row.pop('kind')
-                raw = Frame(request, payload).encode()
+                try:
+                    raw = Frame(request, payload).encode()
+                except FrameMetadataTooLarge:
+                    if operation == "insights" and self._insight_contributors:
+                        raise _error("insight_range_too_large", self.plugin_id) from None
+                    raise
                 payload_limit = {"bank.fetch": 128 * 1024, "merchant.fetch": 128 * 1024,
                                  "file.resources": 4 * 1024 * 1024, "file.parse": 50 * 1024 * 1024,
                                  "category.call": MAX_WORKER_NAMESPACE, "provider.call": MAX_PROVIDER_BYTES,

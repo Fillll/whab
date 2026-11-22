@@ -451,13 +451,17 @@ class PluginRegistry:
                 chart = next((row.chart for row in insights if row.chart is not None), None)
                 if chart is not None and (chart.currency != snapshot.currency or chart.months != tuple(row.month for row in snapshot.spending)):
                     raise ValueError("The chart must match the snapshot's currency and spending months.")
-            except Exception:
+            except Exception as error:
+                if type(error) is PluginError and error.code == "insight_range_too_large":
+                    detail = "Too much transaction detail in this range. Choose fewer months or narrow the filters."
+                else:
+                    detail = "Plugin insights could not be generated. Disable the plugin or contact its author."
                 results.append(
                     PluginInsightResult(
                         plugin_id=plugin.id,
                         display_name=plugin.display_name,
                         insights=(),
-                        error="Plugin insights could not be generated. Disable the plugin or contact its author.",
+                        error=detail,
                     )
                 )
             else:

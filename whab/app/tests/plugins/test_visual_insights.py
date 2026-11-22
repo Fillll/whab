@@ -19,6 +19,7 @@ from whab.plugins import (
     Insight,
     Plugin,
     PluginContract,
+    PluginError,
     PluginRegistry,
     SpendingCategory,
     SpendingContributor,
@@ -26,7 +27,7 @@ from whab.plugins import (
     StackedMonthlyChart,
 )
 from whab.plugins.insight_wire import insight_data, read_insight
-from whab.plugins.report_worker import _snapshot, _snapshot_data
+from whab.plugins.report_worker import ReportWorker, _snapshot, _snapshot_data
 from whab.plugins.ui_render import public_value
 from whab.plugins.wire import WireError
 from whab.services.ledger import InsightRangeTooLarge, LedgerService
@@ -99,6 +100,38 @@ def test_contributors_cross_worker_boundaries_only_with_version_three(snapshot):
         replace(series, contributors=((candidate,),))
     with pytest.raises(ValueError, match="reference accounts"):
         replace(snapshot, accounts=())
+
+
+def test_oversized_contributors_can_be_narrowed_without_stopping_the_report_worker(snapshot, monkeypatch):
+    snapshot = replace(
+        snapshot,
+        accounts=(AccountSnapshot("cash", "Wallet", "depository", "checking", 100),),
+        spending=(replace(snapshot.spending[0], contributors=(
+            SpendingContributor("food", "cash", "大" * 200, 225),
+        )), snapshot.spending[1]),
+    )
+    base = replace(snapshot, spending=(), spending_by="group")
+    query = QueryParams("insight_from=2026-09&insight_to=2026-10&insight_group=category")
+    service = SimpleNamespace(insight_spending=lambda *args, **kwargs: snapshot.spending)
+    with monkeypatch.context() as limits:
+        limits.setattr("whab.web.insight_options.MAX_METADATA_BYTES", 1000)
+        data, options = visual_insight_snapshot(base, query, service, include_contributors=True)
+    assert data is base
+    assert "Choose fewer months or narrow the filters." in options["error"]
+    assert visual_insight_snapshot(base, query, service, include_contributors=True)[0] == snapshot
+
+    worker = ReportWorker("monthly-spending")
+    try:
+        with monkeypatch.context() as limits:
+            limits.setattr("whab.plugins.wire.MAX_METADATA_BYTES", 1000)
+            with pytest.raises(PluginError, match="Choose fewer months or narrow the filters.") as raised:
+                worker.insights(snapshot)
+            assert raised.value.code == "insight_range_too_large"
+        assert worker.healthy
+        result, = worker.insights(snapshot)
+        assert result.chart.series[0].contributors == ((snapshot.spending[0].contributors[0],), ())
+    finally:
+        worker.close()
 
 
 def test_registry_only_shares_history_with_opted_in_reports(snapshot):
