@@ -119,17 +119,14 @@ def test_monthly_contributors_are_escaped_scoped_and_omitted_from_gallery():
         {"id": "category:garden", "label": "House / Garden"},
     ]
     template = environment.get_template("monthly-insight.html")
-    for selection, label in (
-        ({"category_ids": ["category:furniture", "category:fixtures"]}, "House / Fixtures & repairs, House / <Furniture>"),
-        ({"category_id": "category:furniture"}, "House / <Furniture>"),
+    for selection in (
+        {"category_ids": ["category:furniture", "category:fixtures", "category:garden"]},
+        {"category_id": "category:fixtures"},
     ):
         filtered = template.render(**{
             **context, "insight_options": {"group_by": "group", "categories": choices, **selection},
         })
-        category_scope = re.search(r"<p data-monthly-contributor-categories>(.*?)</p>", filtered)[1]
-        assert unescape(category_scope) == f"Category filter · {label}"
-        assert "<Furniture>" not in category_scope
-        assert "House / Garden" not in category_scope
+        assert filtered == detail
 
     preview = environment.get_template("monthly-insight-plot.html").render(
         **context, chart=chart, chart_preview=True, plot=stacked_monthly_plot(months, [(12000, -4900)], "USD"),

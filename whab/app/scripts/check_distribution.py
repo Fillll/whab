@@ -371,7 +371,7 @@ with TestClient(create_app(settings=chart_settings), base_url="https://127.0.0.1
     assert "data-monthly-contributor-trigger" in page.text
     assert "Payee / Category</th>" in page.text
     assert "<title" not in page.text.split("data-monthly-plot", 1)[1].split("</svg>", 1)[0]
-    assert "<p data-monthly-contributor-categories>Category filter · Uncategorized</p>" in page.text
+    assert "data-monthly-contributor-categories" not in page.text
     assert "Fictional chart purchase" in page.text and "Fictional checking" in page.text
     assert "Fictional purchase outside filters" not in page.text
     assert "data-monthly-contributor-trigger" not in gallery.text
@@ -381,6 +381,7 @@ with TestClient(create_app(settings=chart_settings), base_url="https://127.0.0.1
         ("insight_category", "category:groceries"),
     ])
     assert multiple.status_code == 200 and "February 2026 · Net spending $193" in multiple.text
+    assert "data-monthly-contributor-categories" not in multiple.text
 print("Installed wheels: curated catalog resource/contracts, independent versions, MIT licenses, pages, assets and plugin discovery passed.")
 """
 
