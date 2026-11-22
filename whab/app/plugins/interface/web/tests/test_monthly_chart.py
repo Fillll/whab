@@ -108,6 +108,25 @@ def test_monthly_contributors_are_escaped_scoped_and_omitted_from_gallery():
     serialized = re.search(r'data-monthly-contributor-trigger="([^\"]+)"', detail)[1]
     assert json.loads(unescape(serialized)) == [["Old & café", '<img src=x onerror="evil">', "-$49"]]
     assert 'data-private-content="Chart and amounts hidden"' in detail
+    assert "data-monthly-contributor-categories" not in detail
+
+    choices = [
+        {"id": "category:fixtures", "label": "House / Fixtures & repairs"},
+        {"id": "category:furniture", "label": "House / <Furniture>"},
+        {"id": "category:garden", "label": "House / Garden"},
+    ]
+    template = environment.get_template("monthly-insight.html")
+    for selection, label in (
+        ({"category_ids": ["category:furniture", "category:fixtures"]}, "House / Fixtures & repairs, House / <Furniture>"),
+        ({"category_id": "category:furniture"}, "House / <Furniture>"),
+    ):
+        filtered = template.render(**{
+            **context, "insight_options": {"group_by": "group", "categories": choices, **selection},
+        })
+        category_scope = re.search(r"<p data-monthly-contributor-categories>(.*?)</p>", filtered)[1]
+        assert unescape(category_scope) == f"Category filter · {label}"
+        assert "<Furniture>" not in category_scope
+        assert "House / Garden" not in category_scope
 
     preview = environment.get_template("monthly-insight-plot.html").render(
         **context, chart=chart, chart_preview=True, plot=stacked_monthly_plot(months, [(12000, -4900)], "USD"),

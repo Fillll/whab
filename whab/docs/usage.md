@@ -326,6 +326,8 @@ can show a segment below zero. Uncategorized outflows have their own series.
 Income, transfers, opening balances, pending and off-budget activity are excluded.
 Hover over a category or group segment to see its top five transactions,
 including the account, payee and amount. You can also focus a segment or tap it.
+The preview lists the applied Categories filter so you can see which categories
+are included, even when the chart is grouped.
 The preview ranks the largest contributions by magnitude and shows refunds as
 negative. When amounts are hidden, the chart and its previews are hidden too.
 

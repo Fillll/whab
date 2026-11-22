@@ -358,6 +358,7 @@ with TestClient(create_app(settings=chart_settings), base_url="https://127.0.0.1
     assert all_spending.status_code == 200 and "February 2026 · Net spending $316" in all_spending.text
     assert all_spending.text.count("data-monthly-filter-select-all") == 3
     assert all_spending.text.count("data-monthly-filter-deselect-all") == 3
+    assert "data-monthly-contributor-categories" not in all_spending.text
     none_selected = client.get(route, params={**options, "insight_category_none": "1"})
     assert none_selected.status_code == 200 and "None selected" in none_selected.text
     assert "No spending matches these filters." in none_selected.text
@@ -368,6 +369,7 @@ with TestClient(create_app(settings=chart_settings), base_url="https://127.0.0.1
     assert "February 2026 · Net spending $123" in page.text
     assert "March 2026 · Net spending $0" in page.text
     assert "data-monthly-contributor-trigger" in page.text
+    assert "<p data-monthly-contributor-categories>Category filter · Uncategorized</p>" in page.text
     assert "Fictional chart purchase" in page.text and "Fictional checking" in page.text
     assert "Fictional purchase outside filters" not in page.text
     assert "data-monthly-contributor-trigger" not in gallery.text

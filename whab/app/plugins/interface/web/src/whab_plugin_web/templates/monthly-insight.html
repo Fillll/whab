@@ -8,9 +8,14 @@
       {% include 'monthly-insight-plot.html' %}
     </div>
     {% if chart.series|selectattr('contributors')|list %}
+    {% set category_ids = insight_options.category_ids|default([insight_options.category_id]) %}
+    {% set selected_categories = insight_options.categories|default([])|selectattr('id', 'in', category_ids)|map(attribute='label')|list %}
     <div id="{{ chart_id }}-contributors" class="monthly-chart-contributors" data-monthly-contributor-preview popover="manual" role="tooltip" hidden>
       <strong>Top transactions</strong>
       <p data-monthly-contributor-context></p>
+      {% if selected_categories %}
+      <p data-monthly-contributor-categories>Category filter · {{ selected_categories|join(', ') }}</p>
+      {% endif %}
       <table aria-label="Top transactions">
         <thead><tr><th scope="col">Account</th><th scope="col">Payee</th><th scope="col">Amount</th></tr></thead>
         <tbody></tbody>

@@ -5,6 +5,7 @@
 PR: [#227](https://github.com/Fillll/whab/pull/227)
 
 - Add Select all and Deselect all to the Accounts, Category groups and Categories dropdowns in Monthly spending.
+- Show the applied Categories filter in the Top transactions preview.
 
 ## 1.71.0 — 2026-11-21
 
