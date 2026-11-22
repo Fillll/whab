@@ -321,6 +321,11 @@ Stacks show net posted spending from on-budget accounts in the selected currency
 Refunds reduce their category's spending. Months with a net refund for a series
 can show a segment below zero. Uncategorized outflows have their own series.
 Income, transfers, opening balances, pending and off-budget activity are excluded.
+Hover over a category or group segment to see its top five transactions,
+including the account, payee and amount. You can also focus a segment or tap it.
+The preview ranks the largest contributions by magnitude and shows refunds as
+negative. When amounts are hidden, the chart and its previews are hidden too.
+
 The total line shows net spending for each month. Use the breakdown for the values
 behind the chart.
 

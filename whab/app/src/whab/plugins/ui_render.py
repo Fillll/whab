@@ -10,12 +10,19 @@ from starlette.requests import Request
 from whab.web.navigation import page_url
 
 from .contracts import Capability, Requirement
-from .sdk import ChartSeries, Insight, PluginDescription, PluginInsightResult, StackedMonthlyChart
+from .sdk import (
+    ChartSeries,
+    Insight,
+    PluginDescription,
+    PluginInsightResult,
+    SpendingContributor,
+    StackedMonthlyChart,
+)
 from .wire import MAX_METADATA_BYTES, Frame, WireError
 
 MAX_UI_QUERY_FIELDS = 128
 
-_RECORDS = (PluginDescription, PluginInsightResult, Insight, Capability, Requirement, StackedMonthlyChart, ChartSeries)
+_RECORDS = (PluginDescription, PluginInsightResult, Insight, Capability, Requirement, StackedMonthlyChart, ChartSeries, SpendingContributor)
 _HEADERS = frozenset({"x-whab-page-fragment", "x-whab-budget-fragment",
                       "x-whab-transactions-fragment", "x-whab-transactions-sidebar"})
 _ROUTING = frozenset({"key", "personal_key", "workspace", "page", "month_token", "currency", "account_slugs"})
@@ -27,7 +34,10 @@ def _public(value, budget, depth=0):
     if depth > 16 or budget[0] < 0:
         raise WireError()
     if type(value) in _RECORDS:
-        value = {field.name: getattr(value, field.name) for field in fields(value)}
+        record = value
+        value = {field.name: getattr(record, field.name) for field in fields(record)}
+        if type(record) is ChartSeries and not record.contributors:
+            del value["contributors"]
     if type(value) is dict:
         if len(value) > 100000 or any(type(key) is not str or not key or len(key) > 200 for key in value):
             raise WireError()

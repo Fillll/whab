@@ -164,7 +164,7 @@ def test_local_storage_worker_static_contract_is_explicit(metadata_tool, static_
     ("file_import=parser,branding_factory=fresh", ""),
     ("bank_logos=branding,bind=binder", ""),
     ("bank_logos=branding", ",state_version=2"),
-    ("insights=insights", ",provides=(Capability('reporting.insights',3),)"),
+    ("insights=insights", ",provides=(Capability('reporting.insights',4),)"),
 ])
 def test_unsupported_live_shapes_cannot_claim_worker_compatibility(metadata_tool, static_repository, hooks, contract):
     root, _, module = static_repository

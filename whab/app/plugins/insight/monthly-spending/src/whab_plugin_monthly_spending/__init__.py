@@ -1,8 +1,11 @@
 """Build one stacked chart from WHAB's scoped monthly spending projection."""
 
+from bisect import insort
+from dataclasses import replace
 from hashlib import sha256
 
 from whab.plugins import (
+    MAX_INSIGHT_CONTRIBUTORS,
     BudgetSnapshot,
     Capability,
     ChartSeries,
@@ -38,7 +41,30 @@ def _visible_series(labels, amounts, uncategorized, by_group):
         active.append(ChartSeries("system:other", f"{label} ({len(remainder)})", values))
     if any(uncategorized):
         active.append(ChartSeries("system:uncategorized", "Uncategorized", uncategorized))
-    return tuple(active)
+    return tuple(active), {series.id for series in remainder}
+
+
+def _contribution_rank(row):
+    return (-abs(row.amount_cents), row.account_id, row.payee, row.amount_cents)
+
+
+def _with_contributors(series, remainder, spending, keys):
+    contributions = {row.id: [] for row in series}
+    for index, month in enumerate(spending):
+        buckets = {row.id: [] for row in series if row.values[index]}
+        for row in month.contributors:
+            series_id = "system:uncategorized" if row.category_id is None else keys[row.category_id][0]
+            if series_id in remainder:
+                series_id = "system:other"
+            if (bucket := buckets.get(series_id)) is not None:
+                insort(bucket, row, key=_contribution_rank)
+                del bucket[MAX_INSIGHT_CONTRIBUTORS:]
+        for series_id, months in contributions.items():
+            months.append(tuple(buckets.get(series_id, ())))
+    return tuple(
+        replace(row, contributors=tuple(contributions[row.id])) if any(contributions[row.id]) else row
+        for row in series
+    )
 
 
 def insights(snapshot: BudgetSnapshot) -> tuple[Insight, ...]:
@@ -59,7 +85,9 @@ def insights(snapshot: BudgetSnapshot) -> tuple[Insight, ...]:
             amounts[key][index] += row.amount_cents
 
     uncategorized = tuple(month.uncategorized_cents for month in snapshot.spending)
-    chart = StackedMonthlyChart(snapshot.currency, months, _visible_series(labels, amounts, uncategorized, by_group))
+    series, remainder = _visible_series(labels, amounts, uncategorized, by_group)
+    series = _with_contributors(series, remainder, snapshot.spending, keys)
+    chart = StackedMonthlyChart(snapshot.currency, months, series)
     return (Insight(
         "Monthly spending", "", "Posted on-budget spending by month. Refunds reduce spending in their posting month.", chart=chart,
     ),)
@@ -69,5 +97,5 @@ plugin = Plugin(
     id="monthly-spending",
     display_name="Monthly spending",
     insights=insights,
-    contract=PluginContract(provides=(Capability("reporting.insights", 2, "additive"),), lifecycle="live"),
+    contract=PluginContract(provides=(Capability("reporting.insights", 3, "additive"),), lifecycle="live"),
 )

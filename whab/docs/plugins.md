@@ -259,6 +259,18 @@ An empty selection leaves a filter open. The Web URL can repeat each of
 and legacy blank values still work. Duplicate selections count once. The visual
 worker transport accepts up to 128 query fields per request, including repeats.
 
+WHAB 2.90 adds opt-in `reporting.insights` version 3. It supplies the same
+aggregates plus up to five `SpendingContributor(category_id, account_id, payee,
+amount_cents)` records for each original category and month, including
+Uncategorized (`category_id=None`) and categories whose purchases and refunds
+cancel. Contributions use the spending sign convention, with purchases positive
+and refunds negative. The host selects the largest magnitudes after applying the
+same filters as the totals. IDs refer to existing snapshot accounts and
+categories. Payee display text is limited to 200 characters. A v3 report can
+return optional `ChartSeries.contributors`, with one tuple per chart month and
+up to five contributors for each nonzero segment. Older reports receive the
+same snapshots and chart schema as before.
+
 One returned `Insight` may include `chart=StackedMonthlyChart(currency, months,
 series)`. Its currency and consecutive `YYYY-MM` months must match the supplied
 range. It accepts up to 100 `ChartSeries(id, label, values)` records with unique

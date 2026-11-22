@@ -29,7 +29,7 @@ _HOST_CONTRACTS = frozenset({
 
 
 def host_accepts_capability_version(name, version):
-    return version == 1 or (name, version) == ("reporting.insights", 2)
+    return version == 1 or (name == "reporting.insights" and version in (2, 3))
 
 
 class CapabilityError(ValueError):
@@ -240,7 +240,7 @@ def resolve_plugins(plugins: tuple[Plugin, ...]) -> tuple[Plugin, ...]:
             )
         for capability in contracts[plugin.id].provides:
             if capability.name in _HOST_CONTRACTS and not host_accepts_capability_version(capability.name, capability.version):
-                supported = "versions 1 and 2" if capability.name == "reporting.insights" else "version 1"
+                supported = "versions 1 through 3" if capability.name == "reporting.insights" else "version 1"
                 raise CapabilityError(
                     f"Plugin capability '{capability.name}' requires an unsupported host contract version. "
                     f"This WHAB host supports {supported}; install a compatible plugin or upgrade WHAB.",

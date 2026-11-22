@@ -28,6 +28,7 @@ from .sdk import (
     PluginInsightResult,
     PluginSettings,
     SpendingCategory,
+    SpendingContributor,
     SpendingMonth,
     StackedMonthlyChart,
     TransactionSnapshot,
@@ -51,7 +52,7 @@ def _copy_record(value: object, record_type: type):
     return record_type(**{field.name: getattr(value, field.name) for field in fields(record_type)})
 
 
-def copy_snapshot(snapshot: BudgetSnapshot, *, include_spending: bool = False) -> BudgetSnapshot:
+def copy_snapshot(snapshot: BudgetSnapshot, *, include_spending: bool = False, include_contributors: bool = False) -> BudgetSnapshot:
     """Copy the single-month records and any opted-in monthly spending aggregates."""
     if type(snapshot) is not BudgetSnapshot:
         raise ValueError("Plugin snapshot must be a BudgetSnapshot.")
@@ -62,20 +63,24 @@ def copy_snapshot(snapshot: BudgetSnapshot, *, include_spending: bool = False) -
         categories=tuple(_copy_record(row, CategorySnapshot) for row in snapshot.categories),
         transactions=tuple(_copy_record(row, TransactionSnapshot) for row in snapshot.transactions),
         currency=snapshot.currency,
-        spending=tuple(SpendingMonth(row.month, row.uncategorized_cents, tuple(
-            _copy_record(category, SpendingCategory) for category in row.categories
-        )) for row in snapshot.spending) if include_spending else (),
+        spending=tuple(SpendingMonth(
+            row.month, row.uncategorized_cents,
+            tuple(_copy_record(category, SpendingCategory) for category in row.categories),
+            tuple(_copy_record(item, SpendingContributor) for item in row.contributors) if include_contributors else (),
+        ) for row in snapshot.spending) if include_spending else (),
         spending_by=snapshot.spending_by if include_spending else "group",
     )
 
 
-def _copy_insight(value, *, include_chart=False):
+def _copy_insight(value, *, include_chart=False, include_contributors=False):
     insight = _copy_record(value, Insight)
     chart = insight.chart
     if chart is None:
         return insight
     if not include_chart:
-        raise ValueError("Visual insights require reporting.insights version 2.")
+        raise ValueError("Visual insights require reporting.insights version 2 or later.")
+    if not include_contributors and any(row.contributors for row in chart.series):
+        raise ValueError("Chart contributors require reporting.insights version 3.")
     return Insight(insight.title, insight.value, insight.detail, StackedMonthlyChart(
         chart.currency, chart.months, tuple(_copy_record(row, ChartSeries) for row in chart.series),
     ))
@@ -434,11 +439,13 @@ class PluginRegistry:
             if plugin.insights is None:
                 continue
             try:
-                visual = any(row.name == "reporting.insights" and row.version == 2 for row in contract_for(plugin).provides)
-                output = plugin.insights(copy_snapshot(snapshot, include_spending=visual))
+                versions = {row.version for row in contract_for(plugin).provides if row.name == "reporting.insights"}
+                visual = bool(versions & {2, 3})
+                contributors = 3 in versions
+                output = plugin.insights(copy_snapshot(snapshot, include_spending=visual, include_contributors=contributors))
                 if type(output) is not tuple or len(output) > 50:
                     raise ValueError("Insight output must be a tuple of at most 50 records.")
-                insights = tuple(_copy_insight(row, include_chart=visual) for row in output)
+                insights = tuple(_copy_insight(row, include_chart=visual, include_contributors=contributors) for row in output)
                 if sum(row.chart is not None for row in insights) > 1:
                     raise ValueError("Each Insights plugin may return at most one chart.")
                 chart = next((row.chart for row in insights if row.chart is not None), None)

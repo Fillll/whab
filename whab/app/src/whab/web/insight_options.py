@@ -45,7 +45,7 @@ def _choices(snapshot):
     }
 
 
-def visual_insight_snapshot(snapshot, query, service):
+def visual_insight_snapshot(snapshot, query, service, *, include_contributors=False):
     default_start = max("1900-01", shift_month(snapshot.month, -5))
     options = {"start_month": default_start, "end_month": snapshot.month, "group_by": "group",
                "max_fields": MAX_UI_QUERY_FIELDS, **_choices(snapshot)}
@@ -81,7 +81,8 @@ def visual_insight_snapshot(snapshot, query, service):
     try:
         spending = service.insight_spending(snapshot.workspace, start, end, snapshot.currency,
                                            account_ids=options["account_ids"], group_ids=options["category_group_ids"],
-                                           category_ids=category_ids)
+                                           category_ids=category_ids,
+                                           **({"include_contributors": True} if include_contributors else {}))
         return replace(snapshot, spending=spending, spending_by=group), options
     except InsightRangeTooLarge as error:
         options["error"] = str(error)

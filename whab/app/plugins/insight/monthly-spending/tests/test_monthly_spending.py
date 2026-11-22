@@ -6,10 +6,12 @@ import pytest
 from whab_plugin_monthly_spending import insights, plugin
 
 from whab.plugins import (
+    AccountSnapshot,
     BudgetSnapshot,
     Capability,
     CategorySnapshot,
     SpendingCategory,
+    SpendingContributor,
     SpendingMonth,
 )
 
@@ -18,13 +20,13 @@ def category(identifier, name, group):
     return CategorySnapshot(identifier, name, group, 0, 0, 0)
 
 
-def month(value, amounts=(), uncategorized=0):
-    return SpendingMonth(value, uncategorized, tuple(SpendingCategory(*row) for row in amounts))
+def month(value, amounts=(), uncategorized=0, contributors=()):
+    return SpendingMonth(value, uncategorized, tuple(SpendingCategory(*row) for row in amounts), contributors)
 
 
-def snapshot(categories, spending, *, by="group", currency="USD"):
+def snapshot(categories, spending, *, by="group", currency="USD", accounts=()):
     return BudgetSnapshot(
-        workspace="demo", month="2026-03", accounts=(), categories=categories, transactions=(),
+        workspace="demo", month="2026-03", accounts=accounts, categories=categories, transactions=(),
         currency=currency, spending=spending, spending_by=by,
     )
 
@@ -35,7 +37,7 @@ def chart(categories, spending, **options):
 
 
 def test_lifecycle_probe_has_no_report():
-    assert plugin.contract.provides == (Capability("reporting.insights", 2),)
+    assert plugin.contract.provides == (Capability("reporting.insights", 3),)
     assert plugin.insights(BudgetSnapshot("demo", "2026-03", (), (), ())) == ()
 
 
@@ -95,15 +97,74 @@ def test_crowded_chart_preserves_monthly_totals_and_high_activity(mode, uncatego
     assert any(series.id != "system:other" and series.values[-1] == -2500 for series in report.series)
 
 
+def test_contributors_rank_with_refunds_ties_and_zero_net_leaves():
+    food = category("food", "Groceries", "Household")
+    repairs = category("repairs", "Repairs", "Household")
+    canceled = category("zero", "Refunded purchase", "Household")
+    orchard = AccountSnapshot("orchard", "Orchard checking", "depository", "checking", 0)
+    river = AccountSnapshot("river", "River checking", "depository", "checking", 0)
+    low_food = SpendingContributor(food.id, orchard.id, "Corner grocer", 100)
+    highest_food = SpendingContributor(food.id, river.id, "State Market", 600)
+    tied_food = SpendingContributor(food.id, orchard.id, "West Market", 400)
+    tied_repair = SpendingContributor(repairs.id, river.id, "Bench repair", 400)
+    highest_refund = SpendingContributor(repairs.id, river.id, "Returned tool", -900)
+    net_zero_purchase = SpendingContributor(canceled.id, orchard.id, "River hardware", 800)
+    net_zero_refund = SpendingContributor(canceled.id, orchard.id, "River hardware", -800)
+    uncategorized = SpendingContributor(None, river.id, "Bus kiosk", 300)
+    january = month("2026-01", ((food.id, 1100), (repairs.id, -500)), 300, (
+        low_food, highest_food, tied_food, tied_repair, highest_refund,
+        net_zero_purchase, net_zero_refund, uncategorized,
+    ))
+    february = month("2026-02", contributors=(net_zero_purchase, net_zero_refund))
+    categories = (food, repairs, canceled)
+    accounts = (orchard, river)
+
+    group = chart(categories, (january, february), accounts=accounts)
+    household, other = group.series
+    assert (household.label, household.values) == ("Household", (600, 0))
+    assert household.contributors == ((
+        highest_refund, net_zero_refund, net_zero_purchase, highest_food, tied_food,
+    ), ())
+    assert other.contributors == ((uncategorized,), ())
+
+    expense = chart(categories, (january, february), by="category", accounts=accounts)
+    assert {series.label: series.contributors[0] for series in expense.series} == {
+        "Household / Groceries": (highest_food, tied_food, low_food),
+        "Household / Repairs": (highest_refund, tied_repair),
+        "Uncategorized": (uncategorized,),
+    }
+
+
+def test_other_uses_only_the_series_that_were_rolled_up():
+    categories = tuple(category(f"c-{index}", "Spending", f"Group {index:03d}") for index in range(102))
+    amounts = [(row.id, index + 1) for index, row in enumerate(categories)]
+    account = AccountSnapshot("bank", "Orchard checking", "depository", "checking", 0)
+    refund = SpendingContributor(categories[0].id, account.id, "Cedar", -999)
+    purchase = SpendingContributor(categories[0].id, account.id, "Cedar", 1000)
+    neighbor = SpendingContributor(categories[2].id, account.id, "Neighbor", 3)
+    retained = SpendingContributor(categories[-1].id, account.id, "Hilltop", 102)
+    data = month("2026-03", amounts, contributors=(retained, refund, neighbor, purchase))
+    report = chart(categories, (data,), accounts=(account,))
+
+    other = next(series for series in report.series if series.id == "system:other")
+    top = next(series for series in report.series if series.id == categories[-1].parent_id)
+    assert other.values == (6,)
+    assert other.contributors == ((purchase, refund, neighbor),)
+    assert top.contributors == ((retained,),)
+
+
 def test_packaged_example_matches_the_real_report():
     document = json.loads((files("whab_plugin_monthly_spending") / "operations.json").read_text())
     example, = document["operations"][0]["examples"]
     raw = example["input"]["snapshot"].copy()
-    raw["accounts"] = tuple(raw["accounts"])
+    raw["accounts"] = tuple(AccountSnapshot(**row) for row in raw["accounts"])
     raw["transactions"] = tuple(raw["transactions"])
     raw["categories"] = tuple(CategorySnapshot(**row) for row in raw["categories"])
     raw["spending"] = tuple(
-        SpendingMonth(row["month"], row["uncategorized_cents"], tuple(SpendingCategory(**item) for item in row["categories"]))
+        SpendingMonth(
+            row["month"], row["uncategorized_cents"], tuple(SpendingCategory(**item) for item in row["categories"]),
+            tuple(SpendingContributor(**item) for item in row.get("contributors", ())),
+        )
         for row in raw["spending"]
     )
     assert json.loads(json.dumps([asdict(item) for item in insights(BudgetSnapshot(**raw))])) == example["output"]

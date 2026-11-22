@@ -357,9 +357,12 @@ def create_router(
         context["plugin_insights"] = ()
         if insight_plugins:
             snapshot = build_snapshot(workspace, data)
-            if any(capability.name == "reporting.insights" and capability.version == 2
-                   for plugin in insight_plugins for capability in plugin.capabilities):
-                snapshot, context["insight_options"] = visual_insight_snapshot(snapshot, request.query_params, service)
+            versions = {capability.version for plugin in insight_plugins for capability in plugin.capabilities
+                        if capability.name == "reporting.insights"}
+            if versions & {2, 3}:
+                snapshot, context["insight_options"] = visual_insight_snapshot(
+                    snapshot, request.query_params, service, include_contributors=3 in versions,
+                )
             context["plugin_insights"] = plugins.insights(snapshot)
         try:
             response = templates.TemplateResponse(request=request, name="base.html", context=context)

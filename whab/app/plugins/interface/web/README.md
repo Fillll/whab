@@ -522,6 +522,12 @@ in a navigable table. Long ranges scroll horizontally. **Hide amounts** conceals
 the plot, legend, breakdown and report detail while the date controls remain
 available along with the other chart filters.
 
+Hover or focus a chart segment to see up to five contributing transactions for
+that month and series. The preview gives each transaction's account, payee, and
+signed amount. Tap or click the segment to pin the preview and tap again to
+close it. With a segment focused, use the arrow keys to explore, Enter or Space
+to pin, and Escape to close. Hiding amounts also closes the preview.
+
 The Web interface renders typed, escaped report results from the host. It keeps
 the existing six-month trend when no visual report is available. A host that
 supports single-choice filters continues to display them as standard selects.
