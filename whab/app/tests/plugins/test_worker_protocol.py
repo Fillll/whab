@@ -290,7 +290,7 @@ def test_real_example_worker_roundtrip_matches_public_results_and_closes(worker_
                                   'hello:{"unknown":true}', 'hello:{"host":""}',
                                   'hello:{"live":1}', 'hello:{"live":"true"}',
                                   'hello:{"capabilities":[]}',
-                                  'hello:{"capabilities":[{"name":"reporting.insights","version":3},{"name":"reporting.export","version":1}]}',
+                                  'hello:{"capabilities":[{"name":"reporting.insights","version":4},{"name":"reporting.export","version":1}]}',
                                   'hello:{"capabilities":[{"name":"reporting.insights","version":true}]}',
                                   'hello:{"capabilities":[{"name":"reporting.insights","version":1,"extra":true}]}'])
 def test_startup_rejects_crashes_timeouts_and_incompatible_hello_and_cleans_process(mode, fixture_process):

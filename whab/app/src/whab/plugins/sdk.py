@@ -191,6 +191,8 @@ def _records(value: object, record_type: type, label: str) -> None:
 
 MAX_INSIGHT_MONTHS = 24
 MAX_CHART_SERIES = 100
+MAX_INSIGHT_CONTRIBUTORS = 5
+MAX_CONTRIBUTOR_PAYEE = 200
 
 
 def _insight_month(value: str) -> int:
@@ -225,10 +227,28 @@ class SpendingCategory:
 
 
 @dataclass(frozen=True, slots=True)
+class SpendingContributor:
+    category_id: str | None
+    account_id: str
+    payee: str
+    amount_cents: int
+
+    def __post_init__(self) -> None:
+        if self.category_id is not None:
+            _identifier(self.category_id, "Spending contributor category ID")
+        _identifier(self.account_id, "Spending contributor account ID")
+        _text(self.payee, "Spending contributor payee", limit=MAX_CONTRIBUTOR_PAYEE)
+        _insight_amount(self.amount_cents)
+        if not self.amount_cents:
+            raise ValueError("Spending contributors must change the bucket amount.")
+
+
+@dataclass(frozen=True, slots=True)
 class SpendingMonth:
     month: str
     uncategorized_cents: int
     categories: tuple[SpendingCategory, ...]
+    contributors: tuple[SpendingContributor, ...] = ()
 
     def __post_init__(self) -> None:
         _insight_month(self.month)
@@ -241,6 +261,16 @@ class SpendingMonth:
             raise ValueError("Spending category IDs must be unique within each month.")
         for row in self.categories:
             row.__post_init__()
+        if type(self.contributors) is not tuple or len(self.contributors) > 30000:
+            raise ValueError("Provide a bounded tuple of spending contributors.")
+        counts = {}
+        for row in self.contributors:
+            if type(row) is not SpendingContributor:
+                raise ValueError("Use the documented spending contributor record.")
+            row.__post_init__()
+            counts[row.category_id] = counts.get(row.category_id, 0) + 1
+            if counts[row.category_id] > MAX_INSIGHT_CONTRIBUTORS:
+                raise ValueError("A spending category can have at most five monthly contributors.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,6 +278,7 @@ class ChartSeries:
     id: str
     label: str
     values: tuple[int, ...]
+    contributors: tuple[tuple[SpendingContributor, ...], ...] = ()
 
     def __post_init__(self) -> None:
         _identifier(self.id, "Chart series ID")
@@ -256,6 +287,15 @@ class ChartSeries:
             raise ValueError(f"Chart values must be a tuple of 1 to {MAX_INSIGHT_MONTHS} amounts.")
         for amount in self.values:
             _insight_amount(amount)
+        if type(self.contributors) is not tuple or (self.contributors and len(self.contributors) != len(self.values)):
+            raise ValueError("Chart contributors must align with the series months.")
+        for amount, rows in zip(self.values, self.contributors):
+            if type(rows) is not tuple or len(rows) > MAX_INSIGHT_CONTRIBUTORS or (not amount and rows):
+                raise ValueError("Only nonzero chart segments can have up to five contributors.")
+            for row in rows:
+                if type(row) is not SpendingContributor:
+                    raise ValueError("Use the documented spending contributor record.")
+                row.__post_init__()
 
 
 @dataclass(frozen=True, slots=True)
@@ -324,6 +364,10 @@ class BudgetSnapshot:
                 month.__post_init__()
                 if any(row.category_id not in expenses for row in month.categories):
                     raise ValueError("Spending must reference expense categories in its snapshot.")
+                if any(row.account_id not in account_ids or
+                       (row.category_id is not None and row.category_id not in expenses)
+                       for row in month.contributors):
+                    raise ValueError("Spending contributors must reference accounts and expense categories in the snapshot.")
 
 
 @dataclass(frozen=True, slots=True)

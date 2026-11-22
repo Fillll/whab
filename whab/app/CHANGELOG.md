@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.90.0 — 2026-11-21
+
+PR: [#226](https://github.com/Fillll/whab/pull/226)
+
+- Provide opt-in, filtered transaction contributors for visual spending reports.
+
 ## 2.89.0 — 2026-11-20
 
 PR: [#223](https://github.com/Fillll/whab/pull/223)

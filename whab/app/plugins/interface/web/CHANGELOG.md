@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.71.0 — 2026-11-21
+
+PR: [#226](https://github.com/Fillll/whab/pull/226)
+
+- Show account, payee and signed amount for up to five transactions when a Monthly spending segment is hovered, focused or tapped.
+
 ## 1.70.1 — 2026-11-21
 
 PR: [#225](https://github.com/Fillll/whab/pull/225)

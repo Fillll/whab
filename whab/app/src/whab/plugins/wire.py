@@ -17,6 +17,10 @@ class WireError(ValueError):
         super().__init__("The plugin worker sent an invalid or incompatible frame.")
 
 
+class FrameMetadataTooLarge(WireError):
+    """A local frame exceeds the negotiated metadata byte limit."""
+
+
 def _value(value, depth=0, *, max_items=100000):
     if depth > 16:
         raise WireError()
@@ -78,7 +82,9 @@ class Frame:
             raise WireError()
         _value(self.metadata)
         raw = json.dumps(self.metadata, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
-        if len(raw) > MAX_METADATA_BYTES or len(self.payload) > MAX_PAYLOAD_BYTES:
+        if len(raw) > MAX_METADATA_BYTES:
+            raise FrameMetadataTooLarge()
+        if len(self.payload) > MAX_PAYLOAD_BYTES:
             raise WireError()
         return HEADER.pack(_MAGIC, PROTOCOL_VERSION, len(raw), len(self.payload)) + raw + self.payload
 

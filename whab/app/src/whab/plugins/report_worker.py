@@ -40,12 +40,13 @@ from .sdk import (
     ExportTable,
     LogoImage,
     SpendingCategory,
+    SpendingContributor,
     SpendingMonth,
     TransactionSnapshot,
     valid_plugin_name,
 )
 from .ui_worker import read_html, snapshot_ui
-from .wire import HEADER, PROTOCOL_VERSION, Frame, WireError, frame_lengths
+from .wire import HEADER, PROTOCOL_VERSION, Frame, FrameMetadataTooLarge, WireError, frame_lengths
 from .worker_adapters import (
     BINARY_OPERATIONS,
     LIVE_CAPABILITIES,
@@ -69,6 +70,7 @@ _ERRORS = {
     "worker_protocol": "The plugin worker returned an invalid response.",
     "worker_hook_failed": "The plugin worker could not complete this operation.",
     "worker_closed": "The plugin worker has closed. Start a prepared replacement before using it.",
+    "insight_range_too_large": "Too much transaction detail in this range. Choose fewer months or narrow the filters.",
     "worker_classification_unsupported": "Update the report worker to WHAB 2.79 or later to report Income, Transfer and Opening Balance categories. No report was submitted.",
 }
 
@@ -91,17 +93,21 @@ def _snapshot(value):
         if type(months) is not list or len(months) > MAX_INSIGHT_MONTHS:
             raise WireError()
         for month in months:
-            if (type(month) is not dict or month.keys() != {"month", "uncategorized_cents", "categories"}
-                    or type(month["categories"]) is not list or len(month["categories"]) > 10000):
+            required = {"month", "uncategorized_cents", "categories"}
+            if (type(month) is not dict or not required <= month.keys() <= required | {"contributors"}
+                    or type(month["categories"]) is not list or len(month["categories"]) > 10000
+                    or ("contributors" in month
+                        and (type(month["contributors"]) is not list or len(month["contributors"]) > 30000))):
                 raise WireError()
         values["spending"] = tuple(SpendingMonth(
             month["month"], month["uncategorized_cents"],
             tuple(SpendingCategory(**row) for row in month["categories"]),
+            tuple(SpendingContributor(**row) for row in month.get("contributors", ())),
         ) for month in months)
     return BudgetSnapshot(**values)
 
 
-def _snapshot_data(snapshot, *, include_spending=False):
+def _snapshot_data(snapshot, *, include_spending=False, include_contributors=False):
     if type(snapshot) is not BudgetSnapshot:
         raise WireError()
     value = {"workspace": snapshot.workspace, "month": snapshot.month, "currency": snapshot.currency}
@@ -111,6 +117,7 @@ def _snapshot_data(snapshot, *, include_spending=False):
         value.update(spending_by=snapshot.spending_by, spending=[{
             "month": row.month, "uncategorized_cents": row.uncategorized_cents,
             "categories": [asdict(category) for category in row.categories],
+            **({"contributors": [asdict(item) for item in row.contributors]} if include_contributors and row.contributors else {}),
         } for row in snapshot.spending])
     _snapshot(value)
     return value
@@ -356,7 +363,9 @@ class ReportWorker:
             if adapters["ui"] is not None and (value["insights"] or value["export"]):
                 raise WireError()
             self.contract = read_contract(value["contract"], value["capabilities"])
-            self._visual_insights = any(row.name == "reporting.insights" and row.version == 2 for row in self.contract.provides)
+            self._insight_version = next(
+                (row.version for row in self.contract.provides if row.name == "reporting.insights"), 0,
+            )
             if adapters["remote_client"] is not None:
                 from .remote_client_adapter import read_client_record
                 from .sdk import Plugin
@@ -437,14 +446,21 @@ class ReportWorker:
                 if operation in OPERATIONS:
                     request["arguments"] = {} if arguments is None else arguments
                 else:
-                    request["snapshot"] = (_snapshot_data(snapshot, include_spending=operation == "insights" and self._visual_insights)
-                                           if snapshot is not None else None)
+                    request["snapshot"] = (_snapshot_data(
+                        snapshot, include_spending=operation == "insights" and self._insight_version >= 2,
+                        include_contributors=self._insight_version == 3,
+                    ) if snapshot is not None else None)
                     if snapshot is not None and Version(self.info['host']) < Version('2.79'):
                         if any(row['kind'] != 'expense' for row in request['snapshot']['categories']):
                             raise _error('worker_classification_unsupported', self.plugin_id)
                         for row in request['snapshot']['categories']:
                             row.pop('kind')
-                raw = Frame(request, payload).encode()
+                try:
+                    raw = Frame(request, payload).encode()
+                except FrameMetadataTooLarge:
+                    if operation == "insights" and self._insight_version == 3:
+                        raise _error("insight_range_too_large", self.plugin_id) from None
+                    raise
                 payload_limit = {"bank.fetch": 128 * 1024, "merchant.fetch": 128 * 1024,
                                  "file.resources": 4 * 1024 * 1024, "file.parse": 50 * 1024 * 1024,
                                  "category.call": MAX_WORKER_NAMESPACE, "provider.call": MAX_PROVIDER_BYTES,
@@ -486,7 +502,9 @@ class ReportWorker:
         try:
             if type(value) is not list or len(value) > 50 or any(type(row) is not dict for row in value):
                 raise WireError()
-            return tuple(read_insight(row, include_chart=self._visual_insights) for row in value)
+            return tuple(read_insight(
+                row, include_chart=self._insight_version >= 2, include_contributors=self._insight_version == 3,
+            ) for row in value)
         except Exception:
             self._stop()
             raise _error("worker_protocol", self.plugin_id) from None

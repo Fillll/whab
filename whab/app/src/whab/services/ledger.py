@@ -5,6 +5,7 @@ process-specific capabilities: a restarted server rejects an old revision rather
 than risking duplicate writes after losing its in-memory idempotency receipts.
 """
 
+from bisect import insort
 from calendar import monthrange
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
@@ -1064,12 +1065,19 @@ class LedgerService:
             return {**data, "transactionPage": {**data["transactionPage"], "revision": self._revision}}
 
     def insight_spending(self, workspace, start_month, end_month, currency, *,
-                         account_ids=(), category_ids=(), group_ids=()):
+                         account_ids=(), category_ids=(), group_ids=(), include_contributors=False):
         """Return aggregates for any selected value in each active filter."""
         from whab.domain.accounts import is_on_budget
         from whab.domain.budget import posted_expense_amount
         from whab.domain.categories import category_group_id
-        from whab.plugins.sdk import MAX_INSIGHT_MONTHS, SpendingCategory, SpendingMonth
+        from whab.plugins.sdk import (
+            MAX_CONTRIBUTOR_PAYEE,
+            MAX_INSIGHT_CONTRIBUTORS,
+            MAX_INSIGHT_MONTHS,
+            SpendingCategory,
+            SpendingContributor,
+            SpendingMonth,
+        )
 
         self._workspace(workspace)
         _month(start_month)
@@ -1097,6 +1105,7 @@ class LedgerService:
 
         bounds = dates(start_month, end_month)
         totals = {month: defaultdict(int) for month in months}
+        contributors = {month: defaultdict(list) for month in months}
         limit = 30_000
         remaining = limit
         seen_ids = set()
@@ -1134,8 +1143,21 @@ class LedgerService:
                         or group_ids and group_by_category.get(identifier) not in group_ids):
                     continue
                 amount = posted_expense_amount(row, kinds.get(identifier, "expense"))
-                if amount:
-                    totals[row["date"][:7]][identifier] += amount
+                if not amount:
+                    continue
+                month = row["date"][:7]
+                totals[month][identifier] += amount
+                if include_contributors:
+                    account_id = row["accountId"]
+                    payee = row["merchant"]
+                    if len(payee) > MAX_CONTRIBUTOR_PAYEE:
+                        payee = payee[:MAX_CONTRIBUTOR_PAYEE - 1] + "…"
+                    order = (-abs(amount), account_id, payee, amount, row["id"])
+                    bucket = contributors[month][identifier]
+                    if len(bucket) < MAX_INSIGHT_CONTRIBUTORS or order < bucket[-1][0]:
+                        candidate = SpendingContributor(identifier, account_id, payee, amount)
+                        insort(bucket, (order, candidate), key=lambda item: item[0])
+                        del bucket[MAX_INSIGHT_CONTRIBUTORS:]
 
         with self._lock:
             if callable(getattr(self._store, "transaction_register_page", None)):
@@ -1155,9 +1177,12 @@ class LedgerService:
                 for month in months:
                     scope = {"account_ids": account_ids, **dates(month, month)} if account_ids else {}
                     collect(self.transaction_register(workspace, month, currency, **scope))
-        return tuple(SpendingMonth(month, amounts.get(None, 0), tuple(
-            SpendingCategory(identifier, amount) for identifier, amount in amounts.items() if identifier is not None and amount
-        )) for month, amounts in totals.items())
+        return tuple(SpendingMonth(
+            month, amounts.get(None, 0),
+            tuple(SpendingCategory(identifier, amount) for identifier, amount in amounts.items()
+                  if identifier is not None and amount),
+            tuple(row for bucket in contributors[month].values() for _, row in bucket),
+        ) for month, amounts in totals.items())
 
     def _transaction_page(
         self, workspace, month, currency, account_id=None, *, account_ids=None,

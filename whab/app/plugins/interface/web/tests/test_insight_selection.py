@@ -51,8 +51,9 @@ def test_explicit_report_and_builtin_can_share_identifier_and_result_stays_scope
     }
 
 
-def test_legacy_filtered_links_prefer_monthly_spending_and_allow_first_other_visual(row):
-    chart = (Capability("reporting.insights", 2),)
+@pytest.mark.parametrize("version", (2, 3))
+def test_legacy_filtered_links_prefer_monthly_spending_and_allow_first_other_visual(row, version):
+    chart = (Capability("reporting.insights", version),)
     monthly = row(plugin("monthly-spending", capabilities=chart))
     first_visual = row(plugin("first", capabilities=chart))
     another_visual = row(plugin("second", capabilities=chart))

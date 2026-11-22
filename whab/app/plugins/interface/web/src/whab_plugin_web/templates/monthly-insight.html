@@ -7,6 +7,16 @@
     <div class="monthly-chart-scroll" role="region" aria-label="Chart for {{ insight.title }}" tabindex="0">
       {% include 'monthly-insight-plot.html' %}
     </div>
+    {% if chart.series|selectattr('contributors')|list %}
+    <div id="{{ chart_id }}-contributors" class="monthly-chart-contributors" data-monthly-contributor-preview popover="manual" role="tooltip" hidden>
+      <strong>Top transactions</strong>
+      <p data-monthly-contributor-context></p>
+      <table aria-label="Top transactions">
+        <thead><tr><th scope="col">Account</th><th scope="col">Payee</th><th scope="col">Amount</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    {% endif %}
     <div class="monthly-chart-keys">
       <span class="monthly-chart-total-key">Net spending</span>
       <ul class="monthly-chart-legend" aria-label="Spending series">

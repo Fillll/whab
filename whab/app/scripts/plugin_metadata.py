@@ -197,7 +197,7 @@ def descriptor_metadata(module_path, attribute, root):
     state_version = _literal(contract["state_version"]) if "state_version" in contract else 1
     upgrades = _literal(contract["state_upgrades"]) if "state_upgrades" in contract else ()
     unsupported = present - {"id", "display_name", "api_version", "contract", "insights", "export"}
-    optional_versions = all(row["version"] == 1 or (row["name"], row["version"]) == ("reporting.insights", 2)
+    optional_versions = all(row["version"] == 1 or (row["name"] == "reporting.insights" and row["version"] in (2, 3))
                             for row in capabilities.values())
     live = (not legacy and lifecycle == "live" and bool({"insights", "export"} & present)
             and not unsupported and state_version == 1 and not upgrades

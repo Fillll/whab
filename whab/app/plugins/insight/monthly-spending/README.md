@@ -18,14 +18,21 @@ Uncategorized when present. Over that limit it keeps the series with the most
 activity across the selected months and combines the rest into an explicitly
 labeled Other series. The complete monthly net total is preserved.
 
+Open a chart segment to see up to five transactions that contribute to its
+category or group in that month, with each account, payee, and amount. The
+report ranks them by absolute amount and shows refunds as negative. Contributors
+respect the same account, category, group, month, and currency selection as the
+chart. **Other** shows transactions from the categories or groups it combines.
+
 ## Operation documentation
 
 The [packaged operation contract](src/whab_plugin_monthly_spending/operations.json)
 describes the read-only `insights` hook and supplies fictional examples.
-The host's reporting capability version 2 supplies a scoped monthly spending
-projection. This plugin builds a structured chart from that projection. It
-does not fetch transactions, modify the budget, store preferences or contact a
-provider. Rendering is handled by a compatible visual interface.
+The host's reporting capability version 3 supplies scoped monthly spending
+totals and a bounded list of contributing transactions. This plugin uses that
+projection to build the chart and rank each segment's contributors. A compatible
+visual interface renders the chart and resolves account names within the budget.
+The report is read-only and runs locally.
 
 ## Checks
 

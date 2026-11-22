@@ -1,5 +1,141 @@
 /* Enhance server-rendered monthly reports. The host supplies every value. */
 
+const contributorTrigger = '[data-monthly-contributor-trigger]';
+let dismissPreview;
+
+function initContributorPreview(plot) {
+  const preview = plot.querySelector('[data-monthly-contributor-preview]');
+  if (!preview) return;
+  const triggers = [...plot.querySelectorAll(contributorTrigger)];
+  if (!triggers.length) return;
+
+  const document = plot.ownerDocument;
+  const window = document.defaultView;
+  const viewport = document.documentElement;
+  const scroll = plot.querySelector('.monthly-chart-scroll');
+  const context = preview.querySelector('[data-monthly-contributor-context]');
+  const table = preview.querySelector('tbody');
+  let current = triggers[0];
+  let active, pinned, leaveTimer, lifetime, privacy;
+  current.setAttribute('tabindex', '0');
+  for (const trigger of triggers) trigger.querySelector('title')?.remove();
+
+  function close() {
+    window.clearTimeout(leaveTimer);
+    if (!active) return;
+    active.setAttribute('aria-expanded', 'false');
+    active.removeAttribute('aria-describedby');
+    if (preview.hidePopover && preview.matches(':popover-open')) preview.hidePopover();
+    preview.hidden = true;
+    table.replaceChildren();
+    context.textContent = '';
+    lifetime.abort();
+    privacy.disconnect();
+    active = null;
+    pinned = false;
+    dismissPreview = undefined;
+  }
+
+  function position() {
+    const anchor = active.getBoundingClientRect();
+    const chart = scroll.getBoundingClientRect();
+    const width = viewport.clientWidth;
+    const height = viewport.clientHeight;
+    if (anchor.right < Math.max(0, chart.left) || anchor.left > Math.min(width, chart.right)
+        || anchor.bottom < 0 || anchor.top > height) { close(); return; }
+    const panel = preview.getBoundingClientRect();
+    const inset = 8;
+    const below = anchor.bottom + inset;
+    const above = anchor.top - panel.height - inset;
+    preview.style.left = `${Math.max(inset, Math.min(anchor.left, width - panel.width - inset))}px`;
+    preview.style.top = `${Math.max(inset, Math.min(below + panel.height <= height - inset ? below : above, height - panel.height - inset))}px`;
+  }
+
+  function show(trigger) {
+    if (viewport.dataset.amounts === 'hidden') return;
+    window.clearTimeout(leaveTimer);
+    if (active === trigger) return;
+    dismissPreview?.();
+    active = trigger;
+    dismissPreview = close;
+    context.textContent = trigger.getAttribute('aria-label');
+    for (const values of JSON.parse(trigger.dataset.monthlyContributorTrigger)) {
+      const row = table.insertRow();
+      row.setAttribute('data-monthly-contributor-row', '');
+      values.forEach((value, index) => {
+        const cell = row.insertCell();
+        if (index === 2) cell.setAttribute('data-monthly-contributor-amount', '');
+        cell.textContent = value;
+      });
+    }
+    preview.hidden = false;
+    preview.showPopover?.();
+    trigger.setAttribute('aria-expanded', 'true');
+    trigger.setAttribute('aria-describedby', preview.id);
+    lifetime = new AbortController();
+    const signal = lifetime.signal;
+    document.addEventListener('pointerdown', event => {
+      if (!active.contains(event.target) && !preview.contains(event.target)) close();
+    }, {capture: true, signal});
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.preventDefault(); close(); }
+    }, {signal});
+    document.addEventListener('scroll', position, {capture: true, signal});
+    window.addEventListener('resize', position, {signal});
+    privacy = new MutationObserver(() => { if (viewport.dataset.amounts === 'hidden') close(); });
+    privacy.observe(viewport, {attributes: true, attributeFilter: ['data-amounts']});
+    position();
+  }
+
+  function toggle(trigger) {
+    if (active === trigger && pinned) close();
+    else {
+      show(trigger);
+      pinned = active === trigger;
+    }
+  }
+
+  plot.addEventListener('pointerover', event => {
+    if (preview.contains(event.target)) window.clearTimeout(leaveTimer);
+    const trigger = event.target.closest(contributorTrigger);
+    if (trigger && !pinned && event.pointerType !== 'touch') show(trigger);
+  });
+  plot.addEventListener('pointerout', event => {
+    if (!pinned && active && document.activeElement !== active
+        && (active.contains(event.target) || preview.contains(event.target))
+        && !active.contains(event.relatedTarget) && !preview.contains(event.relatedTarget)) {
+      window.clearTimeout(leaveTimer);
+      leaveTimer = window.setTimeout(close, 180);
+    }
+  });
+  plot.addEventListener('focusin', event => {
+    const trigger = event.target.closest(contributorTrigger);
+    if (!trigger) return;
+    current.setAttribute('tabindex', '-1');
+    current = trigger;
+    current.setAttribute('tabindex', '0');
+    show(trigger);
+  });
+  plot.addEventListener('focusout', event => { if (event.target === active) close(); });
+  plot.addEventListener('click', event => {
+    const trigger = event.target.closest(contributorTrigger);
+    if (trigger) toggle(trigger);
+  });
+  plot.addEventListener('keydown', event => {
+    const trigger = event.target.closest(contributorTrigger);
+    if (!trigger) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggle(trigger);
+    }
+    const step = {ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1}[event.key];
+    if (step) {
+      event.preventDefault();
+      triggers[triggers.indexOf(trigger) + step]?.focus();
+    }
+  });
+}
+
 function initMonthlyFilter(picker) {
   const summary = picker.querySelector('summary');
   const label = picker.querySelector('[data-monthly-filter-label]');
@@ -58,6 +194,7 @@ function initMonthlyFilter(picker) {
 }
 
 export function initMonthlyInsights({root, navigate}) {
+  dismissPreview?.();
   const report = root.querySelector('[data-monthly-chart]');
   if (!report) return;
   const form = report.querySelector('[data-monthly-insight-filters]');
@@ -79,6 +216,7 @@ export function initMonthlyInsights({root, navigate}) {
   }
 
   for (const plot of report.querySelectorAll('.monthly-insight')) {
+    initContributorPreview(plot);
     const controls = [...plot.querySelectorAll('[data-chart-emphasis]')];
     const segments = plot.querySelectorAll('[data-chart-series]');
     let selected = null;

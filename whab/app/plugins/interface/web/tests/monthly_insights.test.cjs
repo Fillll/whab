@@ -23,7 +23,7 @@ function legend() {
     dataset: {chartSeries: String(index)}, dimmed: false,
     toggleAttribute(name, value) {assert.equal(name, 'data-chart-dimmed'); this.dimmed = value;},
   }));
-  return {controls, segments, querySelectorAll(selector) {
+  return {controls, segments, querySelector() { return null; }, querySelectorAll(selector) {
     return selector === '[data-chart-emphasis]' ? controls : segments;
   }};
 }
@@ -163,4 +163,98 @@ test('emphasizing a series is local to its chart and reversible', () => {
   main.controls[1].click();
   assert.deepEqual(main.controls.map(control => control.selected), [false, false]);
   assert.deepEqual(main.segments.map(segment => segment.dimmed), [false, false, false]);
+});
+
+test('contributor previews show safe text, stay in the viewport and support hover, touch and keyboard', () => {
+  const state = harness();
+  let privacyChange;
+  state.AbortController = AbortController;
+  state.MutationObserver = class {
+    constructor(change) { privacyChange = change; }
+    observe() {}
+    disconnect() { privacyChange = null; }
+  };
+  const eventTarget = props => ({
+    ...props, events: {},
+    addEventListener(name, handler) { this.events[name] = handler; },
+  });
+  const caption = {};
+  const body = {
+    rows: [], replaceChildren() { this.rows = []; },
+    insertRow() {
+      const row = {cells: [], setAttribute() {}, insertCell() {
+        const cell = {setAttribute(name) { this.attribute = name; }};
+        this.cells.push(cell);
+        return cell;
+      }};
+      this.rows.push(row);
+      return row;
+    },
+  };
+  const panel = {
+    id: 'preview', hidden: true, style: {},
+    contains: target => target === panel,
+    matches: () => panel.open,
+    querySelector: selector => selector === 'tbody' ? body : caption,
+    getBoundingClientRect: () => ({width: 320, height: 180}),
+    showPopover() { this.open = true; },
+    hidePopover() { this.open = false; },
+  };
+  const page = eventTarget({
+    documentElement: {dataset: {amounts: 'shown'}, clientWidth: 360, clientHeight: 320},
+    defaultView: eventTarget({setTimeout, clearTimeout}),
+  });
+  const triggers = ['Checking', 'Archive'].map(label => ({
+    attributes: {'aria-label': label},
+    dataset: {monthlyContributorTrigger: JSON.stringify([[label, '<shop & café>', '-$29']])},
+    contains(target) { return target === this; },
+    closest() { return this; },
+    getAttribute(name) { return this.attributes[name]; },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    removeAttribute(name) { delete this.attributes[name]; },
+    querySelector() { return null; },
+    getBoundingClientRect: () => ({left: 290, right: 320, top: 260, bottom: 280}),
+    focus() { page.activeElement = this; plot.events.focusin({target: this}); },
+  }));
+  const scroll = {getBoundingClientRect: () => ({left: 0, right: 360})};
+  const plot = eventTarget({
+    ownerDocument: page,
+    querySelector: selector => selector === '.monthly-chart-scroll' ? scroll : panel,
+    querySelectorAll: () => triggers,
+  });
+  const event = (target, fields = {}) => ({target, preventDefault() {}, ...fields});
+  const [one, two] = triggers;
+  state.initContributorPreview(plot);
+  assert.equal(one.attributes.tabindex, '0');
+  plot.events.pointerover(event(one, {pointerType: 'mouse'}));
+  assert.equal(panel.open, true);
+  assert.deepEqual(panel.style, {left: '32px', top: '72px'});
+  assert.deepEqual(body.rows[0].cells.map(cell => cell.textContent), ['Checking', '<shop & café>', '-$29']);
+  assert.equal(body.rows[0].cells[2].attribute, 'data-monthly-contributor-amount');
+
+  one.focus();
+  plot.events.keydown(event(one, {key: 'ArrowRight'}));
+  assert.equal(two.attributes.tabindex, '0');
+  assert.equal(two.attributes['aria-describedby'], 'preview');
+  assert.equal(caption.textContent, 'Archive');
+  plot.events.keydown(event(two, {key: 'Enter'}));
+  plot.events.pointerover(event(one, {pointerType: 'mouse'}));
+  assert.equal(caption.textContent, 'Archive');
+  page.events.keydown(event(two, {key: 'Escape'}));
+  assert.equal(panel.hidden, true);
+  assert.equal(body.rows.length, 0);
+
+  plot.events.pointerover(event(one, {pointerType: 'touch'}));
+  assert.equal(panel.hidden, true);
+  plot.events.click(event(one));
+  assert.equal(panel.hidden, false);
+  plot.events.click(event(one));
+  assert.equal(panel.hidden, true);
+  plot.events.click(event(one));
+  page.documentElement.dataset.amounts = 'hidden';
+  privacyChange();
+  assert.equal(panel.hidden, true);
+  assert.equal(one.attributes['aria-expanded'], 'false');
+  plot.events.click(event(one));
+  assert.equal(panel.hidden, true);
 });

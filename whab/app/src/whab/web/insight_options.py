@@ -1,11 +1,13 @@
 """Resolve visual Insight controls against the selected budget and currency."""
 
-from dataclasses import replace
+from dataclasses import asdict, replace
+from json import dumps
 
 from whab.domain.dates import shift_month
 from whab.domain.errors import StoreError
 from whab.plugins.sdk import MAX_INSIGHT_MONTHS, _insight_month
 from whab.plugins.ui_render import MAX_UI_QUERY_FIELDS
+from whab.plugins.wire import MAX_METADATA_BYTES
 from whab.services.ledger import InsightRangeTooLarge
 
 _DATE_CONTROLS = ("insight_from", "insight_to", "insight_group")
@@ -45,7 +47,7 @@ def _choices(snapshot):
     }
 
 
-def visual_insight_snapshot(snapshot, query, service):
+def visual_insight_snapshot(snapshot, query, service, *, include_contributors=False):
     default_start = max("1900-01", shift_month(snapshot.month, -5))
     options = {"start_month": default_start, "end_month": snapshot.month, "group_by": "group",
                "max_fields": MAX_UI_QUERY_FIELDS, **_choices(snapshot)}
@@ -81,7 +83,18 @@ def visual_insight_snapshot(snapshot, query, service):
     try:
         spending = service.insight_spending(snapshot.workspace, start, end, snapshot.currency,
                                            account_ids=options["account_ids"], group_ids=options["category_group_ids"],
-                                           category_ids=category_ids)
+                                           category_ids=category_ids,
+                                           **({"include_contributors": True} if include_contributors else {}))
+        if include_contributors:
+            # Leave space in the worker frames for the ordinary report snapshot and page.
+            contributor_bytes = sum(
+                len(dumps(asdict(row), ensure_ascii=False, separators=(",", ":")).encode("utf-8")) + 1
+                for month in spending for row in month.contributors
+            )
+            if contributor_bytes > MAX_METADATA_BYTES // 2:
+                raise InsightRangeTooLarge(
+                    "Too much transaction detail in this range. Choose fewer months or narrow the filters."
+                )
         return replace(snapshot, spending=spending, spending_by=group), options
     except InsightRangeTooLarge as error:
         options["error"] = str(error)

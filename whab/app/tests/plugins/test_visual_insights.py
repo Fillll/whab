@@ -19,13 +19,15 @@ from whab.plugins import (
     Insight,
     Plugin,
     PluginContract,
+    PluginError,
     PluginRegistry,
     SpendingCategory,
+    SpendingContributor,
     SpendingMonth,
     StackedMonthlyChart,
 )
 from whab.plugins.insight_wire import insight_data, read_insight
-from whab.plugins.report_worker import _snapshot, _snapshot_data
+from whab.plugins.report_worker import ReportWorker, _snapshot, _snapshot_data
 from whab.plugins.ui_render import public_value
 from whab.plugins.wire import WireError
 from whab.services.ledger import InsightRangeTooLarge, LedgerService
@@ -53,6 +55,83 @@ def test_visual_records_cross_both_worker_boundaries_and_legacy_stays_text_only(
     with pytest.raises(WireError):
         read_insight(insight_data(output))
     assert read_insight({"title": "Legacy", "value": "Accepted"}) == Insight("Legacy", "Accepted")
+
+
+def test_contributors_cross_worker_boundaries_only_with_version_three(snapshot):
+    candidate = SpendingContributor("food", "cash", "Chez Émile", 225)
+    snapshot = replace(
+        snapshot,
+        accounts=(AccountSnapshot("cash", "Wallet", "depository", "checking", 100),),
+        spending=(replace(snapshot.spending[0], contributors=(candidate,)), snapshot.spending[1]),
+    )
+    assert _snapshot(_snapshot_data(snapshot, include_spending=True, include_contributors=True)) == snapshot
+    legacy = _snapshot(_snapshot_data(snapshot, include_spending=True))
+    assert legacy.spending[0].contributors == ()
+
+    series = ChartSeries("food", "Épicerie", (225, 0), ((candidate,), ()))
+    chart = StackedMonthlyChart("USD", ("2026-09", "2026-10"), (series,))
+    insight = Insight("Monthly spending", "", chart=chart)
+    payload = insight_data(insight)
+    assert public_value(insight) == payload
+    assert read_insight(payload, include_chart=True, include_contributors=True) == insight
+    with pytest.raises(WireError):
+        read_insight(payload, include_chart=True)
+
+    def check_legacy(data):
+        assert data == legacy
+        return (Insight("Legacy chart", "", chart=replace(chart, series=(replace(series, contributors=()),))),)
+
+    def check_current(data):
+        assert data == snapshot
+        return (insight,)
+
+    for version, hook, has_contributors in ((2, check_legacy, False), (3, check_current, True)):
+        contract = PluginContract(provides=(Capability("reporting.insights", version),), lifecycle="live")
+        registry = PluginRegistry((Plugin("report", "Report", insights=hook, contract=contract),))
+        result = registry.insights(snapshot)[0]
+        assert not result.error
+        assert bool(result.insights[0].chart.series[0].contributors) is has_contributors
+
+    with pytest.raises(ValueError, match="at most five"):
+        replace(snapshot.spending[0], contributors=(candidate,) * 6)
+    with pytest.raises(ValueError, match="nonzero chart"):
+        replace(series, contributors=((), (candidate,)))
+    with pytest.raises(ValueError, match="must align"):
+        replace(series, contributors=((candidate,),))
+    with pytest.raises(ValueError, match="reference accounts"):
+        replace(snapshot, accounts=())
+
+
+def test_oversized_contributors_can_be_narrowed_without_stopping_the_report_worker(snapshot, monkeypatch):
+    snapshot = replace(
+        snapshot,
+        accounts=(AccountSnapshot("cash", "Wallet", "depository", "checking", 100),),
+        spending=(replace(snapshot.spending[0], contributors=(
+            SpendingContributor("food", "cash", "大" * 200, 225),
+        )), snapshot.spending[1]),
+    )
+    base = replace(snapshot, spending=(), spending_by="group")
+    query = QueryParams("insight_from=2026-09&insight_to=2026-10&insight_group=category")
+    service = SimpleNamespace(insight_spending=lambda *args, **kwargs: snapshot.spending)
+    with monkeypatch.context() as limits:
+        limits.setattr("whab.web.insight_options.MAX_METADATA_BYTES", 1000)
+        data, options = visual_insight_snapshot(base, query, service, include_contributors=True)
+    assert data is base
+    assert "Choose fewer months or narrow the filters." in options["error"]
+    assert visual_insight_snapshot(base, query, service, include_contributors=True)[0] == snapshot
+
+    worker = ReportWorker("monthly-spending")
+    try:
+        with monkeypatch.context() as limits:
+            limits.setattr("whab.plugins.wire.MAX_METADATA_BYTES", 1000)
+            with pytest.raises(PluginError, match="Choose fewer months or narrow the filters.") as raised:
+                worker.insights(snapshot)
+            assert raised.value.code == "insight_range_too_large"
+        assert worker.healthy
+        result, = worker.insights(snapshot)
+        assert result.chart.series[0].contributors == ((snapshot.spending[0].contributors[0],), ())
+    finally:
+        worker.close()
 
 
 def test_registry_only_shares_history_with_opted_in_reports(snapshot):
@@ -242,6 +321,43 @@ def test_spending_filters_intersect_before_aggregating_on_each_backend(insight_l
         with pytest.raises(StoreError, match="unavailable for this budget and currency"):
             result(**filters)
     assert service.revision == revision
+
+
+def test_contributor_ranking_uses_the_filtered_spending_rows(store):
+    service = LedgerService(store)
+    cash = service.add_account("personal", {"name": "Wallet", "type": "depository", "balance": 0})
+    off_budget = service.add_account("personal", {
+        "name": "Tracking", "type": "depository", "balance": 0, "onBudget": False,
+    })
+
+    for payee, amount, account in (
+        ("Fictional largest", 700, cash),
+        ("Fictional refund", -600, cash),
+        ("Fictional fourth", 300, cash),
+        ("Fictional third", 350, cash),
+        ("Fictional fifth", 200, cash),
+        ("Fictional sixth", 150, cash),
+        ("Excluded account", 900, off_budget),
+    ):
+        service.add_transaction("personal", {
+            "accountId": account, "date": "2025-01-10", "merchant": payee, "amount": amount,
+            "categoryId": "groceries",
+        })
+
+    service.add_transaction("personal", {
+        "accountId": cash, "date": "2025-01-12", "merchant": "Ignored category", "amount": 800,
+        "categoryId": None,
+    })
+    (month,) = service.insight_spending(
+        "personal", "2025-01", "2025-01", "USD", category_ids=("groceries",), include_contributors=True,
+    )
+    assert month.uncategorized_cents == 0
+    assert month.categories == (SpendingCategory("groceries", 1100),)
+    assert [(row.payee, row.amount_cents) for row in month.contributors] == [
+        ("Fictional largest", 700), ("Fictional refund", -600), ("Fictional third", 350),
+        ("Fictional fourth", 300), ("Fictional fifth", 200),
+    ]
+    assert all(row.account_id == cash for row in month.contributors)
 
 
 def test_atomic_read_projects_on_budget_categorized_refunds_and_empty_months(store):

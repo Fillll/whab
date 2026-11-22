@@ -14,7 +14,7 @@ def _field(record, name):
 
 
 def _has_visual(plugin):
-    return any(_field(row, "name") == "reporting.insights" and _field(row, "version") == 2
+    return any(_field(row, "name") == "reporting.insights" and _field(row, "version") in (2, 3)
                for row in _field(plugin, "capabilities"))
 
 
