@@ -76,7 +76,8 @@ def test_visual_reports_have_isolated_accessible_ids_escaped_labels_and_privacy(
     assert '<script>' not in result and '&lt;script&gt;one&lt;/script&gt;' in result
     assert 'Fictional &lt;travel&gt;' in result and 'Test &amp; Travel' in result
     assert 'aria-controls="monthly-insight-1"' in result and 'aria-controls="monthly-insight-2"' in result
-    assert 'aria-labelledby="monthly-insight-2-title" aria-describedby="monthly-insight-2-description"' in result
+    assert 'aria-label="Second report · JPY" aria-describedby="monthly-insight-2-description"' in result
+    assert "<title" not in result
     assert result.count('data-private-content="Chart and amounts hidden"') == 2
     assert '<td>-JPY 200</td>' in result and 'Category</th>' in result
 
@@ -89,7 +90,8 @@ def test_monthly_contributors_are_escaped_scoped_and_omitted_from_gallery():
     months = ("2026-10", "2026-11")
     chart = {"currency": "USD", "months": months, "series": [{
         "id": "house", "label": "House", "values": (12000, -4900), "contributors": [
-            [], [{"account_id": "closed-cash", "payee": '<img src=x onerror="evil">', "amount_cents": -4900}],
+            [], [{"account_id": "closed-cash", "payee": '<img src=x onerror="evil">', "amount_cents": -4900,
+                  "category_id": "fixtures"}],
         ],
     }]}
     context = {
@@ -106,7 +108,8 @@ def test_monthly_contributors_are_escaped_scoped_and_omitted_from_gallery():
     assert 'aria-label="November 2026 · House · -$49"' in detail
     assert '<img src=' not in detail
     serialized = re.search(r'data-monthly-contributor-trigger="([^\"]+)"', detail)[1]
-    assert json.loads(unescape(serialized)) == [["Old & café", '<img src=x onerror="evil">', "-$49"]]
+    assert json.loads(unescape(serialized)) == [["Old & café", '<img src=x onerror="evil">', "-$49", "fixtures"]]
+    assert 'Payee / Category</th>' in detail and '<title' not in detail
     assert 'data-private-content="Chart and amounts hidden"' in detail
     assert "data-monthly-contributor-categories" not in detail
 
@@ -132,7 +135,7 @@ def test_monthly_contributors_are_escaped_scoped_and_omitted_from_gallery():
         **context, chart=chart, chart_preview=True, plot=stacked_monthly_plot(months, [(12000, -4900)], "USD"),
     )
     assert 'data-insight-preview-chart' in preview and 'data-monthly-contributor-trigger' not in preview
-    assert 'closed-cash' not in preview and 'evil' not in preview
+    assert 'closed-cash' not in preview and 'evil' not in preview and '<title' not in preview
 
 
 def test_range_and_group_filters_preserve_useful_fallbacks(store, tmp_path, client_for):

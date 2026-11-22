@@ -3,7 +3,7 @@
 const contributorTrigger = '[data-monthly-contributor-trigger]';
 let dismissPreview;
 
-function initContributorPreview(plot) {
+function initContributorPreview(plot, categoryLabels) {
   const preview = plot.querySelector('[data-monthly-contributor-preview]');
   if (!preview) return;
   const triggers = [...plot.querySelectorAll(contributorTrigger)];
@@ -18,7 +18,6 @@ function initContributorPreview(plot) {
   let current = triggers[0];
   let active, pinned, leaveTimer, lifetime, privacy;
   current.setAttribute('tabindex', '0');
-  for (const trigger of triggers) trigger.querySelector('title')?.remove();
 
   function close() {
     window.clearTimeout(leaveTimer);
@@ -59,14 +58,19 @@ function initContributorPreview(plot) {
     active = trigger;
     dismissPreview = close;
     context.textContent = trigger.getAttribute('aria-label');
-    for (const values of JSON.parse(trigger.dataset.monthlyContributorTrigger)) {
+    for (const [account, payee, amount, categoryId] of JSON.parse(trigger.dataset.monthlyContributorTrigger)) {
       const row = table.insertRow();
       row.setAttribute('data-monthly-contributor-row', '');
-      values.forEach((value, index) => {
-        const cell = row.insertCell();
-        if (index === 2) cell.setAttribute('data-monthly-contributor-amount', '');
-        cell.textContent = value;
-      });
+      row.insertCell().textContent = account;
+      const payeeCell = row.insertCell();
+      payeeCell.textContent = payee;
+      const categoryLabel = document.createElement('span');
+      categoryLabel.setAttribute('data-monthly-contributor-category', '');
+      categoryLabel.textContent = categoryId === null ? 'Uncategorized' : categoryLabels.get(`category:${categoryId}`) ?? 'Unknown category';
+      payeeCell.append(categoryLabel);
+      const amountCell = row.insertCell();
+      amountCell.setAttribute('data-monthly-contributor-amount', '');
+      amountCell.textContent = amount;
     }
     preview.hidden = false;
     preview.showPopover?.();
@@ -248,8 +252,12 @@ export function initMonthlyInsights({root, navigate}) {
     });
   }
 
+  const categoryLabels = new Map(Array.from(
+    report.querySelectorAll('[data-monthly-filter="insight_category"] [data-monthly-filter-option]'),
+    option => [option.querySelector('input').value, option.querySelector('span').textContent],
+  ));
   for (const plot of report.querySelectorAll('.monthly-insight')) {
-    initContributorPreview(plot);
+    initContributorPreview(plot, categoryLabels);
     const controls = [...plot.querySelectorAll('[data-chart-emphasis]')];
     const segments = plot.querySelectorAll('[data-chart-series]');
     let selected = null;

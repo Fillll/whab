@@ -530,9 +530,10 @@ the plot, legend, breakdown and report detail while the date controls remain
 available along with the other chart filters.
 
 Hover or focus a chart segment to see up to five contributing transactions for
-that month and series. The preview gives each transaction's account, payee, and
-signed amount. It also lists any applied Categories filter, including in
-Groups view. Tap or click the segment to pin the preview and tap again to
+that month and series. The preview shows each transaction's account, payee,
+category and signed amount, with the category below the payee. It also lists
+any applied Categories filter. The chart uses this single popup for hover
+details. Tap or click the segment to pin the preview and tap again to
 close it. With a segment focused, use the arrow keys to explore, Enter or Space
 to pin, and Escape to close. Hiding amounts also closes the preview.
 
