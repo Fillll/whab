@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.70.1 — 2026-11-21
+
+PR: [#225](https://github.com/Fillll/whab/pull/225)
+
+- Use the From and To controls for ranged Insights reports and remove the redundant header month selector.
+
 ## 1.70.0 — 2026-11-21
 
 PR: [#224](https://github.com/Fillll/whab/pull/224)
