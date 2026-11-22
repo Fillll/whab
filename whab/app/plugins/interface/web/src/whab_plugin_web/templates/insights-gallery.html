@@ -1,0 +1,104 @@
+{% macro tile(report, title, period, featured=false) -%}
+  <a class="insight-tile{% if featured %} is-featured{% endif %}" data-insight-tile="{{ report }}"
+     href="{{ url('insights', insight_report=report) }}" aria-labelledby="insight-tile-{{ report }}">
+    <div class="insight-tile-heading">
+      <div>
+        <h2 id="insight-tile-{{ report }}">{{ title }}</h2>
+        <span class="subtle-label">{{ period }}</span>
+      </div>
+      <span class="insight-tile-arrow" aria-hidden="true">{{ icon('arrow-right', 15) }}</span>
+    </div>
+    {{ caller() }}
+  </a>
+{%- endmacro %}
+
+{% macro ranked_row(name, amount) -%}
+  <li><span>{{ name }}</span><strong>{{ money(amount) }}</strong></li>
+{%- endmacro %}
+
+{% macro plugin_preview(plugin, result, insight, featured=false) -%}
+  {% set chart = insight.chart if insight else none %}
+  {% set metrics = result.insights|rejectattr('chart')|list if result else [] %}
+  {% set period = month_label(month) %}
+  {% if chart and chart.months|length > 1 %}
+    {% set period = month_label(chart.months[0]) ~ ' – ' ~ month_label(chart.months[-1]) %}
+  {% elif chart and chart.months %}
+    {% set period = month_label(chart.months[0]) %}
+  {% endif %}
+  {% call tile('plugin:' ~ plugin.id, plugin.display_name, period, featured) %}
+    {% if chart and chart.series %}
+      <div class="insight-preview" data-private-content="Chart and amounts hidden">
+        {% set plot = stacked_monthly_plot(chart.months, chart.series|map(attribute='values'), chart.currency) %}
+        {% set chart_preview = true %}
+        {% include 'monthly-insight-plot.html' %}
+        <ul class="insight-preview-legend" aria-label="Chart series">
+          {% for series in chart.series[:4] %}
+            <li><span class="monthly-chart-swatch" style="--series-color:{{ series_color(series.id) }}" aria-hidden="true"></span>{{ series.label }}</li>
+          {% endfor %}
+          {% if chart.series|length > 4 %}<li>+{{ chart.series|length - 4 }} more</li>{% endif %}
+          <li class="monthly-chart-total-key">Net spending</li>
+        </ul>
+      </div>
+    {% elif result and result.error %}
+      <p class="empty-inline insight-preview">{{ result.error }}</p>
+    {% elif metrics %}
+      <dl class="insight-preview-metrics insight-preview" data-private-content="Amounts hidden">
+        {% for item in metrics[:3] %}<div><dt>{{ item.title }}</dt><dd>{{ item.value }}</dd></div>{% endfor %}
+      </dl>
+    {% else %}
+      <p class="empty-inline insight-preview">{{ 'No spending in the selected months.' if chart else 'No results for this period.' }}</p>
+    {% endif %}
+  {% endcall %}
+{%- endmacro %}
+
+{% set lead = namespace(plugin=none, result=none, insight=none) %}
+{% for result in plugin_insights %}
+  {% set chart_entry = result.insights|selectattr('chart')|selectattr('chart.series')|first|default(none) %}
+  {% if not lead.plugin and chart_entry %}
+    {% set lead.plugin = plugins|selectattr('has_insights')|selectattr('id', 'equalto', result.plugin_id)|first|default(none) %}
+    {% set lead.result = result %}
+    {% set lead.insight = chart_entry %}
+  {% endif %}
+{% endfor %}
+
+<div class="insight-gallery" data-insight-gallery>
+  {% if lead.plugin %}{{ plugin_preview(lead.plugin, lead.result, lead.insight, featured=true) }}{% endif %}
+  {% call tile('overview', builtins.overview, month_label(month)) %}
+    <dl class="insight-preview-metrics insight-preview">
+      <div><dt>Spent</dt><dd><span data-private-amount>{{ money(data.summary.spent) }}</span></dd></div>
+      <div><dt>Income</dt><dd><span data-private-amount>{{ money(data.summary.income) }}</span></dd></div>
+      <div><dt>Posted purchases</dt><dd>{{ purchases }}</dd></div>
+    </dl>
+  {% endcall %}
+  {% call tile('categories', builtins.categories, month_label(month)) %}
+    {% if spending or uncategorized %}
+      <ul class="insight-preview-rows insight-preview" data-private-content="Amounts hidden">
+        {% for row in spending[:3] %}{{ ranked_row(category_names[row.category.id], row.spent) }}{% endfor %}
+        {% if uncategorized and spending|length < 3 %}{{ ranked_row('Uncategorized', uncategorized) }}{% endif %}
+      </ul>
+    {% else %}
+      <p class="empty-inline insight-preview">No category spending for this period.</p>
+    {% endif %}
+  {% endcall %}
+  {% call tile('payees', builtins.payees, month_label(month)) %}
+    {% if payees %}
+      <ul class="insight-preview-rows insight-preview" data-private-content="Amounts hidden">
+        {% for name, amount in payees[:3] %}{{ ranked_row(name, amount) }}{% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty-inline insight-preview">No payees for this period.</p>
+    {% endif %}
+  {% endcall %}
+  {% for plugin in plugins if plugin.has_insights and (not lead.plugin or plugin.id != lead.plugin.id) %}
+    {% set result = plugin_insights|selectattr('plugin_id', 'equalto', plugin.id)|first|default(none) %}
+    {% set preview = result.insights|selectattr('chart')|first|default(none) if result else none %}
+    {{ plugin_preview(plugin, result, preview) }}
+  {% endfor %}
+</div>
+
+{% set exports = plugins|selectattr('has_export')|rejectattr('has_insights')|list %}
+{% if exports %}
+  <section class="plugin-section" aria-label="Exports">
+    {% for plugin in exports %}{% include 'insights-export.html' %}{% endfor %}
+  </section>
+{% endif %}

@@ -93,12 +93,17 @@ def test_range_and_group_filters_preserve_useful_fallbacks(store, tmp_path, clie
     legacy = Plugin("fictional-text", "Fictional text", insights=lambda _: (Insight("Fictional metric", "Expected"),))
     with client_for(store, tmp_path, visual, legacy) as client:
         route = "/budgets/demo/insights/2026-11/usd"
-        report = client.get(route)
-        assert report.status_code == 200
+        gallery = client.get(route)
+        assert gallery.status_code == 200 and 'data-insight-gallery' in gallery.text
+        assert gallery.text.count('data-insight-tile') == 5
+        assert 'data-insight-preview-chart' in gallery.text and 'Fictional metric' in gallery.text
+        assert 'data-monthly-insight-filters' not in gallery.text
+        report = client.get(route, params={"insight_report": "plugin:fictional-chart"})
+        assert report.status_code == 200 and 'data-insight-back' in report.text
+        assert 'name="insight_report" value="plugin:fictional-chart"' in report.text
         assert 'value="group" checked' in report.text
         assert 'Household' in report.text
-        assert 'Fictional metric' in report.text
-        assert 'Spending over time' not in report.text
+        assert 'Fictional metric' not in report.text and 'Spending over time' not in report.text
         assert report.text.count('class="monthly-chart-point"') == 6
         selection = {"insight_from": "2026-10", "insight_to": "2026-11", "insight_group": "category"}
         fragment = client.get(route, params=selection, headers={"X-WHAB-Page-Fragment": "1"})
@@ -108,7 +113,16 @@ def test_range_and_group_filters_preserve_useful_fallbacks(store, tmp_path, clie
         assert fragment.text.count('aria-controls="monthly-insight-1"') == 1
         invalid = client.get(route, params={**selection, "insight_from": "2026-12"})
         assert invalid.status_code == 200 and 'data-monthly-insight-error' in invalid.text
-        assert 'data-monthly-plot' not in invalid.text and 'Spending over time' in invalid.text
+        assert 'data-monthly-plot' not in invalid.text and 'data-insight-back' in invalid.text
+        text = client.get(route, params={"insight_report": "plugin:fictional-text"})
+        assert text.status_code == 200 and 'Fictional metric' in text.text and 'Expected' in text.text
+        assert 'data-monthly-plot' not in text.text and 'data-insight-gallery' not in text.text
+        unavailable = client.get(route, params={"insight_report": "plugin:disabled"})
+        assert unavailable.status_code == 200 and 'data-insight-back' in unavailable.text
+        assert 'data-monthly-plot' not in unavailable.text
+        ambiguous = client.get(route, params=[("insight_report", "overview"), ("insight_report", "categories")])
+        assert ambiguous.status_code == 200 and 'data-insight-back' in ambiguous.text
+        assert '"canonicalUrl": null' in ambiguous.text
 
 
 def test_scoped_picker_choices_render_and_filter_the_chart(store, tmp_path, client_for):
@@ -144,10 +158,10 @@ def test_scoped_picker_choices_render_and_filter_the_chart(store, tmp_path, clie
                     contract=PluginContract(provides=(Capability("reporting.insights", 2, "additive"),)))
     route = "/budgets/home/insights/2026-11/usd"
     with client_for(store, tmp_path, visual) as client:
-        initial = client.get(route)
+        initial = client.get(route, params={"insight_report": "plugin:fictional-chart"})
         assert initial.status_code == 200
         assert 'data-monthly-filter-max-fields="128"' in initial.text
-        assert 'Choose up to 125 options across Accounts, Category groups, and Categories.' in initial.text
+        assert 'Choose up to 124 options across Accounts, Category groups, and Categories.' in initial.text
         form = re.search(r'<form [^>]*data-monthly-insight-filters[^>]*>(.*?)</form>', initial.text, re.S)[1]
         assert re.search(rf'name="insight_account" value="{account}">\s*<span>Café &amp; cash</span>', form)
         assert f'name="insight_account" value="{foreign}"' not in form

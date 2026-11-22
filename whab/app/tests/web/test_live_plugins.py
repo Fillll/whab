@@ -544,11 +544,17 @@ def test_insights_pages_use_current_report_without_recreating_web_resources(tmp_
         path = "/budgets/home/insights/2026-10/usd"
         async with running(app) as client:
             before = await client.get(path)
-            assert before.status_code == 200 and "Fictional first live report" in before.text
+            assert before.status_code == 200 and 'data-insight-tile="plugin:first"' in before.text
+            first_detail = await client.get(path, params={"insight_report": "plugin:first"})
+            assert first_detail.status_code == 200 and "Fictional first live report" in first_detail.text
             assert await app.state.live_plugins.activate(("second",)) == 2
             after = await client.get(path)
-            assert after.status_code == 200 and "Fictional second live report" in after.text
-            assert "Fictional first live report" not in after.text
+            assert after.status_code == 200 and 'data-insight-tile="plugin:second"' in after.text
+            assert 'data-insight-tile="plugin:first"' not in after.text
+            inactive = await client.get(path, params={"insight_report": "plugin:first"})
+            assert inactive.status_code == 200 and "Fictional first live report" not in inactive.text
+            second_detail = await client.get(path, params={"insight_report": "plugin:second"})
+            assert second_detail.status_code == 200 and "Fictional second live report" in second_detail.text
             assert app.state.ui_plugin == "web"
             assert (await client.get("/static/client.js")).status_code == 200
 

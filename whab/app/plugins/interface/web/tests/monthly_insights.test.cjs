@@ -33,7 +33,8 @@ test('applying date, grouping, account and category selections navigates without
   const form = {
     action: 'https://localhost:5173/budgets/fictional/insights/current-month/eur',
     fields: [
-      ['insight_from', '2026-08'], ['insight_to', '2026-11'], ['insight_group', 'category'],
+      ['insight_report', 'plugin:monthly-spending'], ['insight_from', '2026-08'],
+      ['insight_to', '2026-11'], ['insight_group', 'category'],
       ['insight_account', 'café-wallet'], ['insight_account', 'cash'],
       ['insight_category_group', 'living'], ['insight_category_group', 'transit'],
       ['insight_category', 'category:market'], ['insight_category', 'category:metro'],
@@ -57,8 +58,9 @@ test('too many fields keep the draft and explain how to apply it', async () => {
     action: 'https://localhost:5173/budgets/fictional/insights/current-month/usd',
     dataset: {monthlyFilterMaxFields: '128'},
     fields: [
-      ['insight_from', '2026-08'], ['insight_to', '2026-11'], ['insight_group', 'category'],
-      ...Array.from({length: 126}, (_, index) => ['insight_category', `category:${index}`]),
+      ['insight_report', 'plugin:monthly-spending'], ['insight_from', '2026-08'],
+      ['insight_to', '2026-11'], ['insight_group', 'category'],
+      ...Array.from({length: 125}, (_, index) => ['insight_category', `category:${index}`]),
     ],
     addEventListener(event, submit) { this.submit = submit; },
     querySelector() { return error; },

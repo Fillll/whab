@@ -1,0 +1,29 @@
+      {% if chart_preview %}
+      <svg class="insight-preview-chart" data-insight-preview-chart viewBox="0 0 {{ plot.width }} 280" role="img" aria-label="{{ insight.title }}">
+      {% else %}
+      <svg id="{{ chart_id }}" class="monthly-chart" style="--plot-width:{{ plot.width }}px" width="{{ plot.width }}" height="280" viewBox="0 0 {{ plot.width }} 280"
+           data-monthly-plot role="img" aria-labelledby="{{ chart_id }}-title {{ chart_id }}-description">
+        <title id="{{ chart_id }}-title">{{ insight.title }} · {{ chart.currency }}</title>
+        <desc id="{{ chart_id }}-description">Each month is one column. Refunds that exceed purchases in a series extend below zero. The line traces net spending. Amounts are also available in the breakdown table.</desc>
+        {% endif %}
+        {% for tick in plot.ticks %}
+        <line class="{{ 'monthly-chart-zero' if tick.amount == 0 else 'monthly-chart-grid' }}" x1="{{ plot.left }}" x2="{{ plot.right }}" y1="{{ tick.y }}" y2="{{ tick.y }}"/>
+        <text x="{{ plot.left - 9 }}" y="{{ tick.y + 4 }}" text-anchor="end">{{ currency_money(tick.amount, chart.currency) }}</text>
+        {% endfor %}
+        {% for column in plot.columns %}
+          {% for segment in column.segments %}
+          {% set series = chart.series[segment.series] %}
+          <rect data-chart-series="{{ segment.series }}" x="{{ column.bar_x }}" y="{{ segment.y }}" width="{{ plot.bar_width }}" height="{{ segment.height }}"
+                fill="{{ series_color(series.id) }}">
+            <title>{{ month_label(column.month) }} · {{ series.label }} · {{ currency_money(segment.amount, chart.currency) }}</title>
+          </rect>
+          {% endfor %}
+          <text x="{{ column.x }}" y="268" text-anchor="middle">{{ month_label(column.month, true) }}{% if not chart_preview %} ’{{ column.month[2:4] }}{% endif %}</text>
+        {% endfor %}
+        <polyline class="monthly-chart-net" points="{% for column in plot.columns %}{{ column.x }},{{ column.net_y }} {% endfor %}"/>
+        {% for column in plot.columns %}
+        <circle class="monthly-chart-point" cx="{{ column.x }}" cy="{{ column.net_y }}" r="4.5">
+          <title>{{ month_label(column.month) }} · Net spending {{ currency_money(column.net, chart.currency) }}</title>
+        </circle>
+        {% endfor %}
+      </svg>
