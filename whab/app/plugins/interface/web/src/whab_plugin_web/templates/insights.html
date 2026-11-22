@@ -11,9 +11,13 @@
   <div class="insight-page-heading">
     <h1 id="insight-report-title">{{ title }}</h1>
     <div class="insight-page-period">
-      <span class="subtle-label">{{ month_label(month) }} · {{ currency }}</span>
-      <input type="text" pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM"
-             aria-label="Insights month" data-navigation="month" value="{{ month }}">
+      {% if selection.visual and insight_options %}
+        <span class="subtle-label">{{ currency }}</span>
+      {% else %}
+        <span class="subtle-label">{{ month_label(month) }} · {{ currency }}</span>
+        <input type="text" pattern="[0-9]{4}-[0-9]{2}" placeholder="YYYY-MM"
+               aria-label="Insights month" data-navigation="month" value="{{ month }}">
+      {% endif %}
     </div>
   </div>
   {% if selection.report == 'gallery' %}

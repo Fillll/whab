@@ -505,6 +505,7 @@ financial values and chart shapes in tile previews.
 
 With a compatible host and an enabled visual Insights plugin, select the
 **Monthly spending** tile in **Insights**. Choose inclusive **From** and **To** months.
+These dates control the chart range.
 In **Accounts**, **Category groups**, or **Categories**, search and check as many
 options as needed. The chart includes transactions matching any checked option
 within each filter and combines the three filters. **Use all** clears that
