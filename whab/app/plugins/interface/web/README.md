@@ -503,14 +503,14 @@ financial values and chart shapes in tile previews.
 
 ## Monthly spending charts
 
-With a compatible host and an enabled visual Insights plugin, open **Insights**
-to see **Monthly spending**. Choose inclusive **From** and **To** months.
+With a compatible host and an enabled visual Insights plugin, select the
+**Monthly spending** tile in **Insights**. Choose inclusive **From** and **To** months.
 In **Accounts**, **Category groups**, or **Categories**, search and check as many
 options as needed. The chart includes transactions matching any checked option
 within each filter and combines the three filters. **Use all** clears that
 filter's selections. Choose **Groups** or **Categories** under **Show by**, then
 select **Apply**. The initial range is six months, and a custom range can
-contain up to 24. Apply up to 125 choices across the three filters. The address
+contain up to 24. Apply up to 124 choices across the three filters. The address
 keeps the selection for bookmarking and Back/Forward.
 
 Each column is one month in the view's currency, including months with no
