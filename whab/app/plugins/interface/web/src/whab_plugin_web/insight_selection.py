@@ -6,6 +6,7 @@ _BUILTIN_REPORTS = {"overview", "categories", "payees"}
 _MONTHLY_FILTERS = {
     "insight_from", "insight_to", "insight_group",
     "insight_account", "insight_category_group", "insight_category",
+    "insight_account_none", "insight_category_group_none", "insight_category_none",
 }
 
 

@@ -1939,6 +1939,9 @@ strong {
   font-weight: 400;
 }
 .monthly-insight-filter-tools button { flex: none; }
+[data-monthly-filter-none] .monthly-insight-filter-tools { display: grid; gap: 5px; }
+.monthly-insight-filter-actions { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.monthly-insight-filter-actions button { min-height: 29px; }
 .monthly-insight-filter-options {
   max-block-size: min(265px, 45vh);
   overflow-y: auto;

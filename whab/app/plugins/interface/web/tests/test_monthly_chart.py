@@ -108,6 +108,25 @@ def test_monthly_contributors_are_escaped_scoped_and_omitted_from_gallery():
     serialized = re.search(r'data-monthly-contributor-trigger="([^\"]+)"', detail)[1]
     assert json.loads(unescape(serialized)) == [["Old & café", '<img src=x onerror="evil">', "-$49"]]
     assert 'data-private-content="Chart and amounts hidden"' in detail
+    assert "data-monthly-contributor-categories" not in detail
+
+    choices = [
+        {"id": "category:fixtures", "label": "House / Fixtures & repairs"},
+        {"id": "category:furniture", "label": "House / <Furniture>"},
+        {"id": "category:garden", "label": "House / Garden"},
+    ]
+    template = environment.get_template("monthly-insight.html")
+    for selection, label in (
+        ({"category_ids": ["category:furniture", "category:fixtures"]}, "House / Fixtures & repairs, House / <Furniture>"),
+        ({"category_id": "category:furniture"}, "House / <Furniture>"),
+    ):
+        filtered = template.render(**{
+            **context, "insight_options": {"group_by": "group", "categories": choices, **selection},
+        })
+        category_scope = re.search(r"<p data-monthly-contributor-categories>(.*?)</p>", filtered)[1]
+        assert unescape(category_scope) == f"Category filter · {label}"
+        assert "<Furniture>" not in category_scope
+        assert "House / Garden" not in category_scope
 
     preview = environment.get_template("monthly-insight-plot.html").render(
         **context, chart=chart, chart_preview=True, plot=stacked_monthly_plot(months, [(12000, -4900)], "USD"),
@@ -208,6 +227,11 @@ def test_scoped_picker_choices_render_and_filter_the_chart(store, tmp_path, clie
         assert 'data-monthly-filter-max-fields="128"' in initial.text
         assert 'Choose up to 124 options across Accounts, Category groups, and Categories.' in initial.text
         form = re.search(r'<form [^>]*data-monthly-insight-filters[^>]*>(.*?)</form>', initial.text, re.S)[1]
+        assert form.count("data-monthly-filter-all>") == 3
+        assert form.count("data-monthly-filter-select-all>") == 3
+        assert form.count("data-monthly-filter-deselect-all>") == 3
+        assert not re.search(r'type="checkbox"[^>]* checked', form)
+        assert '<td>$4,097</td>' in initial.text
         assert re.search(rf'name="insight_account" value="{account}">\s*<span>Café &amp; cash</span>', form)
         assert f'name="insight_account" value="{foreign}"' not in form
         assert re.search(rf'value="category:{category}">\s*<span>Food &amp; drink / Café</span>', form)
@@ -231,3 +255,10 @@ def test_scoped_picker_choices_render_and_filter_the_chart(store, tmp_path, clie
         empty = client.get(route, params={**params, "insight_category": "uncategorized"})
         assert empty.status_code == 200 and 'No spending matches these filters.' in empty.text
         assert 'name="insight_category" value="uncategorized" checked>' in empty.text
+        for name in ("insight_account", "insight_category_group", "insight_category"):
+            restored = client.get(route, params={name + "_none": "1"})
+            assert restored.status_code == 200 and 'No spending matches these filters.' in restored.text
+            assert 'data-insight-report="plugin:fictional-chart"' in restored.text
+            assert restored.text.count('data-monthly-filter-label>None selected') == 1
+            assert f'<noscript><label><input type="checkbox" name="{name}_none" value="1" checked> Match none</label></noscript>' in restored.text
+            assert not re.search(rf'type="checkbox" name="{name}"[^>]* checked', restored.text)

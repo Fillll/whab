@@ -508,11 +508,18 @@ With a compatible host and an enabled visual Insights plugin, select the
 These dates control the chart range.
 In **Accounts**, **Category groups**, or **Categories**, search and check as many
 options as needed. The chart includes transactions matching any checked option
-within each filter and combines the three filters. **Use all** clears that
-filter's selections. Choose **Groups** or **Categories** under **Show by**, then
-select **Apply**. The initial range is six months, and a custom range can
-contain up to 24. Apply up to 124 choices across the three filters. The address
-keeps the selection for bookmarking and Back/Forward.
+within each filter and combines the three filters. **Select all** and **Deselect
+all** apply to every choice in the picker, including those hidden by search.
+The picker stays open while you make changes. All options start selected, and
+clearing the entire selection in any picker shows no spending when you apply it.
+Choose **Groups** or **Categories** under **Show by**, then select **Apply**. The
+initial range is six months, and a custom range can contain up to 24. Apply up to
+124 filter choices, counting a cleared picker as one choice and a fully
+selected picker as zero. The address keeps the selections for bookmarking and
+Back/Forward. A saved link listing every category group retains its categorized
+scope. Selecting **Select all** in that picker includes uncategorized spending
+too. Older hosts with multi-select filters expose **Use all** and treat an empty
+picker as all choices.
 
 Each column is one month in the view's currency, including months with no
 spending. The colors identify series across months. Negative net amounts extend
@@ -524,7 +531,8 @@ available along with the other chart filters.
 
 Hover or focus a chart segment to see up to five contributing transactions for
 that month and series. The preview gives each transaction's account, payee, and
-signed amount. Tap or click the segment to pin the preview and tap again to
+signed amount. It also lists any applied Categories filter, including in
+Groups view. Tap or click the segment to pin the preview and tap again to
 close it. With a segment focused, use the arrow keys to explore, Enter or Space
 to pin, and Escape to close. Hiding amounts also closes the preview.
 

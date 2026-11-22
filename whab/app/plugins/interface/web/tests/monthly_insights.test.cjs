@@ -121,7 +121,7 @@ test('search preserves selections and the picker clears to All without submittin
   assert.deepEqual(options.map(option => option.hidden), [false, true]);
   assert.deepEqual(options.map(option => option.checkbox.checked), [true, true]);
   options[0].checkbox.checked = false;
-  picker.events.change();
+  picker.events.change({target: options[0].checkbox});
   assert.equal(label.textContent, '1 selected');
 
   function keystroke(key) {
@@ -141,6 +141,116 @@ test('search preserves selections and the picker clears to All without submittin
   assert.deepEqual(options.map(option => option.checkbox.checked), [false, false]);
   assert.equal(label.textContent, 'All categories');
   assert.equal(picker.open, false);
+});
+
+test('bulk picker actions include hidden rows and distinguish all, subsets and explicit none when applying', async () => {
+  const {initMonthlyInsights, initMonthlyFilter} = harness();
+  const listener = (props = {}) => ({
+    ...props, events: {}, addEventListener(type, select) { this.events[type] = select; },
+  });
+  function facet(name, allLabel, size) {
+    const options = Array.from({length: size}, (_, index) => ({
+      textContent: index ? `Choice ${index}` : 'Café',
+      input: {name, value: `choice-${index}`, checked: false}, querySelector() { return this.input; },
+    }));
+    const label = {};
+    const search = listener({value: ''});
+    const select = listener();
+    const deselect = listener();
+    const children = {
+      '[data-monthly-filter-label]': label,
+      '[data-monthly-filter-search]': search,
+      '[data-monthly-filter-select-all]': select,
+      '[data-monthly-filter-deselect-all]': deselect,
+      '[data-monthly-filter-tools]': {},
+      '[data-monthly-filter-empty]': {},
+    };
+    return listener({
+      open: true, label, search, select, deselect, options,
+      dataset: {monthlyFilter: name, monthlyFilterNone: '0', monthlyFilterAll: '', allLabel},
+      querySelector: selector => children[selector], querySelectorAll: () => options,
+      setAttribute() {},
+    });
+  }
+  const [account, group, category] = [
+    facet('insight_account', 'All accounts', 3),
+    facet('insight_category_group', 'All groups', 4),
+    facet('insight_category', 'All categories', 135),
+  ];
+  const pickers = [account, group, category];
+  const error = {hidden: true};
+  const form = {
+    action: 'https://localhost:5173/budgets/fictional/insights/current-month/usd',
+    dataset: {monthlyFilterMaxFields: '128'},
+    get fields() { return [
+      ['insight_report', 'plugin:monthly-spending'],
+      ...pickers.flatMap(picker => picker.options.filter(row => row.input.checked).map(row => [row.input.name, row.input.value])),
+    ]; },
+    addEventListener(_, submit) { this.submit = submit; },
+    querySelector: () => error,
+  };
+  const report = {querySelector: () => form, querySelectorAll: selector => selector === '[data-monthly-filter]' ? pickers : []};
+  const requests = [];
+  initMonthlyInsights({root: {querySelector: () => report}, navigate: async url => { requests.push(url); return true; }});
+  const event = {preventDefault() {}};
+  assert.equal(form.fields.length, 143);
+  await form.submit(event);
+  assert.equal(error.hidden, true);
+  assert.deepEqual([...requests[0].searchParams], [['insight_report', 'plugin:monthly-spending']]);
+
+  category.search.value = 'cafe';
+  category.search.events.input();
+  assert.equal(category.options.filter(row => !row.hidden).length, 1);
+  category.deselect.events.click();
+  assert.ok(category.options.every(row => !row.input.checked));
+  assert.equal(category.label.textContent, 'None selected');
+  assert.equal(category.open, true);
+  category.select.events.click();
+  assert.ok(category.options.every(row => row.input.checked));
+  assert.equal(category.label.textContent, 'All categories');
+  assert.equal(category.search.value, 'cafe');
+  assert.equal(category.open, true);
+  account.options[0].input.checked = false;
+  account.events.change({target: account.options[0].input});
+  assert.equal(account.label.textContent, '2 selected');
+  group.deselect.events.click();
+  await form.submit(event);
+  assert.deepEqual([...requests[1].searchParams], [
+    ['insight_report', 'plugin:monthly-spending'], ['insight_account', 'choice-1'], ['insight_account', 'choice-2'],
+    ['insight_category_group_none', '1'],
+  ]);
+
+  for (const picker of pickers) picker.deselect.events.click();
+  await form.submit(event);
+  assert.deepEqual([...requests[2].searchParams], [
+    ['insight_report', 'plugin:monthly-spending'], ['insight_account_none', '1'],
+    ['insight_category_group_none', '1'], ['insight_category_none', '1'],
+  ]);
+
+  const savedGroup = facet('insight_category_group', 'All groups', 2);
+  delete savedGroup.dataset.monthlyFilterAll;
+  savedGroup.options.forEach(row => { row.input.checked = true; });
+  const savedGroupValues = new URLSearchParams('insight_category_group=choice-0&insight_category_group=choice-1');
+  const writeSavedGroup = initMonthlyFilter(savedGroup);
+  assert.equal(savedGroup.label.textContent, '2 selected');
+  savedGroup.events.change({target: savedGroup.search});
+  writeSavedGroup(savedGroupValues);
+  assert.deepEqual(savedGroupValues.getAll('insight_category_group'), ['choice-0', 'choice-1']);
+  savedGroup.select.events.click();
+  writeSavedGroup(savedGroupValues);
+  assert.equal(savedGroupValues.size, 0);
+  assert.equal(savedGroup.label.textContent, 'All groups');
+
+  const empty = facet('insight_account', 'All accounts', 0);
+  const writeEmpty = initMonthlyFilter(empty);
+  const emptyValues = new URLSearchParams();
+  writeEmpty(emptyValues);
+  assert.equal(emptyValues.size, 0);
+  delete empty.dataset.monthlyFilterAll;
+  empty.dataset.monthlyFilterNone = '1';
+  const writeExplicitEmpty = initMonthlyFilter(empty);
+  writeExplicitEmpty(emptyValues);
+  assert.equal(emptyValues.get('insight_account_none'), '1');
 });
 
 test('emphasizing a series is local to its chart and reversible', () => {

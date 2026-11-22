@@ -144,6 +144,14 @@ function initMonthlyFilter(picker) {
   const empty = picker.querySelector('[data-monthly-filter-empty]');
   const options = [...picker.querySelectorAll('[data-monthly-filter-option]')];
   const checkboxes = options.map(option => option.querySelector('input'));
+  const initialNone = picker.dataset.monthlyFilterNone;
+  const explicitEmpty = initialNone !== undefined;
+  const name = picker.dataset.monthlyFilter;
+  const selectedCount = () => checkboxes.filter(input => input.checked).length;
+  const noneSelected = count => count === 0 && (checkboxes.length > 0 || initialNone === '1');
+  // A saved list of all group IDs still excludes uncategorized activity.
+  let keepGroupScope = explicitEmpty && name === 'insight_category_group'
+    && checkboxes.length > 0 && selectedCount() === checkboxes.length;
   const searchKey = text => text.toLocaleLowerCase().normalize('NFKD').replace(/\p{Mark}/gu, '');
   const names = options.map(option => searchKey(option.textContent));
 
@@ -154,8 +162,15 @@ function initMonthlyFilter(picker) {
     empty.textContent = query ? 'No matching options.' : 'No options available.';
   }
   function updateLabel() {
-    const count = checkboxes.filter(input => input.checked).length;
-    label.textContent = count ? `${count} selected` : picker.dataset.allLabel;
+    const count = selectedCount();
+    if (explicitEmpty && noneSelected(count)) label.textContent = 'None selected';
+    else if (!count || (explicitEmpty && !keepGroupScope && count === checkboxes.length)) label.textContent = picker.dataset.allLabel;
+    else label.textContent = `${count} selected`;
+  }
+  function selectEvery(checked) {
+    keepGroupScope = false;
+    checkboxes.forEach(input => { input.checked = checked; });
+    updateLabel();
   }
   function close() {
     picker.open = false;
@@ -172,7 +187,10 @@ function initMonthlyFilter(picker) {
     const viewport = picker.ownerDocument.documentElement.clientWidth;
     picker.toggleAttribute('data-monthly-filter-align-end', panel.getBoundingClientRect().right > viewport - 12);
   });
-  picker.addEventListener('change', updateLabel);
+  picker.addEventListener('change', event => {
+    if (checkboxes.includes(event.target)) keepGroupScope = false;
+    updateLabel();
+  });
   picker.addEventListener('focusout', event => {
     if (!picker.contains(event.relatedTarget)) picker.open = false;
   });
@@ -186,11 +204,25 @@ function initMonthlyFilter(picker) {
     }
   });
   search.addEventListener('input', filter);
-  picker.querySelector('[data-monthly-filter-clear]').addEventListener('click', () => {
-    checkboxes.forEach(input => { input.checked = false; });
-    updateLabel();
-    close();
-  });
+  if (!explicitEmpty) {
+    picker.querySelector('[data-monthly-filter-clear]').addEventListener('click', () => {
+      selectEvery(false);
+      close();
+    });
+    return;
+  }
+  picker.querySelector('[data-monthly-filter-select-all]').addEventListener('click', () => selectEvery(true));
+  picker.querySelector('[data-monthly-filter-deselect-all]').addEventListener('click', () => selectEvery(false));
+  if (picker.dataset.monthlyFilterAll !== undefined) selectEvery(true);
+  else updateLabel();
+
+  return filters => {
+    const count = selectedCount();
+    const noneName = `${name}_none`;
+    filters.delete(noneName);
+    if (noneSelected(count)) filters.set(noneName, '1');
+    else if (!keepGroupScope && count === checkboxes.length) filters.delete(name);
+  };
 }
 
 export function initMonthlyInsights({root, navigate}) {
@@ -201,10 +233,11 @@ export function initMonthlyInsights({root, navigate}) {
   if (form) {
     const maxFields = Number(form.dataset?.monthlyFilterMaxFields);
     const limitError = maxFields && form.querySelector('[data-monthly-filter-limit-error]');
-    for (const picker of report.querySelectorAll('[data-monthly-filter]')) initMonthlyFilter(picker);
+    const writeSelections = Array.from(report.querySelectorAll('[data-monthly-filter]'), initMonthlyFilter).filter(Boolean);
     form.addEventListener('submit', async event => {
       event.preventDefault();
       const filters = new URLSearchParams(new FormData(form));
+      for (const writeSelection of writeSelections) writeSelection(filters);
       if (limitError) {
         limitError.hidden = filters.size <= maxFields;
         if (!limitError.hidden) return;

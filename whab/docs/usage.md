@@ -314,8 +314,11 @@ an inclusive range of up to 24 months. Switch between **Groups** for the broad
 breakdown and **Categories** for the individual budget categories.
 Choose one or more values in **Accounts**, **Category groups**, and **Categories**,
 then select **Apply**. Transactions can match any chosen value within a filter
-and must match each filter in use. Clear a filter to include all its values.
-Your selection stays in the address when you reload or share the report link.
+and must match each filter in use. Use **Select all** or **Deselect all** in any
+dropdown to change every option, including choices hidden by the dropdown search.
+The default is all selected. Deselecting everything shows no matches after
+you select **Apply**. Your selections stay in the address when you reload or
+share the report link.
 
 Stacks show net posted spending from on-budget accounts in the selected currency.
 Refunds reduce their category's spending. Months with a net refund for a series
@@ -323,6 +326,8 @@ can show a segment below zero. Uncategorized outflows have their own series.
 Income, transfers, opening balances, pending and off-budget activity are excluded.
 Hover over a category or group segment to see its top five transactions,
 including the account, payee and amount. You can also focus a segment or tap it.
+The preview lists the applied Categories filter so you can see which categories
+are included, even when the chart is grouped.
 The preview ranks the largest contributions by magnitude and shows refunds as
 negative. When amounts are hidden, the chart and its previews are hidden too.
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.91.0 — 2026-11-21
+
+PR: [#227](https://github.com/Fillll/whab/pull/227)
+
+- Preserve explicitly empty Monthly spending filters in report links and return no matching spending.
+
 ## 2.90.0 — 2026-11-21
 
 PR: [#226](https://github.com/Fillll/whab/pull/226)
