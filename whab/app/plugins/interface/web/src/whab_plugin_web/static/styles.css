@@ -867,6 +867,30 @@ strong {
 .transaction-toolbar-actions .button {
   min-height: 39px;
 }
+.transaction-toolbar-actions .transaction-help-button {
+  width: 39px;
+  padding: 0;
+}
+.transaction-help .modal-heading { align-items: center; margin-bottom: 16px; }
+.transaction-help h3 { font-size: 13px; }
+.transaction-help :is(dl, ul) { font-size: 12px; line-height: 1.5; }
+.transaction-help dl { margin: 8px 0 16px; }
+.transaction-help dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.transaction-help dd { margin: 0; }
+.transaction-help kbd {
+  padding: 1px 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font: inherit;
+}
+.transaction-help ul { margin: 8px 0 0; padding-inline-start: 17px; }
+.transaction-help li + li { margin-top: 5px; }
 .transaction-count {
   color: var(--muted);
   font-size: 11px;
@@ -5098,7 +5122,6 @@ main:has(.budget-planner) > .demo-ribbon,
 .transactions-table .transaction-draft-row input::placeholder {color: var(--muted); opacity: 1;}
 .transaction-grid-action {display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0; color: var(--brand-red); background: transparent;}
 
-.transaction-grid-help {font-size: 10px; color: var(--muted); margin: 0 0 8px;}
 .transaction-stream-status {min-height: 1px; padding: 0 12px; font-size: 11px; color: var(--muted); background: var(--surface);}
 .transaction-stream-status[data-state='loading'], .transaction-stream-status[data-state='error'] {padding-top: 12px; padding-bottom: 12px;}
 .transaction-stream-status button {margin-left: 10px;}
