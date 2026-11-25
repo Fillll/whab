@@ -88,31 +88,6 @@
   <button class="button primary" type="button" data-add-transaction {% if selected_account and selected_account.closed|default(false) %}disabled title="Reopen this archived account before adding transactions" {% elif not active_transaction_accounts %}disabled title="{{ 'Add or reopen an account in Accounts first' if transaction_accounts else 'Add an account in Accounts first' }}" {% endif %}>{{ icon('plus', 16) }}Add transaction</button>
 </div>
 </div>
-<dialog class="modal transaction-help" id="transaction-help-dialog" aria-labelledby="transaction-help-title">
-  <header class="modal-heading">
-    <h2 id="transaction-help-title">Transactions help</h2>
-    <form method="dialog">
-      <button class="icon-button" type="submit" aria-label="Close Transactions help" autofocus>{{ icon('close', 18) }}</button>
-    </form>
-  </header>
-  <h3>Keyboard shortcuts</h3>
-  <dl>
-    <div><dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Move between rows</dd></div>
-    <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Move between fields, or move within text while editing</dd></div>
-    <div><dt><kbd>Tab</kbd> or <kbd>Shift</kbd> + <kbd>Tab</kbd></dt><dd>Move between fields</dd></div>
-    <div><dt><kbd>Enter</kbd></dt><dd>Edit a field or finish editing and move down</dd></div>
-    <div><dt><kbd>F2</kbd></dt><dd>Edit a field or keep the arrow keys inside its editor</dd></div>
-    <div><dt><kbd>Esc</kbd></dt><dd>Finish editing and return to the cell</dd></div>
-    <div><dt><kbd>Ctrl</kbd> + <kbd>Enter</kbd></dt><dd>Save a new transaction</dd></div>
-  </dl>
-  <h3>Using the table</h3>
-  <ul>
-    <li>Shift-click checkboxes to select a range.</li>
-    <li>Click a heading to cycle through ascending, descending and unsorted.</li>
-    <li>Drag a text column edge to resize it. Double-click the edge to reset it.</li>
-    <li>Click a field to edit it. Edited rows stay visible until refresh.</li>
-  </ul>
-</dialog>
 <dialog class="modal transfer-workspace" data-transfer-panel aria-labelledby="transfer-matches-title">
   <header class="modal-heading">
     <h2 id="transfer-matches-title" tabindex="-1">Transfers</h2>
