@@ -36,6 +36,14 @@ def test_transaction_fragment_matches_full_register_without_reloading_shell(clie
     register, account_payload = response.text.split('<template data-account-list>', 1)
     full = client.get(path).text
     assert register.strip() in full
+    assert register.count('data-dialog="transaction-help-dialog"') == 1
+    assert 'aria-label="Transactions help and shortcuts"' in register
+    assert "transaction-grid-help" not in register
+    assert 'id="transaction-help-dialog"' not in register
+    dialog = re.search(r'<dialog [^>]*id="transaction-help-dialog"[^>]*>(.*?)</dialog>', full, re.S)[1]
+    assert 'method="dialog"' in dialog
+    assert "<kbd>F2</kbd>" in dialog and "<kbd>Ctrl</kbd> + <kbd>Enter</kbd>" in dialog
+    assert "Shift-click checkboxes" in dialog
     assert re.sub(r'</template>\s*$', '', account_payload).strip() in full
     assert "<!DOCTYPE" not in response.text and "<script" not in response.text
     assert 'class="sidebar"' not in response.text and 'class="topbar"' not in response.text

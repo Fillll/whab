@@ -81,6 +81,8 @@
 <span id="transaction-count" class="transaction-count" role="status">{{ '{:,}'.format(register.count) }}{% if register.count != register.total %} of {{ '{:,}'.format(register.total) }}{% endif %} {{ 'transaction' if register.count == register.total == 1 else 'transactions' }}</span>
 <span class="sr-only" data-stream-loaded>{{ register.rows|length }} loaded</span>
 <div class="button-group transaction-toolbar-actions">
+  <button class="button secondary transaction-help-button" type="button" data-dialog="transaction-help-dialog"
+          aria-haspopup="dialog" aria-controls="transaction-help-dialog" aria-label="Transactions help and shortcuts">{{ icon('help', 18) }}</button>
   {% if selected_account %}<button class="button secondary" type="button" data-dialog="account-classification-dialog" data-edit-account="{{ selected_account.id }}" aria-label="Account settings for {{ selected_account.name }}" title="Account settings">{{ icon('settings', 16) }}<span>Account settings</span></button>{% endif %}
   <button class="button secondary" type="button" data-transfer-find aria-haspopup="dialog">Transfers</button>
   <button class="button primary" type="button" data-add-transaction {% if selected_account and selected_account.closed|default(false) %}disabled title="Reopen this archived account before adding transactions" {% elif not active_transaction_accounts %}disabled title="{{ 'Add or reopen an account in Accounts first' if transaction_accounts else 'Add an account in Accounts first' }}" {% endif %}>{{ icon('plus', 16) }}Add transaction</button>
@@ -112,10 +114,9 @@
 <template data-transaction-accounts>{% for choice in transaction_accounts %}<option value="{{ choice.id }}"{% if choice.closed|default(false) %} data-account-closed{% endif %}>{{ choice.name }}{% if choice.closed|default(false) %} · Closed{% endif %}</option>{% endfor %}</template>
 <template data-transaction-categories>{% for group in groups %}<optgroup label="{{ group.name }}">{% for row in group.rows %}<option value="{{ row.category.id }}" data-category-kind="{{ row.category.kind|default('expense') }}">{{ category_labels[row.category.id] }}</option>{% endfor %}</optgroup>{% endfor %}</template>
 <form id="transaction-create-form" data-transaction-create hidden></form>
-<p class="transaction-grid-help" id="transaction-grid-help">Shift-click checkboxes to select a range · Edits stay until refresh · Headings: ascending → descending → none · Drag text column edges to resize · Click a field to edit · ↑ ↓ move between rows · Tab moves between fields · F2 keeps arrows in the editor</p>
 <span class="sr-only" id="transaction-resize-help">Resize with left and right arrows, Shift for larger steps. Home or double-click resets the column. Escape cancels a drag. Widths are saved in this browser.</span>
 <div class="table-scroll transactions-scroll" role="region" aria-labelledby="transaction-title" tabindex="0">
-  <table aria-describedby="transaction-grid-help" class="transactions-table{% if show_account_column %} transactions-table-multi-account{% endif %}">
+  <table class="transactions-table{% if show_account_column %} transactions-table-multi-account{% endif %}">
     <thead><tr>
       <th class="transaction-select-cell" scope="col"><span class="sr-only">Multi-select</span><input type="checkbox" data-select-all aria-label="Select loaded transactions" title="Multi-select"></th>
       <th scope="col" class="date-cell" aria-sort="{{ 'ascending' if register.sorts['date'].direction == 'asc' else 'descending' if register.sorts['date'].direction == 'desc' else 'none' }}">{{ sort_heading('date', 'Date') }}</th>
