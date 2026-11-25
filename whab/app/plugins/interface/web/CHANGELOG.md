@@ -1,5 +1,11 @@
 # Web interface plugin changelog
 
+## 1.72.3 — 2026-11-24
+
+PR: [#230](https://github.com/Fillll/whab/pull/230)
+
+- Open Transactions table help and keyboard shortcuts from a small toolbar button.
+
 ## 1.72.2 — 2026-11-21
 
 PR: [#229](https://github.com/Fillll/whab/pull/229)
